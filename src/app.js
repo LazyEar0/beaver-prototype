@@ -588,13 +588,16 @@ function renderWsWorkflowsTab(ws) {
       </div>
       <div class="filter-actions">
         <div class="sort-dropdown"><select onchange="onWsContentSort(this.value)"><option value="editedAt" ${wsContentSortField === 'editedAt' ? 'selected' : ''}>最后编辑</option><option value="createdAt" ${wsContentSortField === 'createdAt' ? 'selected' : ''}>创建时间</option><option value="name" ${wsContentSortField === 'name' ? 'selected' : ''}>名称</option></select><button class="sort-toggle-btn" onclick="toggleWsContentSort()">${wsContentSortAsc ? icons.arrowUp : icons.arrowDown}</button></div>
+        ${isMemberOrAbove ? `<button class="btn btn-secondary btn-sm" onclick="toggleBatchMode()" style="${batchMode ? 'background:var(--md-primary);color:white' : ''}">${icons.check}<span>${batchMode ? '退出批量' : '批量操作'}</span></button>` : ''}
         ${isMemberOrAbove ? `<button class="btn btn-primary btn-sm" onclick="showCreateWfModal()">${icons.plus}<span>新建工作流</span></button>` : ''}
         ${canCreateFolder ? `<button class="btn btn-secondary btn-sm" onclick="showCreateFolderModal()">${icons.folder}<span>新建文件夹</span></button>` : ''}
       </div>
     </div>
 
+    ${batchMode && batchSelectedIds.size > 0 ? `<div class="batch-action-bar" style="display:flex;align-items:center;gap:var(--space-3);padding:var(--space-2) var(--space-4);background:var(--md-primary-container);border-radius:var(--radius-md);margin-top:var(--space-2);font-size:var(--font-size-sm)"><span style="color:var(--md-on-primary-container);font-weight:500">已选中 ${batchSelectedIds.size} 项</span><div style="margin-left:auto;display:flex;gap:var(--space-2)"><button class="btn btn-secondary btn-sm" onclick="batchMove()">${icons.move}<span>批量移动</span></button><button class="btn btn-secondary btn-sm" onclick="batchDisable()">${icons.disable}<span>批量停用</span></button><button class="btn btn-danger btn-sm" onclick="batchDelete()">${icons.trash}<span>批量删除</span></button></div></div>` : ''}
+
     ${isEmpty ? (isSearchMode ? renderEmptyState('searchNoResult') : (wsCurrentFolderId !== null ? `<div class="empty-state" style="padding:var(--space-10)"><img src="./public/images/empty-folder-content.png" class="empty-state-img" /><div class="empty-state-title">该文件夹为空</div><div class="empty-state-desc">在此文件夹中创建工作流或子文件夹</div><div style="display:flex;gap:var(--space-2);margin-top:var(--space-4)">${isMemberOrAbove ? `<button class="btn btn-primary btn-sm" onclick="showCreateWfModal()">${icons.plus}<span>新建工作流</span></button>` : ''}${canCreateFolder ? `<button class="btn btn-secondary btn-sm" onclick="showCreateFolderModal()">${icons.folder}<span>新建子文件夹</span></button>` : ''}</div></div>` : `<div class="empty-state" style="padding:var(--space-10)"><img src="./public/images/empty-folder-content.png" class="empty-state-img" /><div class="empty-state-title">暂无内容</div><div class="empty-state-desc">创建工作流或文件夹来组织您的空间</div><div style="display:flex;gap:var(--space-2);margin-top:var(--space-4)">${isMemberOrAbove ? `<button class="btn btn-primary btn-sm" onclick="showCreateWfModal()">${icons.plus}<span>新建工作流</span></button><button class="btn btn-secondary btn-sm" onclick="showCreateFolderModal()">${icons.folder}<span>新建文件夹</span></button>` : ''}</div></div>`)) : `
-    <div class="content-list-header"><span style="flex:2">名称</span><span style="flex:1">状态</span><span style="flex:1">创建者</span><span style="flex:1">最后编辑</span><span style="width:140px">操作</span></div>
+    <div class="content-list-header">${batchMode ? `<span style="display:flex;align-items:center;padding-right:var(--space-2)"><input type="checkbox" ${batchSelectedIds.size === sortedWf.length && sortedWf.length > 0 ? 'checked' : ''} onchange="toggleBatchSelectAll(${ws.id})" style="width:16px;height:16px;accent-color:var(--md-primary);cursor:pointer" /></span>` : ''}<span style="flex:2">名称</span><span style="flex:1">状态</span><span style="flex:1">创建者</span><span style="flex:1">最后编辑</span><span style="width:170px">操作</span></div>
     <div class="content-list">
       ${showFolders ? sortedFolders.map(f => {
         const subF = getSubFolderCount(ws.id, f.id), subW = getSubWfCount(ws.id, f.id);
@@ -611,12 +614,16 @@ function renderWsWorkflowsTab(ws) {
         const canDelete = isAdmin || wf.owners.includes(101);
         const canExec = wf.status === 'published';
         const ownerNames = wf.owners.map(oid => { const u = ssoUsers.find(x => x.id === oid); return u ? u.name : ''; }).filter(Boolean).join(', ');
-        return `<div class="content-list-item">
+        const isChecked = batchSelectedIds.has(wf.id);
+        return `<div class="content-list-item${isChecked ? ' batch-selected' : ''}" style="${isChecked ? 'background:var(--md-primary-container-low, rgba(103,80,164,0.05))' : ''}">
+          ${batchMode ? `<div style="display:flex;align-items:center;padding-right:var(--space-2)"><input type="checkbox" ${isChecked ? 'checked' : ''} onchange="toggleBatchSelect(${wf.id})" style="width:16px;height:16px;accent-color:var(--md-primary);cursor:pointer" /></div>` : ''}
           <div class="content-item-main" style="flex:2"><div class="content-item-icon wf-icon">${icons.workflow}</div><div><div class="content-item-name">${wf.name}${isSearchMode ? `<span style="font-size:11px;color:var(--md-outline);margin-left:8px">${getFolderPath(ws.id, wf.folderId) || '根目录'}</span>` : ''}</div><div class="content-item-desc">${icons.hash} ${wf.code}${wf.desc ? ` · ${wf.desc}` : ''}</div></div></div>
           <div style="flex:1;display:flex;align-items:center;gap:6px"><span class="status-badge ${statusClass[wf.status]}">${statusLabel[wf.status]}</span>${wf.version > 0 ? `<span class="version-badge">v${wf.version}</span>` : ''}<span class="badge badge-type" style="font-size:10px">${typeLabel[wf.type]}</span>${wf.lastRun ? `<span class="last-run"><span class="last-run-dot ${lastRunClass[wf.lastRun]}"></span>${lastRunLabel[wf.lastRun]}</span>` : ''}</div>
           <div style="flex:1;font-size:var(--font-size-sm);color:var(--md-on-surface-variant)">${wf.creator}</div>
           <div style="flex:1;font-size:var(--font-size-sm);color:var(--md-outline)">${wf.editedAt}</div>
-          <div class="content-item-actions" style="width:140px">
+          <div class="content-item-actions" style="width:170px">
+            ${isMemberOrAbove ? `<button class="table-action-btn" title="编辑流程" onclick="openDesigner(${ws.id}, ${wf.id})" style="color:var(--md-primary)">${icons.edit}</button>` : ''}
+            ${wf.status === 'draft' && isMemberOrAbove ? `<button class="table-action-btn" title="发布" onclick="showPublishWfModal(${wf.id})" style="color:#16a34a">${icons.arrowUp}</button>` : ''}
             <button class="table-action-btn ${!canExec ? 'disabled' : ''}" title="执行" onclick="${canExec ? `executeWf(${wf.id})` : ''}" ${!canExec ? 'style="opacity:0.4;cursor:not-allowed"' : ''}>${icons.play}</button>
             ${isMemberOrAbove ? `<button class="table-action-btn" title="复制" onclick="copyWf(${wf.id})">${icons.copy}</button><button class="table-action-btn" title="移动" onclick="showMoveWfModal(${wf.id})">${icons.move}</button>` : ''}
             ${wf.status === 'published' && isMemberOrAbove ? `<button class="table-action-btn" title="停用" onclick="showDisableWfModal(${wf.id})">${icons.disable}</button>` : ''}
@@ -881,6 +888,95 @@ function showRollbackModal(wfId, targetVersion) {
 function rollbackWf(wfId, targetVersion) {
   const wf = (wsWorkflows[wsCurrentId] || []).find(x => x.id === wfId); if (!wf) return;
   closeModal(); showToast('success', '回滚成功', `已基于 v${targetVersion} 创建新草稿版本`); render();
+}
+
+// --- Publish Workflow from list ---
+function showPublishWfModal(wfId) {
+  const wf = (wsWorkflows[wsCurrentId] || []).find(x => x.id === wfId); if (!wf) return;
+  const nextV = wf.version + 1;
+  showModal(`<div class="modal" style="max-width:480px"><div class="modal-header"><h2 class="modal-title">发布工作流</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
+    <div style="display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-4);padding:var(--space-3);background:var(--md-surface-container);border-radius:var(--radius-md)">
+      <div class="content-item-icon wf-icon" style="width:36px;height:36px">${icons.workflow}</div>
+      <div><div style="font-weight:500">${wf.name}</div><div style="font-size:var(--font-size-xs);color:var(--md-outline)">${icons.hash} ${wf.code}</div></div>
+      <span class="version-badge" style="margin-left:auto">v${nextV}</span>
+    </div>
+    <div class="form-group"><label class="form-label">发布说明</label><textarea class="form-textarea" id="publishNote" placeholder="选填，简要描述本次发布变更内容" maxlength="200" rows="3"></textarea></div>
+    ${!wf.debugPassed ? `<div class="delete-warning" style="margin-top:var(--space-3)"><span class="delete-warning-icon">${icons.alertTriangle}</span><div class="delete-warning-text" style="font-size:var(--font-size-sm)">建议先通过调试验证后再发布，当前流程尚未通过调试。</div></div>` : ''}
+  </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="publishWfFromList(${wfId})">确认发布</button></div></div>`);
+}
+function publishWfFromList(wfId) {
+  const wf = (wsWorkflows[wsCurrentId] || []).find(x => x.id === wfId); if (!wf) return;
+  const note = document.getElementById('publishNote')?.value?.trim() || '';
+  const now = new Date().toISOString();
+  wf.version++;
+  // Mark existing current version as history
+  if (wf.versions) wf.versions.forEach(v => { if (v.status === 'current') v.status = 'history'; });
+  if (!wf.versions) wf.versions = [];
+  wf.versions.unshift({ v: wf.version, status: 'current', publishedAt: now.slice(0, 16).replace('T', ' '), publisher: 'Sukey Wu', note });
+  wf.status = 'published';
+  wf.editedAt = now.slice(0, 16).replace('T', ' ');
+  closeModal(); showToast('success', '发布成功', `工作流「${wf.name}」v${wf.version} 已发布`); render();
+}
+
+// --- Batch Operations ---
+let batchMode = false;
+let batchSelectedIds = new Set();
+function toggleBatchMode() {
+  batchMode = !batchMode;
+  batchSelectedIds.clear();
+  render();
+}
+function toggleBatchSelect(wfId) {
+  if (batchSelectedIds.has(wfId)) batchSelectedIds.delete(wfId);
+  else batchSelectedIds.add(wfId);
+  render();
+}
+function toggleBatchSelectAll(wsId) {
+  const wfs = (wsWorkflows[wsId] || []).filter(wf => wf.folderId === wsCurrentFolderId);
+  if (batchSelectedIds.size === wfs.length) batchSelectedIds.clear();
+  else wfs.forEach(wf => batchSelectedIds.add(wf.id));
+  render();
+}
+function batchDelete() {
+  if (batchSelectedIds.size === 0) return;
+  const count = batchSelectedIds.size;
+  showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">批量删除</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
+  <div class="delete-warning"><span class="delete-warning-icon">${icons.alertTriangle}</span><div class="delete-warning-text">确定删除选中的 ${count} 个工作流吗？此操作不可恢复。</div></div>
+  </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-danger" onclick="confirmBatchDelete()">确认删除 (${count})</button></div></div>`);
+}
+function confirmBatchDelete() {
+  const ids = [...batchSelectedIds];
+  wsWorkflows[wsCurrentId] = (wsWorkflows[wsCurrentId] || []).filter(wf => !ids.includes(wf.id));
+  ids.forEach(id => { wsExecutions[wsCurrentId] = (wsExecutions[wsCurrentId] || []).filter(e => e.wfId !== id); });
+  batchSelectedIds.clear(); batchMode = false;
+  closeModal(); showToast('success', '批量删除成功', `已删除 ${ids.length} 个工作流`); render();
+}
+function batchMove() {
+  if (batchSelectedIds.size === 0) return;
+  const ws = workspaces.find(w => w.id === wsCurrentId); if (!ws) return;
+  const treeHtml = buildFolderTreeForMove(ws.id, null, [...batchSelectedIds].map(id => (wsWorkflows[wsCurrentId] || []).find(wf => wf.id === id)?.folderId).filter(Boolean));
+  showModal(`<div class="modal" style="max-width:480px"><div class="modal-header"><h2 class="modal-title">批量移动 (${batchSelectedIds.size}项)</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
+  <p style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant);margin-bottom:var(--space-3)">选择目标文件夹：</p>
+  <div class="folder-tree">
+    <div class="folder-tree-node" onclick="confirmBatchMove(null)" style="cursor:pointer"><span class="folder-tree-icon">${icons.folder}</span><span class="folder-tree-label">${ws.name}（根目录）</span></div>
+    ${treeHtml}
+  </div></div></div>`);
+}
+function confirmBatchMove(targetFolderId) {
+  const ids = [...batchSelectedIds];
+  (wsWorkflows[wsCurrentId] || []).forEach(wf => {
+    if (ids.includes(wf.id)) { wf.folderId = targetFolderId; wf.editedAt = new Date().toISOString().slice(0, 16).replace('T', ' '); }
+  });
+  batchSelectedIds.clear(); batchMode = false;
+  closeModal(); showToast('success', '批量移动成功', `已移动 ${ids.length} 个工作流`); render();
+}
+function batchDisable() {
+  if (batchSelectedIds.size === 0) return;
+  const wfs = (wsWorkflows[wsCurrentId] || []).filter(wf => batchSelectedIds.has(wf.id) && wf.status === 'published');
+  if (wfs.length === 0) { showToast('info', '提示', '选中的工作流中没有已发布状态的工作流'); return; }
+  wfs.forEach(wf => { wf.status = 'disabled'; });
+  batchSelectedIds.clear(); batchMode = false;
+  showToast('success', '批量停用成功', `已停用 ${wfs.length} 个工作流`); render();
 }
 
 // ============================================
