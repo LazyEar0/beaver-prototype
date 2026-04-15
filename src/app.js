@@ -332,8 +332,8 @@ function onFilterAuth(val) { listState.authFilter = val; listState.page = 1; ren
 function goToPage(p) { listState.page = p; render(); }
 function renderPagination(current, total) {
   let pages = '';
-  for (let i = 1; i <= total; i++) pages += `<button class="page-btn ${i === current ? 'active' : ''}" onclick="goToPage(${i})">${i}</button>`;
-  return `<div class="pagination"><button class="page-btn" ${current <= 1 ? 'disabled' : ''} onclick="goToPage(${current - 1})">${icons.chevronLeft}</button>${pages}<button class="page-btn" ${current >= total ? 'disabled' : ''} onclick="goToPage(${current + 1})">${icons.chevronRight}</button></div>`;
+  for (let i = 1; i <= total; i++) pages += `<button class="pagination-btn ${i === current ? 'active' : ''}" onclick="goToPage(${i})">${i}</button>`;
+  return `<div class="pagination"><button class="pagination-btn" ${current <= 1 ? 'disabled' : ''} onclick="goToPage(${current - 1})">${icons.chevronLeft}</button>${pages}<button class="pagination-btn" ${current >= total ? 'disabled' : ''} onclick="goToPage(${current + 1})">${icons.chevronRight}</button></div>`;
 }
 
 function renderEmptyState(type) {
@@ -375,11 +375,11 @@ function renderDataItemsTab(ds) {
 function toggleItemSort(field) { if (itemSortField === field) itemSortAsc = !itemSortAsc; else { itemSortField = field; itemSortAsc = true; } render(); }
 
 function renderAuthTab(ds) {
-  const authToggle = `<div style="display:flex;align-items:center;gap:var(--space-3);padding:var(--space-3) var(--space-4);background:var(--md-surface-container-low);border-radius:var(--radius-lg);margin-bottom:var(--space-4)">
+  const authToggle = `<div style="display:flex;align-items:center;gap:var(--space-4);margin-bottom:var(--space-5)">
     <span style="font-size:var(--font-size-sm);font-weight:500;color:var(--md-on-surface-variant);white-space:nowrap">授权方式</span>
-    <div style="display:flex;gap:var(--space-2);flex:1">
-      <button class="btn ${ds.isPublic ? 'btn-primary' : 'btn-secondary'} btn-sm" onclick="switchAuthType(${ds.id}, true)" style="flex:1">${icons.globe}<span>公开</span></button>
-      <button class="btn ${!ds.isPublic ? 'btn-primary' : 'btn-secondary'} btn-sm" onclick="switchAuthType(${ds.id}, false)" style="flex:1">${icons.lock}<span>指定空间</span></button>
+    <div class="segmented-control" style="flex:1;max-width:360px">
+      <button class="segmented-control-btn ${ds.isPublic ? 'active' : ''}" onclick="switchAuthType(${ds.id}, true)">${icons.globe}<span>公开</span></button>
+      <button class="segmented-control-btn ${!ds.isPublic ? 'active' : ''}" onclick="switchAuthType(${ds.id}, false)">${icons.lock}<span>指定空间</span></button>
     </div></div>`;
   if (ds.isPublic) return `${authToggle}<div class="empty-state" style="padding:var(--space-8) var(--space-6)"><span class="empty-state-icon">${icons.globe}</span><div class="empty-state-title">所有空间均可访问</div><div class="empty-state-desc">当前为公开数据源，无需单独授权</div></div>`;
   return `${authToggle}<div class="tab-toolbar"><div class="tab-toolbar-left"><span class="item-count">已授权 <strong>${ds.authorizedSpaces.length}</strong> 个空间</span></div><div class="tab-toolbar-right"><button class="btn btn-primary btn-sm" onclick="showAddSpaceModal(${ds.id})">${icons.plus}<span>添加授权</span></button></div></div>
@@ -389,26 +389,32 @@ function renderAuthTab(ds) {
 function switchAuthType(dsId, toPublic) {
   const ds = dataSources.find(d => d.id === dsId); if (!ds) return;
   if (ds.isPublic === toPublic) return;
-  if (toPublic && ds.authorizedSpaces.length > 0) {
+  if (toPublic) {
+    // 指定空间 → 公开
+    const hasSpaces = ds.authorizedSpaces.length > 0;
     showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">切换为公开</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
-    <div class="delete-warning"><span class="delete-warning-icon">${icons.alertTriangle}</span><div class="delete-warning-text">切换为公开后，已有的 <strong>${ds.authorizedSpaces.length}</strong> 个空间授权将被清空。</div></div>
-    <p style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant);margin-top:var(--space-2)">所有空间将可以直接访问此数据源。</p>
+    ${hasSpaces ? `<div class="delete-warning"><span class="delete-warning-icon">${icons.alertTriangle}</span><div class="delete-warning-text">切换为公开后，已有的 <strong>${ds.authorizedSpaces.length}</strong> 个空间授权将被清空且无法恢复。</div></div>` : ''}
+    <p style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant);margin-top:${hasSpaces ? 'var(--space-2)' : '0'}">切换后所有空间将可以直接访问此数据源，确定切换吗？</p>
     </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="confirmSwitchAuthType(${dsId}, true)">确认切换</button></div></div>`);
   } else {
-    ds.isPublic = toPublic; render();
-    showToast('success', '已切换', toPublic ? '数据源已设为公开' : '数据源已设为指定空间授权');
+    // 公开 → 指定空间
+    showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">切换为指定空间</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
+    <p style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant)">切换为「指定空间」后，只有被授权的空间才可以访问此数据源。</p>
+    <p style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant);margin-top:var(--space-2)">切换后需手动添加授权空间，未授权空间内引用此数据源的工作流新实例将无法启动。确定切换吗？</p>
+    </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="confirmSwitchAuthType(${dsId}, false)">确认切换</button></div></div>`);
   }
 }
 function confirmSwitchAuthType(dsId, toPublic) {
   const ds = dataSources.find(d => d.id === dsId); if (!ds) return;
-  ds.isPublic = toPublic; ds.authorizedSpaces = [];
-  closeModal(); showToast('success', '已切换', '数据源已设为公开，空间授权已清空'); render();
+  if (toPublic) { ds.authorizedSpaces = []; }
+  ds.isPublic = toPublic;
+  closeModal(); showToast('success', '已切换', toPublic ? '数据源已设为公开' : '数据源已设为指定空间授权'); render();
 }
 
 function renderSyncTab(ds) {
   return `<div class="sync-config"><h3 class="sync-config-title">API 同步配置</h3>
-  <div class="form-group" style="margin-bottom:var(--space-3)"><label class="form-label">API 地址</label><input type="text" class="form-input" id="syncUrl" value="${ds.syncConfig.url}" placeholder="https://api.example.com/data" /></div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3);margin-bottom:var(--space-4)"><div class="form-group"><label class="form-label">Key 字段映射</label><input type="text" class="form-input" id="syncKeyField" value="${ds.syncConfig.keyField}" placeholder="字段名" /></div><div class="form-group"><label class="form-label">Value 字段映射</label><input type="text" class="form-input" id="syncValueField" value="${ds.syncConfig.valueField}" placeholder="字段名" /></div></div>
+  <div class="form-group" style="margin-bottom:var(--space-3)"><label class="form-label">API 地址</label><input type="text" class="form-input" id="syncUrl" value="${ds.syncConfig.url}" placeholder="https://api.example.com/data" oninput="this.classList.remove('error');var e=this.parentElement.querySelector('.sync-field-error');if(e)e.remove()" /></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3);margin-bottom:var(--space-4)"><div class="form-group"><label class="form-label">Key 字段映射</label><input type="text" class="form-input" id="syncKeyField" value="${ds.syncConfig.keyField}" placeholder="字段名" oninput="this.classList.remove('error');var e=this.parentElement.querySelector('.sync-field-error');if(e)e.remove()" /></div><div class="form-group"><label class="form-label">Value 字段映射</label><input type="text" class="form-input" id="syncValueField" value="${ds.syncConfig.valueField}" placeholder="字段名" oninput="this.classList.remove('error');var e=this.parentElement.querySelector('.sync-field-error');if(e)e.remove()" /></div></div>
   <div style="display:flex;gap:var(--space-2)"><button class="btn btn-secondary btn-sm" onclick="saveSyncConfig(${ds.id})">保存配置</button><button class="btn btn-primary btn-sm" onclick="showSyncStrategyModal(${ds.id})">${icons.sync}<span>立即同步</span></button></div></div>
   <div style="margin-top:var(--space-6)"><h3 class="sync-config-title">同步记录</h3>
   ${ds.syncLogs.length === 0 ? renderEmptyState('syncLog') : `<div class="table-wrapper"><table class="data-table"><thead><tr><th>时间</th><th>操作人</th><th>策略</th><th>结果</th><th>详情</th></tr></thead><tbody>${ds.syncLogs.map(log => `<tr><td>${log.time}</td><td>${log.operator}</td><td>${log.strategy}</td><td><span class="sync-result ${log.result}">${log.result === 'success' ? `${icons.checkCircle} 成功` : `${icons.xCircle} 失败`}</span></td><td>${log.result === 'success' ? log.summary : `<span style="color:var(--md-error)">${log.reason}</span>`}</td></tr>`).join('')}</tbody></table></div>`}</div>`;
@@ -420,7 +426,7 @@ function closeModal() { const o = document.getElementById('modalContainer'); o.c
 
 // --- DS CRUD ---
 function showCreateDsModal() {
-  showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">新建数据源</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body"><div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">数据源名称 <span class="required">*</span></label><input type="text" class="form-input" id="dsName" placeholder="请输入数据源名称" maxlength="50" /><div class="form-error hidden" id="nameError"></div></div><div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">描述</label><textarea class="form-textarea" id="dsDesc" placeholder="请输入描述（选填）" maxlength="200"></textarea></div><div class="form-group"><label class="form-label">授权方式</label><div class="radio-group"><label class="radio-item"><input type="radio" name="dsAuth" value="public" checked /> ${icons.globe} 公开</label><label class="radio-item"><input type="radio" name="dsAuth" value="private" /> ${icons.lock} 指定空间</label></div></div></div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="createDataSource()">创建</button></div></div>`);
+  showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">新建数据源</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body"><div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">数据源名称 <span class="required">*</span></label><input type="text" class="form-input" id="dsName" placeholder="请输入数据源名称" maxlength="50" oninput="this.classList.remove('error');document.getElementById('nameError').classList.add('hidden')" /><div class="form-error hidden" id="nameError"></div></div><div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">描述</label><textarea class="form-textarea" id="dsDesc" placeholder="请输入描述（选填）" maxlength="200"></textarea></div><div class="form-group"><label class="form-label">授权方式</label><div class="radio-group"><label class="radio-item"><input type="radio" name="dsAuth" value="public" checked /> ${icons.globe} 公开</label><label class="radio-item"><input type="radio" name="dsAuth" value="private" /> ${icons.lock} 指定空间</label></div></div></div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="createDataSource()">创建</button></div></div>`);
   setTimeout(() => document.getElementById('dsName')?.focus(), 300);
 }
 function createDataSource() {
@@ -437,7 +443,7 @@ function createDataSource() {
 function showEditDsModal(id) {
   const ds = dataSources.find(d => d.id === id); if (!ds) return;
   showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">编辑数据源</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
-  <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">数据源名称 <span class="required">*</span></label><input type="text" class="form-input" id="dsName" value="${ds.name}" maxlength="50" /><div class="form-error hidden" id="nameError"></div></div>
+  <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">数据源名称 <span class="required">*</span></label><input type="text" class="form-input" id="dsName" value="${ds.name}" maxlength="50" oninput="this.classList.remove('error');document.getElementById('nameError').classList.add('hidden')" /><div class="form-error hidden" id="nameError"></div></div>
   <div class="form-group"><label class="form-label">描述</label><textarea class="form-textarea" id="dsDesc" maxlength="200">${ds.desc}</textarea></div>
   </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="updateDataSource(${id})">保存</button></div></div>`);
 }
@@ -453,13 +459,15 @@ function showDeleteDsModal(id) {
   const ds = dataSources.find(d => d.id === id); if (!ds) return;
   let refHtml = '';
   if (ds.referenced && ds.referenceCount > 0) {
-    const mockRefs = [{ wfName: '酒店搜索', wsName: '酒店预订流程' }, { wfName: '价格计算', wsName: '机票同步流程' }, { wfName: '数据格式校验', wsName: '数据清洗工作区' }, { wfName: '订单验证', wsName: '酒店预订流程' }, { wfName: '汇率转换', wsName: '机票同步流程' }, { wfName: '报表生成', wsName: '报表统计空间' }].slice(0, Math.min(ds.referenceCount, 6));
+    const wsNames = ['酒店预订流程', '机票同步流程', '数据清洗工作区', '报表统计空间', '通知推送流程'];
+    const wfPrefixes = ['搜索', '计算', '校验', '验证', '转换', '生成', '同步', '导入', '导出', '清洗', '格式化', '汇总'];
+    const mockRefs = [];
+    for (let i = 0; i < ds.referenceCount; i++) { mockRefs.push({ wfName: wfPrefixes[i % wfPrefixes.length] + '流程' + (i >= wfPrefixes.length ? (Math.floor(i / wfPrefixes.length) + 1) : ''), wsName: wsNames[i % wsNames.length] }); }
     refHtml = `<div class="delete-warning"><span class="delete-warning-icon">${icons.alertTriangle}</span><div class="delete-warning-text">该数据源被 <strong>${ds.referenceCount}</strong> 个工作流引用：</div></div>
     <div style="margin:var(--space-3) 0;border:1px solid var(--md-outline-variant);border-radius:var(--radius-md);overflow:hidden">
-      <div style="display:flex;padding:var(--space-2) var(--space-3);background:var(--md-surface-container);font-size:var(--font-size-xs);font-weight:500;color:var(--md-on-surface-variant);position:sticky;top:0"><span style="flex:1">工作流名称</span><span style="flex:1">所属空间</span></div>
-      <div style="max-height:180px;overflow-y:auto">
+      <div style="display:flex;padding:var(--space-2) var(--space-3);background:var(--md-surface-container);font-size:var(--font-size-xs);font-weight:500;color:var(--md-on-surface-variant)"><span style="flex:1">工作流名称</span><span style="flex:1">所属空间</span></div>
+      <div style="max-height:240px;overflow-y:auto">
       ${mockRefs.map(r => `<div style="display:flex;padding:var(--space-2) var(--space-3);border-top:1px solid var(--md-outline-variant);font-size:var(--font-size-sm)"><span style="flex:1;color:var(--md-primary);font-weight:500">${r.wfName}</span><span style="flex:1;color:var(--md-on-surface-variant)">${r.wsName}</span></div>`).join('')}
-      ${ds.referenceCount > mockRefs.length ? `<div style="padding:var(--space-2) var(--space-3);border-top:1px solid var(--md-outline-variant);font-size:var(--font-size-xs);color:var(--md-outline);text-align:center">还有 ${ds.referenceCount - mockRefs.length} 处引用未展示</div>` : ''}
       </div>
     </div><p style="font-size:var(--font-size-sm);color:var(--md-error);margin-top:var(--space-2)">删除后，上述工作流的新实例将无法启动。是否继续？</p>`;
   } else {
@@ -478,10 +486,10 @@ function getValueInputHtml(type, value, id) {
   const errId = vid + 'Error';
   switch (type) {
     case 'Boolean': return `<select class="form-input" id="${vid}"><option value="true" ${value === 'true' ? 'selected' : ''}>true</option><option value="false" ${value === 'false' ? 'selected' : ''}>false</option></select>`;
-    case 'Integer': return `<input type="number" step="1" class="form-input" id="${vid}" value="${value}" placeholder="请输入整数" /><div class="form-error hidden" id="${errId}"></div>`;
-    case 'Double': return `<input type="number" step="any" class="form-input" id="${vid}" value="${value}" placeholder="请输入数字" /><div class="form-error hidden" id="${errId}"></div>`;
-    case 'DateTime': return `<input type="datetime-local" class="form-input" id="${vid}" value="${value}" /><div class="form-error hidden" id="${errId}"></div>`;
-    default: return `<input type="text" class="form-input" id="${vid}" value="${value}" placeholder="请输入文本" /><div class="form-error hidden" id="${errId}"></div>`;
+    case 'Integer': return `<input type="number" step="1" class="form-input" id="${vid}" value="${value}" placeholder="请输入整数" oninput="this.classList.remove('error');document.getElementById('${errId}').classList.add('hidden')" /><div class="form-error hidden" id="${errId}"></div>`;
+    case 'Double': return `<input type="number" step="any" class="form-input" id="${vid}" value="${value}" placeholder="请输入数字" oninput="this.classList.remove('error');document.getElementById('${errId}').classList.add('hidden')" /><div class="form-error hidden" id="${errId}"></div>`;
+    case 'DateTime': return `<input type="datetime-local" class="form-input" id="${vid}" value="${value}" oninput="this.classList.remove('error');document.getElementById('${errId}').classList.add('hidden')" /><div class="form-error hidden" id="${errId}"></div>`;
+    default: return `<input type="text" class="form-input" id="${vid}" value="${value}" placeholder="请输入文本" oninput="this.classList.remove('error');document.getElementById('${errId}').classList.add('hidden')" /><div class="form-error hidden" id="${errId}"></div>`;
   }
 }
 function validateItemValue(type, value) {
@@ -498,7 +506,7 @@ const dsItemTypes = ['String', 'Integer', 'Double', 'Boolean', 'DateTime'];
 
 function showAddItemModal(dsId) {
   showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">添加数据项</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
-  <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">Key <span class="required">*</span></label><input type="text" class="form-input" id="itemKey" placeholder="英文、数字、下划线、连字符" maxlength="100" /><div class="form-error hidden" id="keyError"></div></div>
+  <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">Key <span class="required">*</span></label><input type="text" class="form-input" id="itemKey" placeholder="英文、数字、下划线、连字符" maxlength="100" oninput="this.classList.remove('error');document.getElementById('keyError').classList.add('hidden')" /><div class="form-error hidden" id="keyError"></div></div>
   <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">类型 <span class="required">*</span></label><select class="form-input" id="itemType" onchange="onAddItemTypeChange(${dsId})">${dsItemTypes.map(t => `<option value="${t}">${t}</option>`).join('')}</select></div>
   <div class="form-group" id="valueGroup"><label class="form-label">Value <span class="required">*</span></label>${getValueInputHtml('String', '', 'itemValue')}</div>
   </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="addItem(${dsId})">添加</button></div></div>`);
@@ -573,12 +581,12 @@ function showAddSpaceModal(dsId) {
   if (available.length === 0) { showToast('info', '提示', '所有空间均已授权'); return; }
   showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">添加授权空间</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
   <div style="margin-bottom:var(--space-3)"><div class="filter-search" style="width:100%">${icons.search}<input type="text" id="spaceSearchInput" placeholder="搜索空间名称..." oninput="filterSpaceList(${dsId})" /></div></div>
-  <div class="auth-space-list" id="spaceListContainer">${available.map(space => `<div class="auth-space-item" style="cursor:pointer" data-space-name="${space}" onclick="addSpace(${dsId}, '${space}')"><div class="auth-space-info"><div class="auth-space-icon ${spaceColors[allSpaces.indexOf(space) % spaceColors.length]}">${space.charAt(0)}</div><div><div class="auth-space-name">${space}</div></div></div>${icons.plus}</div>`).join('')}</div>
+  <div style="max-height:320px;overflow-y:auto"><div class="auth-space-list" id="spaceListContainer">${available.map(space => `<div class="clickable-list-item" data-space-name="${space}" onclick="addSpace(${dsId}, '${space}')"><div class="auth-space-info"><div class="auth-space-icon ${spaceColors[allSpaces.indexOf(space) % spaceColors.length]}">${space.charAt(0)}</div><div><div class="auth-space-name">${space}</div></div></div>${icons.plus}</div>`).join('')}</div></div>
   </div></div>`);
 }
 function filterSpaceList(dsId) {
   const keyword = document.getElementById('spaceSearchInput').value.trim().toLowerCase();
-  const items = document.querySelectorAll('#spaceListContainer .auth-space-item');
+  const items = document.querySelectorAll('#spaceListContainer .clickable-list-item');
   items.forEach(item => {
     const name = item.getAttribute('data-space-name').toLowerCase();
     item.style.display = name.includes(keyword) ? '' : 'none';
@@ -627,6 +635,7 @@ function showSyncStrategyModal(dsId) {
   const ds = dataSources.find(d => d.id === dsId); if (!ds) return;
   const validationError = validateSyncFields();
   if (validationError) { showToast('warning', '提示', validationError); return; }
+  selectedSyncStrategy = null;
   showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">选择同步策略</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
   <p style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant);margin-bottom:var(--space-3)">请选择数据同步策略后执行</p>
   <div style="display:flex;flex-direction:column;gap:var(--space-3)">
@@ -850,7 +859,7 @@ function navigateToWsFolderByIndex(idx) { wsFolderPath = wsFolderPath.slice(0, i
 
 // --- Folder CRUD ---
 function showCreateFolderModal() {
-  showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">新建文件夹</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body"><div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">文件夹名称 <span class="required">*</span></label><input type="text" class="form-input" id="folderName" placeholder="请输入文件夹名称" maxlength="50" /><div class="form-error hidden" id="folderNameError"></div></div><div class="form-group"><label class="form-label">描述</label><textarea class="form-textarea" id="folderDesc" placeholder="选填" maxlength="500"></textarea></div></div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="createFolder()">创建</button></div></div>`);
+  showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">新建文件夹</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body"><div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">文件夹名称 <span class="required">*</span></label><input type="text" class="form-input" id="folderName" placeholder="请输入文件夹名称" maxlength="50" oninput="this.classList.remove('error');document.getElementById('folderNameError').classList.add('hidden')" /><div class="form-error hidden" id="folderNameError"></div></div><div class="form-group"><label class="form-label">描述</label><textarea class="form-textarea" id="folderDesc" placeholder="选填" maxlength="500"></textarea></div></div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="createFolder()">创建</button></div></div>`);
   setTimeout(() => document.getElementById('folderName')?.focus(), 300);
 }
 function createFolder() {
@@ -866,7 +875,7 @@ function createFolder() {
 }
 function showEditFolderModal(folderId) {
   const f = (wsFolders[wsCurrentId] || []).find(x => x.id === folderId); if (!f) return;
-  showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">编辑文件夹</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body"><div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">文件夹名称 <span class="required">*</span></label><input type="text" class="form-input" id="folderName" value="${f.name}" maxlength="50" /><div class="form-error hidden" id="folderNameError"></div></div><div class="form-group"><label class="form-label">描述</label><textarea class="form-textarea" id="folderDesc" maxlength="500">${f.desc || ''}</textarea></div></div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="updateFolder(${folderId})">保存</button></div></div>`);
+  showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">编辑文件夹</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body"><div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">文件夹名称 <span class="required">*</span></label><input type="text" class="form-input" id="folderName" value="${f.name}" maxlength="50" oninput="this.classList.remove('error');document.getElementById('folderNameError').classList.add('hidden')" /><div class="form-error hidden" id="folderNameError"></div></div><div class="form-group"><label class="form-label">描述</label><textarea class="form-textarea" id="folderDesc" maxlength="500">${f.desc || ''}</textarea></div></div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="updateFolder(${folderId})">保存</button></div></div>`);
 }
 function updateFolder(folderId) {
   const f = (wsFolders[wsCurrentId] || []).find(x => x.id === folderId); if (!f) return;
@@ -975,8 +984,8 @@ function moveFolder(folderId, targetParentId) {
 function showCreateWfModal() {
   const ws = workspaces.find(w => w.id === wsCurrentId);
   showModal(`<div class="modal" style="max-width:560px"><div class="modal-header"><h2 class="modal-title">新建工作流</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
-  <div class="form-row"><div class="form-group" style="flex:1"><label class="form-label">工作流名称 <span class="required">*</span></label><input type="text" class="form-input" id="wfName" placeholder="请输入工作流名称" maxlength="50" /><div class="form-error hidden" id="wfNameError"></div></div></div>
-  <div class="form-row"><div class="form-group" style="flex:1"><label class="form-label">工作流编号 <span class="required">*</span></label><input type="text" class="form-input" id="wfCode" placeholder="英文、数字、下划线、连字符" maxlength="30" /><div class="form-error hidden" id="wfCodeError"></div></div></div>
+  <div class="form-row"><div class="form-group" style="flex:1"><label class="form-label">工作流名称 <span class="required">*</span></label><input type="text" class="form-input" id="wfName" placeholder="请输入工作流名称" maxlength="50" oninput="this.classList.remove('error');document.getElementById('wfNameError').classList.add('hidden')" /><div class="form-error hidden" id="wfNameError"></div></div></div>
+  <div class="form-row"><div class="form-group" style="flex:1"><label class="form-label">工作流编号 <span class="required">*</span></label><input type="text" class="form-input" id="wfCode" placeholder="英文、数字、下划线、连字符" maxlength="30" oninput="this.classList.remove('error');document.getElementById('wfCodeError').classList.add('hidden')" /><div class="form-error hidden" id="wfCodeError"></div></div></div>
   <div class="form-row"><div class="form-group" style="flex:1"><label class="form-label">描述</label><textarea class="form-textarea" id="wfDesc" placeholder="选填" maxlength="500"></textarea></div></div>
   <div class="form-row" style="gap:var(--space-4)">
     <div class="form-group" style="flex:1"><label class="form-label">工作流类型 <span class="required">*</span></label><select class="form-input" id="wfType"><option value="app">应用流</option><option value="chat">对话流</option></select></div>
@@ -1159,7 +1168,8 @@ function confirmBatchDelete() {
 function batchMove() {
   if (batchSelectedIds.size === 0) return;
   const ws = workspaces.find(w => w.id === wsCurrentId); if (!ws) return;
-  const treeHtml = buildFolderTreeForMove(ws.id, null, [...batchSelectedIds].map(id => (wsWorkflows[wsCurrentId] || []).find(wf => wf.id === id)?.folderId).filter(Boolean));
+  const allFolders = wsFolders[wsCurrentId] || [];
+  const treeHtml = buildFolderTree(allFolders, null, null, null, `confirmBatchMove(__ID__)`, 0);
   showModal(`<div class="modal" style="max-width:480px"><div class="modal-header"><h2 class="modal-title">批量移动 (${batchSelectedIds.size}项)</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
   <p style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant);margin-bottom:var(--space-3)">选择目标文件夹：</p>
   <div class="folder-tree">
@@ -1267,7 +1277,7 @@ function renderExecDetail(ws) {
   const statusLabel = { running: '运行中', paused: '已暂停', completed: '已完成', failed: '失败', cancelled: '已取消' };
   const statusClass = { running: 'exec-running', paused: 'exec-paused', completed: 'exec-completed', failed: 'exec-failed', cancelled: 'exec-cancelled' };
   const triggerLabel = { manual: '手动', scheduled: '定时', event: '事件触发', subflow: '子流程调用' };
-  const nodeStatusClass = { success: 'node-success', failed: 'node-failed', running: 'node-running', skipped: 'node-skipped', paused: 'node-running' };
+  const nodeStatusClass = { success: 'success', failed: 'failed', running: 'running', skipped: 'skipped', paused: 'running' };
 
   return `
     <div class="detail-back" onclick="wsExecDetailId = null; render()" style="margin-bottom:var(--space-4)">${icons.arrowLeft}<span>返回执行记录列表</span></div>
@@ -1400,9 +1410,9 @@ function switchMemberTab(tab) { wsMemberTab = tab; render(); }
 // --- Workspace CRUD ---
 function showCreateWsModal() {
   showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">创建空间</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
-  <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">空间名称 <span class="required">*</span></label><input type="text" class="form-input" id="wsName" placeholder="请输入空间名称" maxlength="50" /><div class="form-error hidden" id="wsNameError"></div></div>
+  <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">空间名称 <span class="required">*</span></label><input type="text" class="form-input" id="wsName" placeholder="请输入空间名称" maxlength="50" oninput="this.classList.remove('error');document.getElementById('wsNameError').classList.add('hidden')" /><div class="form-error hidden" id="wsNameError"></div></div>
   <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">空间描述</label><textarea class="form-textarea" id="wsDesc" placeholder="选填" maxlength="200"></textarea></div>
-  <div class="form-group"><label class="form-label">空间编号 <span class="required">*</span></label><input type="text" class="form-input" id="wsCode" placeholder="英文、数字、下划线、连字符" maxlength="30" /><div class="form-error hidden" id="wsCodeError"></div></div>
+  <div class="form-group"><label class="form-label">空间编号 <span class="required">*</span></label><input type="text" class="form-input" id="wsCode" placeholder="英文、数字、下划线、连字符" maxlength="30" oninput="this.classList.remove('error');document.getElementById('wsCodeError').classList.add('hidden')" /><div class="form-error hidden" id="wsCodeError"></div></div>
   </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="createWorkspace()">创建</button></div></div>`);
   setTimeout(() => document.getElementById('wsName')?.focus(), 300);
 }
@@ -1426,7 +1436,7 @@ function createWorkspace() {
 function showEditWsModal(id) {
   const ws = workspaces.find(w => w.id === id); if (!ws) return;
   showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">编辑空间</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
-  <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">空间名称 <span class="required">*</span></label><input type="text" class="form-input" id="wsName" value="${ws.name}" maxlength="50" /><div class="form-error hidden" id="wsNameError"></div></div>
+  <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">空间名称 <span class="required">*</span></label><input type="text" class="form-input" id="wsName" value="${ws.name}" maxlength="50" oninput="this.classList.remove('error');document.getElementById('wsNameError').classList.add('hidden')" /><div class="form-error hidden" id="wsNameError"></div></div>
   <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">空间描述</label><textarea class="form-textarea" id="wsDesc" maxlength="200">${ws.desc}</textarea></div>
   <div class="form-group"><label class="form-label">空间编号 <span style="font-size:var(--font-size-xs);color:var(--md-outline);font-weight:400">创建后不可修改</span></label><input type="text" class="form-input" id="wsCode" value="${ws.code}" disabled style="background:var(--md-surface);color:var(--md-outline);cursor:not-allowed" /></div>
   </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="updateWorkspace(${id})">保存</button></div></div>`);
@@ -1475,7 +1485,7 @@ function showAddMemberModal() {
   const targetRole = wsMemberTab;
   showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">添加${roleLabels[targetRole]}</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
   <div class="people-picker-search">${icons.search}<input type="text" placeholder="搜索用户名..." oninput="filterPeoplePicker(this.value)" /></div>
-  <div class="people-picker-list" id="peoplePickerList">${available.length === 0 ? '<div style="text-align:center;color:var(--md-outline);padding:var(--space-8)">暂无可添加的用户</div>' :
+  <div class="people-picker-list" id="peoplePickerList" style="max-height:320px;overflow-y:auto">${available.length === 0 ? '<div style="text-align:center;color:var(--md-outline);padding:var(--space-8)">暂无可添加的用户</div>' :
     available.map(u => `<div class="people-picker-item" data-name="${u.name}" onclick="addMember(${ws.id}, ${u.id}, '${targetRole}')"><div class="member-avatar avatar-${targetRole}">${u.avatar}</div><div class="people-picker-item-info"><div class="people-picker-item-name">${u.name}</div><div class="people-picker-item-dept">${u.dept}</div></div><div class="people-picker-item-add">${icons.plus}</div></div>`).join('')}
   </div></div></div>`);
 }
@@ -1513,7 +1523,7 @@ function showTransferAdminModal(wsId) {
   showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">转让管理员</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
   <div class="transfer-info"><span class="transfer-info-icon">${icons.info}</span><div class="transfer-info-text">转让后，目标用户将成为管理员，您的角色将变更为成员。</div></div>
   <div class="people-picker-search">${icons.search}<input type="text" placeholder="搜索用户名..." oninput="filterTransferPicker(this.value)" /></div>
-  <div class="people-picker-list" id="transferPickerList">${ssoUsers.filter(u => u.id !== 101).map(u => `<div class="people-picker-item" data-name="${u.name}" onclick="confirmTransferAdmin(${wsId}, ${u.id}, '${u.name}')"><div class="member-avatar avatar-admin">${u.avatar}</div><div class="people-picker-item-info"><div class="people-picker-item-name">${u.name}</div><div class="people-picker-item-dept">${u.dept}</div></div><div class="people-picker-item-add">${icons.transfer}</div></div>`).join('')}</div></div></div>`);
+  <div class="people-picker-list" id="transferPickerList" style="max-height:320px;overflow-y:auto">${ssoUsers.filter(u => u.id !== 101).map(u => `<div class="people-picker-item" data-name="${u.name}" onclick="confirmTransferAdmin(${wsId}, ${u.id}, '${u.name}')"><div class="member-avatar avatar-admin">${u.avatar}</div><div class="people-picker-item-info"><div class="people-picker-item-name">${u.name}</div><div class="people-picker-item-dept">${u.dept}</div></div><div class="people-picker-item-add">${icons.transfer}</div></div>`).join('')}</div></div></div>`);
 }
 function filterTransferPicker(val) { document.querySelectorAll('#transferPickerList .people-picker-item').forEach(item => { item.style.display = item.getAttribute('data-name').toLowerCase().includes(val.toLowerCase()) ? 'flex' : 'none'; }); }
 function confirmTransferAdmin(wsId, targetUserId, targetName) {
