@@ -375,10 +375,34 @@ function renderDataItemsTab(ds) {
 function toggleItemSort(field) { if (itemSortField === field) itemSortAsc = !itemSortAsc; else { itemSortField = field; itemSortAsc = true; } render(); }
 
 function renderAuthTab(ds) {
-  if (ds.isPublic) return `<div class="empty-state" style="padding:var(--space-10) var(--space-8)"><span class="empty-state-icon">${icons.globe}</span><div class="empty-state-title">公开数据源</div><div class="empty-state-desc">所有空间均可访问</div></div>`;
-  return `<div class="tab-toolbar"><div class="tab-toolbar-left"><span class="item-count">已授权 <strong>${ds.authorizedSpaces.length}</strong> 个空间</span></div><div class="tab-toolbar-right"><button class="btn btn-primary btn-sm" onclick="showAddSpaceModal(${ds.id})">${icons.plus}<span>添加授权</span></button></div></div>
-  ${ds.authorizedSpaces.length === 0 ? '<div class="empty-state" style="padding:var(--space-8)"><div class="empty-state-title">暂无授权空间</div></div>' :
+  const authToggle = `<div style="display:flex;align-items:center;gap:var(--space-3);padding:var(--space-3) var(--space-4);background:var(--md-surface-container-low);border-radius:var(--radius-lg);margin-bottom:var(--space-4)">
+    <span style="font-size:var(--font-size-sm);font-weight:500;color:var(--md-on-surface-variant);white-space:nowrap">授权方式</span>
+    <div style="display:flex;gap:var(--space-2);flex:1">
+      <button class="btn ${ds.isPublic ? 'btn-primary' : 'btn-secondary'} btn-sm" onclick="switchAuthType(${ds.id}, true)" style="flex:1">${icons.globe}<span>公开</span></button>
+      <button class="btn ${!ds.isPublic ? 'btn-primary' : 'btn-secondary'} btn-sm" onclick="switchAuthType(${ds.id}, false)" style="flex:1">${icons.lock}<span>指定空间</span></button>
+    </div></div>`;
+  if (ds.isPublic) return `${authToggle}<div class="empty-state" style="padding:var(--space-8) var(--space-6)"><span class="empty-state-icon">${icons.globe}</span><div class="empty-state-title">所有空间均可访问</div><div class="empty-state-desc">当前为公开数据源，无需单独授权</div></div>`;
+  return `${authToggle}<div class="tab-toolbar"><div class="tab-toolbar-left"><span class="item-count">已授权 <strong>${ds.authorizedSpaces.length}</strong> 个空间</span></div><div class="tab-toolbar-right"><button class="btn btn-primary btn-sm" onclick="showAddSpaceModal(${ds.id})">${icons.plus}<span>添加授权</span></button></div></div>
+  ${ds.authorizedSpaces.length === 0 ? '<div class="empty-state" style="padding:var(--space-8)"><div class="empty-state-title">暂无授权空间</div><div class="empty-state-desc">点击上方「添加授权」指定可访问此数据源的空间</div></div>' :
   `<div class="auth-space-list">${ds.authorizedSpaces.map(space => { const idx = allSpaces.indexOf(space); return `<div class="auth-space-item"><div class="auth-space-info"><div class="auth-space-icon ${spaceColors[idx % spaceColors.length]}">${space.charAt(0)}</div><div><div class="auth-space-name">${space}</div></div></div><button class="btn btn-ghost btn-sm" style="color:var(--md-error)" onclick="removeSpace(${ds.id}, '${space}')">${icons.trash}<span>移除</span></button></div>`; }).join('')}</div>`}`;
+}
+function switchAuthType(dsId, toPublic) {
+  const ds = dataSources.find(d => d.id === dsId); if (!ds) return;
+  if (ds.isPublic === toPublic) return;
+  if (toPublic && ds.authorizedSpaces.length > 0) {
+    showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">切换为公开</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
+    <div class="delete-warning"><span class="delete-warning-icon">${icons.alertTriangle}</span><div class="delete-warning-text">切换为公开后，已有的 <strong>${ds.authorizedSpaces.length}</strong> 个空间授权将被清空。</div></div>
+    <p style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant);margin-top:var(--space-2)">所有空间将可以直接访问此数据源。</p>
+    </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="confirmSwitchAuthType(${dsId}, true)">确认切换</button></div></div>`);
+  } else {
+    ds.isPublic = toPublic; render();
+    showToast('success', '已切换', toPublic ? '数据源已设为公开' : '数据源已设为指定空间授权');
+  }
+}
+function confirmSwitchAuthType(dsId, toPublic) {
+  const ds = dataSources.find(d => d.id === dsId); if (!ds) return;
+  ds.isPublic = toPublic; ds.authorizedSpaces = [];
+  closeModal(); showToast('success', '已切换', '数据源已设为公开，空间授权已清空'); render();
 }
 
 function renderSyncTab(ds) {
@@ -391,7 +415,7 @@ function renderSyncTab(ds) {
 }
 
 // --- Modal System ---
-function showModal(html) { const o = document.getElementById('modalContainer'); o.innerHTML = html; o.classList.add('visible'); o.onclick = (e) => { if (e.target === o) closeModal(); }; }
+function showModal(html, options) { const opt = options || {}; const o = document.getElementById('modalContainer'); o.innerHTML = html; o.classList.add('visible'); o.onclick = (e) => { if (e.target === o && opt.allowBackdropClose) closeModal(); }; }
 function closeModal() { const o = document.getElementById('modalContainer'); o.classList.remove('visible'); setTimeout(() => { o.innerHTML = ''; }, 200); }
 
 // --- DS CRUD ---
@@ -405,16 +429,16 @@ function createDataSource() {
   if (!name) { ni.classList.add('error'); ne.textContent = '请输入数据源名称'; ne.classList.remove('hidden'); return; }
   if (dataSources.some(d => d.name === name)) { ni.classList.add('error'); ne.textContent = '该名称已存在'; ne.classList.remove('hidden'); return; }
   dataSources.push({ id: nextId++, name, desc, createdAt: new Date().toISOString().slice(0, 10), creator: 'Sukey Wu', isPublic, referenced: false, referenceCount: 0, items: [], authorizedSpaces: [], syncConfig: { url: '', keyField: '', valueField: '' }, syncLogs: [] });
+  const newId = nextId - 1;
   listState.search = ''; listState.authFilter = 'all'; listState.refFilter = 'all';
-  closeModal(); showToast('success', '创建成功', `数据源「${name}」已创建`); render();
+  closeModal(); showToast('success', '创建成功', `数据源「${name}」已创建`);
+  currentView = 'detail'; currentDsId = newId; currentTab = 'items'; render();
 }
 function showEditDsModal(id) {
   const ds = dataSources.find(d => d.id === id); if (!ds) return;
   showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">编辑数据源</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
   <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">数据源名称 <span class="required">*</span></label><input type="text" class="form-input" id="dsName" value="${ds.name}" maxlength="50" /><div class="form-error hidden" id="nameError"></div></div>
-  <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">描述</label><textarea class="form-textarea" id="dsDesc" maxlength="200">${ds.desc}</textarea></div>
-  <div class="form-group"><label class="form-label">授权方式</label><div class="radio-group"><label class="radio-item"><input type="radio" name="dsAuth" value="public" ${ds.isPublic ? 'checked' : ''} /> ${icons.globe} 公开 <span style="font-size:var(--font-size-xs);color:var(--md-outline);margin-left:4px">所有空间均可访问</span></label><label class="radio-item"><input type="radio" name="dsAuth" value="private" ${!ds.isPublic ? 'checked' : ''} /> ${icons.lock} 指定空间 <span style="font-size:var(--font-size-xs);color:var(--md-outline);margin-left:4px">仅授权空间可访问</span></label></div>
-  ${!ds.isPublic && ds.authorizedSpaces.length > 0 ? `<div style="margin-top:var(--space-2);padding:var(--space-2) var(--space-3);background:var(--md-info-container);border-radius:var(--radius-sm);font-size:var(--font-size-xs);color:var(--md-info)">${icons.info} 切换为公开后，已有的空间授权将被清空</div>` : ''}</div>
+  <div class="form-group"><label class="form-label">描述</label><textarea class="form-textarea" id="dsDesc" maxlength="200">${ds.desc}</textarea></div>
   </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="updateDataSource(${id})">保存</button></div></div>`);
 }
 function updateDataSource(id) {
@@ -422,21 +446,21 @@ function updateDataSource(id) {
   const ni = document.getElementById('dsName'), ne = document.getElementById('nameError'); ni.classList.remove('error'); ne.classList.add('hidden');
   if (!name) { ni.classList.add('error'); ne.textContent = '请输入名称'; ne.classList.remove('hidden'); return; }
   if (dataSources.some(d => d.id !== id && d.name === name)) { ni.classList.add('error'); ne.textContent = '名称已存在'; ne.classList.remove('hidden'); return; }
-  const newIsPublic = document.querySelector('input[name="dsAuth"]:checked').value === 'public';
-  if (ds.isPublic !== newIsPublic && newIsPublic) { ds.authorizedSpaces = []; }
-  ds.name = name; ds.desc = document.getElementById('dsDesc').value.trim(); ds.isPublic = newIsPublic;
+  ds.name = name; ds.desc = document.getElementById('dsDesc').value.trim();
   closeModal(); showToast('success', '保存成功', `数据源已更新`); render();
 }
 function showDeleteDsModal(id) {
   const ds = dataSources.find(d => d.id === id); if (!ds) return;
   let refHtml = '';
   if (ds.referenced && ds.referenceCount > 0) {
-    const mockRefs = [{ wfName: '酒店搜索', wsName: '酒店预订流程' }, { wfName: '价格计算', wsName: '机票同步流程' }, { wfName: '数据格式校验', wsName: '数据清洗工作区' }].slice(0, Math.min(ds.referenceCount, 3));
-    refHtml = `<div class="delete-warning"><span class="delete-warning-icon">${icons.alertTriangle}</span><div class="delete-warning-text">该数据源被以下工作流引用：</div></div>
+    const mockRefs = [{ wfName: '酒店搜索', wsName: '酒店预订流程' }, { wfName: '价格计算', wsName: '机票同步流程' }, { wfName: '数据格式校验', wsName: '数据清洗工作区' }, { wfName: '订单验证', wsName: '酒店预订流程' }, { wfName: '汇率转换', wsName: '机票同步流程' }, { wfName: '报表生成', wsName: '报表统计空间' }].slice(0, Math.min(ds.referenceCount, 6));
+    refHtml = `<div class="delete-warning"><span class="delete-warning-icon">${icons.alertTriangle}</span><div class="delete-warning-text">该数据源被 <strong>${ds.referenceCount}</strong> 个工作流引用：</div></div>
     <div style="margin:var(--space-3) 0;border:1px solid var(--md-outline-variant);border-radius:var(--radius-md);overflow:hidden">
-      <div style="display:flex;padding:var(--space-2) var(--space-3);background:var(--md-surface-container);font-size:var(--font-size-xs);font-weight:500;color:var(--md-on-surface-variant)"><span style="flex:1">工作流名称</span><span style="flex:1">所属空间</span></div>
+      <div style="display:flex;padding:var(--space-2) var(--space-3);background:var(--md-surface-container);font-size:var(--font-size-xs);font-weight:500;color:var(--md-on-surface-variant);position:sticky;top:0"><span style="flex:1">工作流名称</span><span style="flex:1">所属空间</span></div>
+      <div style="max-height:180px;overflow-y:auto">
       ${mockRefs.map(r => `<div style="display:flex;padding:var(--space-2) var(--space-3);border-top:1px solid var(--md-outline-variant);font-size:var(--font-size-sm)"><span style="flex:1;color:var(--md-primary);font-weight:500">${r.wfName}</span><span style="flex:1;color:var(--md-on-surface-variant)">${r.wsName}</span></div>`).join('')}
-      ${ds.referenceCount > 3 ? `<div style="padding:var(--space-2) var(--space-3);border-top:1px solid var(--md-outline-variant);font-size:var(--font-size-xs);color:var(--md-outline);text-align:center">还有 ${ds.referenceCount - 3} 处引用未展示</div>` : ''}
+      ${ds.referenceCount > mockRefs.length ? `<div style="padding:var(--space-2) var(--space-3);border-top:1px solid var(--md-outline-variant);font-size:var(--font-size-xs);color:var(--md-outline);text-align:center">还有 ${ds.referenceCount - mockRefs.length} 处引用未展示</div>` : ''}
+      </div>
     </div><p style="font-size:var(--font-size-sm);color:var(--md-error);margin-top:var(--space-2)">删除后，上述工作流的新实例将无法启动。是否继续？</p>`;
   } else {
     refHtml = `<div class="delete-warning"><span class="delete-warning-icon">${icons.alertTriangle}</span><div class="delete-warning-text">确定删除数据源「${ds.name}」吗？此操作不可恢复。</div></div>`;
@@ -474,8 +498,8 @@ const dsItemTypes = ['String', 'Integer', 'Double', 'Boolean', 'DateTime'];
 
 function showAddItemModal(dsId) {
   showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">添加数据项</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
-  <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">类型 <span class="required">*</span></label><select class="form-input" id="itemType" onchange="onAddItemTypeChange(${dsId})">${dsItemTypes.map(t => `<option value="${t}">${t}</option>`).join('')}</select><div style="font-size:var(--font-size-xs);color:var(--md-outline);margin-top:4px">选择类型后，Value 输入框将自动适配</div></div>
   <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">Key <span class="required">*</span></label><input type="text" class="form-input" id="itemKey" placeholder="英文、数字、下划线、连字符" maxlength="100" /><div class="form-error hidden" id="keyError"></div></div>
+  <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">类型 <span class="required">*</span></label><select class="form-input" id="itemType" onchange="onAddItemTypeChange(${dsId})">${dsItemTypes.map(t => `<option value="${t}">${t}</option>`).join('')}</select></div>
   <div class="form-group" id="valueGroup"><label class="form-label">Value <span class="required">*</span></label>${getValueInputHtml('String', '', 'itemValue')}</div>
   </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="addItem(${dsId})">添加</button></div></div>`);
 }
