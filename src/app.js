@@ -58,7 +58,7 @@ let currentModule = 'datasource';
 //   DATA SOURCE MODULE - Mock Data & State
 // ============================================
 let dataSources = [
-  { id: 1, name: '酒店星级字典', desc: '定义酒店星级分类标准', createdAt: '2025-03-15', creator: 'Admin', isPublic: true, referenced: true, referenceCount: 3, items: [{ key: 'ONE_STAR', value: '一星级', type: 'String' }, { key: 'TWO_STAR', value: '二星级', type: 'String' }, { key: 'THREE_STAR', value: '三星级', type: 'String' }, { key: 'FOUR_STAR', value: '四星级', type: 'String' }, { key: 'FIVE_STAR', value: '五星级', type: 'String' }], authorizedSpaces: [], syncConfig: { url: '', keyField: '', valueField: '' }, syncLogs: [] },
+  { id: 1, name: '酒店星级字典', desc: '定义酒店星级分类标准', createdAt: '2025-03-15', creator: 'Admin', isPublic: true, referenced: true, referenceCount: 3, items: [{ key: 'ONE_STAR', value: '一星级', type: 'String' }, { key: 'TWO_STAR', value: '二星级', type: 'String' }, { key: 'STAR_COUNT', value: '5', type: 'Integer' }, { key: 'IS_ACTIVE', value: 'true', type: 'Boolean' }, { key: 'AVG_PRICE', value: '688.50', type: 'Double' }, { key: 'LAST_SYNC', value: '2025-04-10T14:30', type: 'DateTime' }], authorizedSpaces: [], syncConfig: { url: '', keyField: '', valueField: '' }, syncLogs: [] },
   { id: 2, name: '货币代码', desc: '国际标准货币代码对照表', createdAt: '2025-03-18', creator: 'Sukey Wu', isPublic: true, referenced: true, referenceCount: 8, items: [{ key: 'CNY', value: '人民币', type: 'String' }, { key: 'USD', value: '美元', type: 'String' }, { key: 'EUR', value: '欧元', type: 'String' }], authorizedSpaces: [], syncConfig: { url: 'https://api.example.com/currencies', keyField: 'code', valueField: 'name_cn' }, syncLogs: [{ time: '2025-04-10 14:30', operator: 'Sukey Wu', strategy: '全量覆盖', result: 'success', summary: '新增 0 条、更新 7 条、删除 0 条', reason: '' }] },
   { id: 3, name: '房型代码', desc: '酒店房型编码与中文名称映射', createdAt: '2025-03-22', creator: 'Admin', isPublic: false, referenced: true, referenceCount: 2, items: [{ key: 'SGL', value: '单人房', type: 'String' }, { key: 'DBL', value: '双人房', type: 'String' }, { key: 'TWN', value: '双床房', type: 'String' }], authorizedSpaces: ['酒店预订流程', '数据清洗工作区'], syncConfig: { url: '', keyField: '', valueField: '' }, syncLogs: [] },
   { id: 4, name: '供应商列表', desc: '酒店供应商接入方清单', createdAt: '2025-04-01', creator: 'Sukey Wu', isPublic: false, referenced: false, referenceCount: 0, items: [{ key: 'SUPPLIER_A', value: 'Expedia', type: 'String' }, { key: 'SUPPLIER_B', value: 'Booking.com', type: 'String' }], authorizedSpaces: ['酒店预订流程'], syncConfig: { url: '', keyField: '', valueField: '' }, syncLogs: [] },
@@ -339,7 +339,7 @@ function renderPagination(current, total) {
 function renderEmptyState(type) {
   const s = {
     datasource: { img: './public/images/empty-datasource.png', title: '暂无数据源', desc: '创建您的第一个数据源来管理配置数据', btn: `<button class="btn btn-primary" onclick="showCreateDsModal()">${icons.plus}<span>新建数据源</span></button>` },
-    dataItems: { img: './public/images/empty-dataitems.png', title: '暂无数据项', desc: '添加数据项来定义数据源内容', btn: '' },
+    dataItems: { img: './public/images/empty-dataitems.png', title: '暂无数据项', desc: '添加数据项来定义数据源内容', btn: `<button class="btn btn-primary" onclick="showAddItemModal(${typeof currentDsId !== 'undefined' ? currentDsId : 0})">${icons.plus}<span>添加数据项</span></button>` },
     syncLog: { img: './public/images/empty-sync-log.png', title: '暂无同步记录', desc: '执行 API 同步后将在此记录历史', btn: '' },
     workspace: { img: './public/images/empty-workspace.png', title: '暂无工作空间', desc: '创建工作空间来组织工作流', btn: `<button class="btn btn-primary" onclick="showCreateWsModal()">${icons.plus}<span>创建空间</span></button>` },
     wsSearchEmpty: { img: './public/images/empty-workspace.png', title: '未找到匹配空间', desc: '请调整搜索或筛选条件', btn: '' },
@@ -410,38 +410,219 @@ function createDataSource() {
 }
 function showEditDsModal(id) {
   const ds = dataSources.find(d => d.id === id); if (!ds) return;
-  showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">编辑数据源</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body"><div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">数据源名称 <span class="required">*</span></label><input type="text" class="form-input" id="dsName" value="${ds.name}" maxlength="50" /><div class="form-error hidden" id="nameError"></div></div><div class="form-group"><label class="form-label">描述</label><textarea class="form-textarea" id="dsDesc" maxlength="200">${ds.desc}</textarea></div></div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="updateDataSource(${id})">保存</button></div></div>`);
+  showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">编辑数据源</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
+  <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">数据源名称 <span class="required">*</span></label><input type="text" class="form-input" id="dsName" value="${ds.name}" maxlength="50" /><div class="form-error hidden" id="nameError"></div></div>
+  <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">描述</label><textarea class="form-textarea" id="dsDesc" maxlength="200">${ds.desc}</textarea></div>
+  <div class="form-group"><label class="form-label">授权方式</label><div class="radio-group"><label class="radio-item"><input type="radio" name="dsAuth" value="public" ${ds.isPublic ? 'checked' : ''} /> ${icons.globe} 公开 <span style="font-size:var(--font-size-xs);color:var(--md-outline);margin-left:4px">所有空间均可访问</span></label><label class="radio-item"><input type="radio" name="dsAuth" value="private" ${!ds.isPublic ? 'checked' : ''} /> ${icons.lock} 指定空间 <span style="font-size:var(--font-size-xs);color:var(--md-outline);margin-left:4px">仅授权空间可访问</span></label></div>
+  ${!ds.isPublic && ds.authorizedSpaces.length > 0 ? `<div style="margin-top:var(--space-2);padding:var(--space-2) var(--space-3);background:var(--md-info-container);border-radius:var(--radius-sm);font-size:var(--font-size-xs);color:var(--md-info)">${icons.info} 切换为公开后，已有的空间授权将被清空</div>` : ''}</div>
+  </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="updateDataSource(${id})">保存</button></div></div>`);
 }
 function updateDataSource(id) {
   const ds = dataSources.find(d => d.id === id), name = document.getElementById('dsName').value.trim();
   const ni = document.getElementById('dsName'), ne = document.getElementById('nameError'); ni.classList.remove('error'); ne.classList.add('hidden');
   if (!name) { ni.classList.add('error'); ne.textContent = '请输入名称'; ne.classList.remove('hidden'); return; }
   if (dataSources.some(d => d.id !== id && d.name === name)) { ni.classList.add('error'); ne.textContent = '名称已存在'; ne.classList.remove('hidden'); return; }
-  ds.name = name; ds.desc = document.getElementById('dsDesc').value.trim();
+  const newIsPublic = document.querySelector('input[name="dsAuth"]:checked').value === 'public';
+  if (ds.isPublic !== newIsPublic && newIsPublic) { ds.authorizedSpaces = []; }
+  ds.name = name; ds.desc = document.getElementById('dsDesc').value.trim(); ds.isPublic = newIsPublic;
   closeModal(); showToast('success', '保存成功', `数据源已更新`); render();
 }
 function showDeleteDsModal(id) {
   const ds = dataSources.find(d => d.id === id); if (!ds) return;
-  showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">删除数据源</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body"><div class="delete-warning"><span class="delete-warning-icon">${icons.alertTriangle}</span><div class="delete-warning-text">${ds.referenced ? `被 ${ds.referenceCount} 处引用，删除后相关节点将报错。` : '确定删除此数据源？此操作不可恢复。'}</div></div></div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-danger" onclick="deleteDataSource(${id})">删除</button></div></div>`);
+  let refHtml = '';
+  if (ds.referenced && ds.referenceCount > 0) {
+    const mockRefs = [{ wfName: '酒店搜索', wsName: '酒店预订流程' }, { wfName: '价格计算', wsName: '机票同步流程' }, { wfName: '数据格式校验', wsName: '数据清洗工作区' }].slice(0, Math.min(ds.referenceCount, 3));
+    refHtml = `<div class="delete-warning"><span class="delete-warning-icon">${icons.alertTriangle}</span><div class="delete-warning-text">该数据源被以下工作流引用：</div></div>
+    <div style="margin:var(--space-3) 0;border:1px solid var(--md-outline-variant);border-radius:var(--radius-md);overflow:hidden">
+      <div style="display:flex;padding:var(--space-2) var(--space-3);background:var(--md-surface-container);font-size:var(--font-size-xs);font-weight:500;color:var(--md-on-surface-variant)"><span style="flex:1">工作流名称</span><span style="flex:1">所属空间</span></div>
+      ${mockRefs.map(r => `<div style="display:flex;padding:var(--space-2) var(--space-3);border-top:1px solid var(--md-outline-variant);font-size:var(--font-size-sm)"><span style="flex:1;color:var(--md-primary);font-weight:500">${r.wfName}</span><span style="flex:1;color:var(--md-on-surface-variant)">${r.wsName}</span></div>`).join('')}
+      ${ds.referenceCount > 3 ? `<div style="padding:var(--space-2) var(--space-3);border-top:1px solid var(--md-outline-variant);font-size:var(--font-size-xs);color:var(--md-outline);text-align:center">还有 ${ds.referenceCount - 3} 处引用未展示</div>` : ''}
+    </div><p style="font-size:var(--font-size-sm);color:var(--md-error);margin-top:var(--space-2)">删除后，上述工作流的新实例将无法启动。是否继续？</p>`;
+  } else {
+    refHtml = `<div class="delete-warning"><span class="delete-warning-icon">${icons.alertTriangle}</span><div class="delete-warning-text">确定删除数据源「${ds.name}」吗？此操作不可恢复。</div></div>`;
+  }
+  showModal(`<div class="modal" style="max-width:520px"><div class="modal-header"><h2 class="modal-title">删除数据源</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">${refHtml}</div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-danger" onclick="deleteDataSource(${id})">确认删除</button></div></div>`);
 }
 function deleteDataSource(id) {
   const ds = dataSources.find(d => d.id === id); dataSources = dataSources.filter(d => d.id !== id);
   closeModal(); showToast('success', '删除成功', `数据源「${ds.name}」已删除`);
   if (currentView === 'detail' && currentDsId === id) { currentView = 'list'; currentDsId = null; } render();
 }
-function showAddItemModal(dsId) { showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">添加数据项</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body"><div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">Key <span class="required">*</span></label><input type="text" class="form-input" id="itemKey" placeholder="请输入 Key" /><div class="form-error hidden" id="keyError"></div></div><div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">Value <span class="required">*</span></label><input type="text" class="form-input" id="itemValue" placeholder="请输入 Value" /></div><div class="form-group"><label class="form-label">类型</label><select class="form-input" id="itemType"><option value="String">String</option><option value="Number">Number</option><option value="Boolean">Boolean</option></select></div></div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="addItem(${dsId})">添加</button></div></div>`); }
-function addItem(dsId) { const ds = dataSources.find(d => d.id === dsId), key = document.getElementById('itemKey').value.trim(), value = document.getElementById('itemValue').value.trim(), type = document.getElementById('itemType').value, ki = document.getElementById('itemKey'), ke = document.getElementById('keyError'); ki.classList.remove('error'); ke.classList.add('hidden'); if (!key) { ki.classList.add('error'); ke.textContent = '请输入 Key'; ke.classList.remove('hidden'); return; } if (ds.items.some(i => i.key === key)) { ki.classList.add('error'); ke.textContent = 'Key 已存在'; ke.classList.remove('hidden'); return; } ds.items.push({ key, value, type }); closeModal(); showToast('success', '添加成功', `数据项已添加`); render(); }
-function showEditItemModal(dsId, key) { const ds = dataSources.find(d => d.id === dsId); if (!ds) return; const item = ds.items.find(i => i.key === key); if (!item) return; showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">编辑数据项</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body"><div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">Key</label><input type="text" class="form-input" value="${item.key}" disabled style="background:var(--md-surface);color:var(--md-outline)" /></div><div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">Value</label><input type="text" class="form-input" id="itemValue" value="${item.value}" /></div><div class="form-group"><label class="form-label">类型</label><select class="form-input" id="itemType"><option value="String" ${item.type === 'String' ? 'selected' : ''}>String</option><option value="Number" ${item.type === 'Number' ? 'selected' : ''}>Number</option><option value="Boolean" ${item.type === 'Boolean' ? 'selected' : ''}>Boolean</option></select></div></div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="updateItem(${dsId}, '${key}')">保存</button></div></div>`); }
-function updateItem(dsId, key) { const ds = dataSources.find(d => d.id === dsId), item = ds.items.find(i => i.key === key); item.value = document.getElementById('itemValue').value.trim(); item.type = document.getElementById('itemType').value; closeModal(); showToast('success', '保存成功', '数据项已更新'); render(); }
-function deleteItem(dsId, key) { const ds = dataSources.find(d => d.id === dsId); ds.items = ds.items.filter(i => i.key !== key); showToast('success', '删除成功', '数据项已删除'); render(); }
+// --- Data Item Value Component Helper ---
+function getValueInputHtml(type, value, id) {
+  const vid = id || 'itemValue';
+  const errId = vid + 'Error';
+  switch (type) {
+    case 'Boolean': return `<select class="form-input" id="${vid}"><option value="true" ${value === 'true' ? 'selected' : ''}>true</option><option value="false" ${value === 'false' ? 'selected' : ''}>false</option></select>`;
+    case 'Integer': return `<input type="number" step="1" class="form-input" id="${vid}" value="${value}" placeholder="请输入整数" /><div class="form-error hidden" id="${errId}"></div>`;
+    case 'Double': return `<input type="number" step="any" class="form-input" id="${vid}" value="${value}" placeholder="请输入数字" /><div class="form-error hidden" id="${errId}"></div>`;
+    case 'DateTime': return `<input type="datetime-local" class="form-input" id="${vid}" value="${value}" /><div class="form-error hidden" id="${errId}"></div>`;
+    default: return `<input type="text" class="form-input" id="${vid}" value="${value}" placeholder="请输入文本" /><div class="form-error hidden" id="${errId}"></div>`;
+  }
+}
+function validateItemValue(type, value) {
+  if (!value && value !== 'false') return '请输入 Value';
+  switch (type) {
+    case 'Integer': if (!/^-?\d+$/.test(value)) return 'Value 必须为整数'; break;
+    case 'Double': if (isNaN(Number(value))) return 'Value 必须为数字'; break;
+    case 'Boolean': if (value !== 'true' && value !== 'false') return 'Value 必须为 true 或 false'; break;
+    case 'DateTime': if (isNaN(Date.parse(value))) return 'Value 必须为有效的日期时间'; break;
+  }
+  return '';
+}
+const dsItemTypes = ['String', 'Integer', 'Double', 'Boolean', 'DateTime'];
 
-function showAddSpaceModal(dsId) { const ds = dataSources.find(d => d.id === dsId); if (!ds) return; const available = allSpaces.filter(s => !ds.authorizedSpaces.includes(s)); if (available.length === 0) { showToast('info', '提示', '所有空间均已授权'); return; } showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">添加授权空间</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body"><div class="auth-space-list">${available.map(space => `<div class="auth-space-item" style="cursor:pointer" onclick="addSpace(${dsId}, '${space}')"><div class="auth-space-info"><div class="auth-space-icon ${spaceColors[allSpaces.indexOf(space) % spaceColors.length]}">${space.charAt(0)}</div><div><div class="auth-space-name">${space}</div></div></div>${icons.plus}</div>`).join('')}</div></div></div>`); }
+function showAddItemModal(dsId) {
+  showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">添加数据项</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
+  <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">类型 <span class="required">*</span></label><select class="form-input" id="itemType" onchange="onAddItemTypeChange(${dsId})">${dsItemTypes.map(t => `<option value="${t}">${t}</option>`).join('')}</select><div style="font-size:var(--font-size-xs);color:var(--md-outline);margin-top:4px">选择类型后，Value 输入框将自动适配</div></div>
+  <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">Key <span class="required">*</span></label><input type="text" class="form-input" id="itemKey" placeholder="英文、数字、下划线、连字符" maxlength="100" /><div class="form-error hidden" id="keyError"></div></div>
+  <div class="form-group" id="valueGroup"><label class="form-label">Value <span class="required">*</span></label>${getValueInputHtml('String', '', 'itemValue')}</div>
+  </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="addItem(${dsId})">添加</button></div></div>`);
+}
+function onAddItemTypeChange(dsId) {
+  const type = document.getElementById('itemType').value;
+  const group = document.getElementById('valueGroup');
+  group.innerHTML = `<label class="form-label">Value <span class="required">*</span></label>${getValueInputHtml(type, '', 'itemValue')}`;
+}
+function addItem(dsId) {
+  const ds = dataSources.find(d => d.id === dsId);
+  const key = document.getElementById('itemKey').value.trim();
+  const value = document.getElementById('itemValue').value.trim();
+  const type = document.getElementById('itemType').value;
+  const ki = document.getElementById('itemKey'), ke = document.getElementById('keyError');
+  ki.classList.remove('error'); ke.classList.add('hidden');
+  if (!key) { ki.classList.add('error'); ke.textContent = '请输入 Key'; ke.classList.remove('hidden'); return; }
+  if (!/^[a-zA-Z0-9_-]+$/.test(key)) { ki.classList.add('error'); ke.textContent = 'Key 仅支持英文、数字、下划线和连字符'; ke.classList.remove('hidden'); return; }
+  if (ds.items.some(i => i.key === key)) { ki.classList.add('error'); ke.textContent = '该 Key 已存在，请使用其他名称'; ke.classList.remove('hidden'); return; }
+  if (ds.items.length >= 500) { showToast('warning', '已达上限', '已达数据项上限（500条）'); return; }
+  const valErr = validateItemValue(type, value);
+  if (valErr) {
+    const ve = document.getElementById('itemValueError');
+    const vi = document.getElementById('itemValue');
+    if (vi) vi.classList.add('error');
+    if (ve) { ve.textContent = valErr; ve.classList.remove('hidden'); }
+    else { showToast('warning', '校验失败', valErr); }
+    return;
+  }
+  ds.items.push({ key, value, type }); closeModal(); showToast('success', '添加成功', `数据项已添加`); render();
+}
+function showEditItemModal(dsId, key) {
+  const ds = dataSources.find(d => d.id === dsId); if (!ds) return;
+  const item = ds.items.find(i => i.key === key); if (!item) return;
+  showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">编辑数据项</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
+  <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">Key</label><input type="text" class="form-input" value="${item.key}" disabled style="background:var(--md-surface-container);color:var(--md-outline)" /></div>
+  <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">类型</label><input type="text" class="form-input" value="${item.type}" disabled style="background:var(--md-surface-container);color:var(--md-outline)" /><div style="font-size:var(--font-size-xs);color:var(--md-outline);margin-top:4px">类型创建后不可修改</div></div>
+  <div class="form-group"><label class="form-label">Value <span class="required">*</span></label>${getValueInputHtml(item.type, item.value, 'itemValue')}</div>
+  </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="updateItem(${dsId}, '${key}')">保存</button></div></div>`);
+}
+function updateItem(dsId, key) {
+  const ds = dataSources.find(d => d.id === dsId), item = ds.items.find(i => i.key === key);
+  const value = document.getElementById('itemValue').value.trim();
+  const valErr = validateItemValue(item.type, value);
+  if (valErr) {
+    const ve = document.getElementById('itemValueError');
+    const vi = document.getElementById('itemValue');
+    if (vi) vi.classList.add('error');
+    if (ve) { ve.textContent = valErr; ve.classList.remove('hidden'); }
+    else { showToast('warning', '校验失败', valErr); }
+    return;
+  }
+  item.value = value;
+  closeModal(); showToast('success', '保存成功', '数据项已更新'); render();
+}
+function deleteItem(dsId, key) {
+  const ds = dataSources.find(d => d.id === dsId); if (!ds) return;
+  const item = ds.items.find(i => i.key === key); if (!item) return;
+  showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">删除数据项</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
+  <div class="delete-warning"><span class="delete-warning-icon">${icons.alertTriangle}</span><div class="delete-warning-text">确定删除数据项「${item.key}」吗？此操作不可恢复。</div></div>
+  <div style="margin-top:var(--space-3);padding:var(--space-3);background:var(--md-surface-container);border-radius:var(--radius-md);font-size:var(--font-size-sm)"><div style="display:flex;gap:var(--space-4)"><span style="color:var(--md-on-surface-variant)">Key:</span><code style="font-weight:500">${item.key}</code></div><div style="display:flex;gap:var(--space-4);margin-top:4px"><span style="color:var(--md-on-surface-variant)">Value:</span><span>${item.value}</span></div><div style="display:flex;gap:var(--space-4);margin-top:4px"><span style="color:var(--md-on-surface-variant)">类型:</span><span class="badge badge-type">${item.type}</span></div></div>
+  </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-danger" onclick="confirmDeleteItem(${dsId}, '${key}')">确认删除</button></div></div>`);
+}
+function confirmDeleteItem(dsId, key) {
+  const ds = dataSources.find(d => d.id === dsId); ds.items = ds.items.filter(i => i.key !== key);
+  closeModal(); showToast('success', '删除成功', '数据项已删除'); render();
+}
+
+function showAddSpaceModal(dsId) {
+  const ds = dataSources.find(d => d.id === dsId); if (!ds) return;
+  const available = allSpaces.filter(s => !ds.authorizedSpaces.includes(s));
+  if (available.length === 0) { showToast('info', '提示', '所有空间均已授权'); return; }
+  showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">添加授权空间</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
+  <div style="margin-bottom:var(--space-3)"><div class="filter-search" style="width:100%">${icons.search}<input type="text" id="spaceSearchInput" placeholder="搜索空间名称..." oninput="filterSpaceList(${dsId})" /></div></div>
+  <div class="auth-space-list" id="spaceListContainer">${available.map(space => `<div class="auth-space-item" style="cursor:pointer" data-space-name="${space}" onclick="addSpace(${dsId}, '${space}')"><div class="auth-space-info"><div class="auth-space-icon ${spaceColors[allSpaces.indexOf(space) % spaceColors.length]}">${space.charAt(0)}</div><div><div class="auth-space-name">${space}</div></div></div>${icons.plus}</div>`).join('')}</div>
+  </div></div>`);
+}
+function filterSpaceList(dsId) {
+  const keyword = document.getElementById('spaceSearchInput').value.trim().toLowerCase();
+  const items = document.querySelectorAll('#spaceListContainer .auth-space-item');
+  items.forEach(item => {
+    const name = item.getAttribute('data-space-name').toLowerCase();
+    item.style.display = name.includes(keyword) ? '' : 'none';
+  });
+}
 function addSpace(dsId, space) { const ds = dataSources.find(d => d.id === dsId); if (!ds) return; ds.authorizedSpaces.push(space); closeModal(); showToast('success', '授权成功', `已授权「${space}」`); render(); }
-function removeSpace(dsId, space) { const ds = dataSources.find(d => d.id === dsId); if (!ds) return; showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">移除授权</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body"><div class="delete-warning"><span class="delete-warning-icon">${icons.alertTriangle}</span><div class="delete-warning-text">确定要移除「${space}」的授权吗？</div></div></div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-danger" onclick="confirmRemoveSpace(${dsId}, '${space}')">确认移除</button></div></div>`); }
+function removeSpace(dsId, space) {
+  const ds = dataSources.find(d => d.id === dsId); if (!ds) return;
+  showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">移除授权</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
+  <div class="delete-warning"><span class="delete-warning-icon">${icons.alertTriangle}</span><div class="delete-warning-text">确定要移除「${space}」的授权吗？</div></div>
+  <div style="margin-top:var(--space-3);padding:var(--space-3);background:var(--md-surface-container);border-radius:var(--radius-md);font-size:var(--font-size-sm);color:var(--md-on-surface-variant);line-height:1.6">
+  <div style="font-weight:500;color:var(--md-error);margin-bottom:4px">移除后的影响：</div>
+  <ul style="margin:0;padding-left:var(--space-4)"><li>该空间内引用此数据源的工作流<strong>新实例将无法启动</strong></li><li>已运行的实例不受影响</li><li>重新授权后可恢复访问</li></ul></div>
+  </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-danger" onclick="confirmRemoveSpace(${dsId}, '${space}')">确认移除</button></div></div>`);
+}
 function confirmRemoveSpace(dsId, space) { const ds = dataSources.find(d => d.id === dsId); if (!ds) return; ds.authorizedSpaces = ds.authorizedSpaces.filter(s => s !== space); closeModal(); showToast('success', '移除成功', `已撤销授权`); render(); }
-function saveSyncConfig(dsId) { const ds = dataSources.find(d => d.id === dsId); if (!ds) return; ds.syncConfig.url = document.getElementById('syncUrl').value.trim(); ds.syncConfig.keyField = document.getElementById('syncKeyField').value.trim(); ds.syncConfig.valueField = document.getElementById('syncValueField').value.trim(); showToast('success', '保存成功', 'API 同步配置已保存'); }
-function showSyncStrategyModal(dsId) { const ds = dataSources.find(d => d.id === dsId); if (!ds) return; const url = document.getElementById('syncUrl')?.value?.trim() || ds.syncConfig.url; if (!url) { showToast('warning', '提示', '请先输入 API 地址'); return; } showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">选择同步策略</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body"><div style="display:flex;flex-direction:column;gap:var(--space-3)"><div class="auth-space-item" style="cursor:pointer;border:2px solid transparent;" onclick="executeSyncAction(this, ${dsId}, 'full')"><div class="auth-space-info"><div class="auth-space-icon bg-blue">${icons.sync}</div><div><div class="auth-space-name">全量覆盖</div><div class="auth-space-desc">清空后完整替换</div></div></div></div><div class="auth-space-item" style="cursor:pointer;border:2px solid transparent;" onclick="executeSyncAction(this, ${dsId}, 'incremental')"><div class="auth-space-info"><div class="auth-space-icon bg-green">${icons.plus}</div><div><div class="auth-space-name">增量更新</div><div class="auth-space-desc">新增和更新</div></div></div></div></div></div></div>`); }
-function executeSyncAction(el, dsId, strategy) { document.querySelectorAll('.auth-space-item').forEach(e => e.style.borderColor = 'transparent'); el.style.borderColor = 'var(--md-primary)'; setTimeout(() => executeSync(dsId, strategy), 300); }
+function saveSyncConfig(dsId) {
+  const ds = dataSources.find(d => d.id === dsId); if (!ds) return;
+  const url = document.getElementById('syncUrl').value.trim();
+  const keyField = document.getElementById('syncKeyField').value.trim();
+  const valueField = document.getElementById('syncValueField').value.trim();
+  const urlInput = document.getElementById('syncUrl');
+  // Clear previous errors
+  document.querySelectorAll('.sync-field-error').forEach(e => e.remove());
+  document.querySelectorAll('#syncUrl,#syncKeyField,#syncValueField').forEach(e => e.classList.remove('error'));
+  let hasError = false;
+  if (!url) { urlInput.classList.add('error'); urlInput.insertAdjacentHTML('afterend', '<div class="form-error sync-field-error">请输入 API 地址</div>'); hasError = true; }
+  else if (!/^https?:\/\/.+/i.test(url)) { urlInput.classList.add('error'); urlInput.insertAdjacentHTML('afterend', '<div class="form-error sync-field-error">API 地址格式不正确，需以 http:// 或 https:// 开头</div>'); hasError = true; }
+  if (!keyField) { const el = document.getElementById('syncKeyField'); el.classList.add('error'); el.insertAdjacentHTML('afterend', '<div class="form-error sync-field-error">请输入 Key 映射字段</div>'); hasError = true; }
+  if (!valueField) { const el = document.getElementById('syncValueField'); el.classList.add('error'); el.insertAdjacentHTML('afterend', '<div class="form-error sync-field-error">请输入 Value 映射字段</div>'); hasError = true; }
+  if (hasError) return;
+  ds.syncConfig.url = url; ds.syncConfig.keyField = keyField; ds.syncConfig.valueField = valueField;
+  showToast('success', '保存成功', 'API 同步配置已保存');
+}
+function validateSyncFields() {
+  const url = document.getElementById('syncUrl')?.value?.trim();
+  const keyField = document.getElementById('syncKeyField')?.value?.trim();
+  const valueField = document.getElementById('syncValueField')?.value?.trim();
+  if (!url) return '请先输入 API 地址';
+  if (!/^https?:\/\/.+/i.test(url)) return 'API 地址格式不正确，需以 http:// 或 https:// 开头';
+  if (!keyField) return '请先填写 Key 映射字段';
+  if (!valueField) return '请先填写 Value 映射字段';
+  return '';
+}
+function showSyncStrategyModal(dsId) {
+  const ds = dataSources.find(d => d.id === dsId); if (!ds) return;
+  const validationError = validateSyncFields();
+  if (validationError) { showToast('warning', '提示', validationError); return; }
+  showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">选择同步策略</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
+  <p style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant);margin-bottom:var(--space-3)">请选择数据同步策略后执行</p>
+  <div style="display:flex;flex-direction:column;gap:var(--space-3)">
+    <div class="sync-strategy-card" onclick="selectSyncStrategy(this, ${dsId}, 'full')"><div class="auth-space-info"><div class="auth-space-icon bg-blue">${icons.sync}</div><div><div class="auth-space-name">全量覆盖</div><div class="auth-space-desc">清空现有数据后完整替换为 API 返回结果</div></div></div><div class="strategy-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg></div></div>
+    <div class="sync-strategy-card" onclick="selectSyncStrategy(this, ${dsId}, 'incremental')"><div class="auth-space-info"><div class="auth-space-icon bg-green">${icons.plus}</div><div><div class="auth-space-name">增量更新</div><div class="auth-space-desc">仅新增和更新数据，不删除已有项</div></div></div><div class="strategy-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg></div></div>
+  </div></div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" id="syncExecBtn" disabled onclick="executeSyncFromModal(${dsId})">执行同步</button></div></div>`);
+}
+let selectedSyncStrategy = null;
+function selectSyncStrategy(el, dsId, strategy) {
+  selectedSyncStrategy = strategy;
+  document.querySelectorAll('.sync-strategy-card').forEach(e => e.classList.remove('selected'));
+  el.classList.add('selected');
+  const btn = document.getElementById('syncExecBtn');
+  if (btn) { btn.disabled = false; }
+}
+function executeSyncFromModal(dsId) {
+  if (!selectedSyncStrategy) return;
+  executeSync(dsId, selectedSyncStrategy);
+  selectedSyncStrategy = null;
+}
 function executeSync(dsId, strategy) { const ds = dataSources.find(d => d.id === dsId); if (!ds) return; const isSuccess = Math.random() > 0.3; const strategyText = strategy === 'full' ? '全量覆盖' : '增量更新'; const now = new Date(); const timeStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`; ds.syncLogs.unshift({ time: timeStr, operator: 'Sukey Wu', strategy: strategyText, result: isSuccess ? 'success' : 'error', summary: isSuccess ? `新增 ${Math.floor(Math.random() * 5)} 条、更新 ${Math.floor(Math.random() * 10)} 条` : '', reason: isSuccess ? '' : 'API 返回格式异常' }); closeModal(); showToast(isSuccess ? 'success' : 'error', isSuccess ? '同步成功' : '同步失败', ''); render(); }
 
 // ============================================

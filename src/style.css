@@ -1330,6 +1330,54 @@ img { display: block; max-width: 100%; }
   background: var(--color-bg-hover);
 }
 
+/* Sync strategy card styles */
+.sync-strategy-card {
+  cursor: pointer;
+  border: 2px solid var(--md-outline-variant);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-bg-page);
+  transition: var(--transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.sync-strategy-card:hover {
+  border-color: var(--md-primary);
+  background: hsl(var(--primary-hue) var(--primary-sat) 96%);
+  box-shadow: 0 0 0 1px hsl(var(--primary-hue) var(--primary-sat) 80% / 0.3);
+}
+.sync-strategy-card.selected {
+  border-color: var(--md-primary);
+  background: hsl(var(--primary-hue) var(--primary-sat) 94%);
+  box-shadow: 0 0 0 2px hsl(var(--primary-hue) var(--primary-sat) 70% / 0.25);
+}
+.sync-strategy-card .strategy-check {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid var(--md-outline-variant);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition-fast);
+  flex-shrink: 0;
+}
+.sync-strategy-card.selected .strategy-check {
+  border-color: var(--md-primary);
+  background: var(--md-primary);
+  color: var(--md-on-primary);
+}
+.sync-strategy-card .strategy-check svg {
+  width: 12px;
+  height: 12px;
+  opacity: 0;
+  transition: var(--transition-fast);
+}
+.sync-strategy-card.selected .strategy-check svg {
+  opacity: 1;
+}
+
 .auth-space-info {
   display: flex;
   align-items: center;
