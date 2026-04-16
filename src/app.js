@@ -1088,7 +1088,7 @@ function renderWsWorkflowsTab(ws) {
     </div>
 
     ${isEmpty ? (isSearchMode ? renderEmptyState('searchNoResult') : (wsCurrentFolderId !== null ? `<div class="empty-state" style="padding:var(--space-10)"><img src="./public/images/empty-folder-content.png" class="empty-state-img" /><div class="empty-state-title">该文件夹为空</div><div class="empty-state-desc">在此文件夹中创建工作流或子文件夹</div><div style="display:flex;gap:var(--space-2);margin-top:var(--space-4)">${isMemberOrAbove ? `<button class="btn btn-primary btn-sm" onclick="showCreateWfModal()">${icons.plus}<span>新建工作流</span></button>` : ''}${canCreateFolder ? `<button class="btn btn-secondary btn-sm" onclick="showCreateFolderModal()">${icons.folder}<span>新建子文件夹</span></button>` : ''}</div></div>` : `<div class="empty-state" style="padding:var(--space-10)"><img src="./public/images/empty-folder-content.png" class="empty-state-img" /><div class="empty-state-title">暂无内容</div><div class="empty-state-desc">创建工作流或文件夹来组织您的空间</div><div style="display:flex;gap:var(--space-2);margin-top:var(--space-4)">${isMemberOrAbove ? `<button class="btn btn-primary btn-sm" onclick="showCreateWfModal()">${icons.plus}<span>新建工作流</span></button><button class="btn btn-secondary btn-sm" onclick="showCreateFolderModal()">${icons.folder}<span>新建文件夹</span></button>` : ''}</div></div>`)) : `
-    <div class="content-list-header"><span class="col-header ${sortCls('name')}" style="flex:2.5" onclick="onWsContentSort('name')">名称 ${sortIcon('name')}</span><span style="flex:0.7">状态</span><span style="flex:0.6">发布版本</span><span style="flex:0.6">类型</span><span style="flex:0.8">创建者</span><span style="flex:0.8">负责人</span><span class="col-header ${sortCls('editedAt')}" style="flex:0.9" onclick="onWsContentSort('editedAt')">最后编辑 ${sortIcon('editedAt')}</span><span style="width:80px">操作</span></div>
+    <div class="content-list-header"><span class="col-header ${sortCls('name')}" style="flex:2.5" onclick="onWsContentSort('name')">名称 ${sortIcon('name')}</span><span style="flex:0.7">状态</span><span style="flex:0.6">发布版本</span><span style="flex:0.6">类型</span><span style="flex:0.8">创建者</span><span style="flex:0.8">负责人</span><span class="col-header ${sortCls('editedAt')}" style="flex:0.9" onclick="onWsContentSort('editedAt')">最后编辑 ${sortIcon('editedAt')}</span><span style="width:110px">操作</span></div>
     <div class="content-list">
       ${showFolders ? sortedFolders.map(f => {
         const subF = getSubFolderCount(ws.id, f.id), subW = getSubWfCount(ws.id, f.id);
@@ -1114,10 +1114,10 @@ function renderWsWorkflowsTab(ws) {
           <div style="flex:0.8;font-size:var(--font-size-sm);color:var(--md-on-surface-variant)">${wf.creator}</div>
           <div style="flex:0.8;font-size:var(--font-size-sm);color:var(--md-on-surface-variant)">${wfOwnerNames || '-'}</div>
           <div style="flex:0.9;font-size:var(--font-size-sm);color:var(--md-outline)">${wf.editedAt}</div>
-          <div class="content-item-actions" style="width:80px">
+          <div class="content-item-actions" style="width:110px">
             ${isMemberOrAbove ? `<button class="table-action-btn" title="编辑流程" onclick="openDesigner(${ws.id}, ${wf.id})" style="color:var(--md-primary)">${icons.edit}</button>` : `<button class="table-action-btn" title="查看流程" onclick="openDesigner(${ws.id}, ${wf.id})">${icons.eye}</button>`}
+            ${canExec ? `<button class="table-action-btn" title="执行" onclick="executeWf(${wf.id})" style="color:var(--md-tertiary)">${icons.play}</button>` : ''}
             <div class="more-menu-wrapper"><button class="table-action-btn" title="更多" onclick="event.stopPropagation();toggleMoreMenu(this)">${icons.chevronDown}</button><div class="more-menu-panel hidden">
-              ${canExec ? `<div class="more-menu-item" onclick="executeWf(${wf.id})">${icons.play}<span>执行</span></div>` : ''}
               ${isMemberOrAbove ? `<div class="more-menu-item" onclick="showCopyWfModal(${wf.id})">${icons.copy}<span>复制</span></div>` : ''}
               ${isMemberOrAbove ? `<div class="more-menu-item" onclick="showMoveWfModal(${wf.id})">${icons.move}<span>移动</span></div>` : ''}
               ${isAdmin ? `<div style="border-top:1px solid var(--md-outline-variant);margin:4px 0"></div><div class="more-menu-item danger" onclick="showDeleteWfModal(${wf.id})">${icons.trash}<span>删除</span></div>` : ''}

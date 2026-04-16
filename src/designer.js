@@ -353,9 +353,12 @@ function filterNodes(query) {
 function renderCanvasNodes() {
   return designerNodes.map(node => {
     const nt = nodeTypes.find(t => t.type === node.type) || {};
-    const isSelected = designerSelectedNodeId === node.id;
+    const isSelected = designerSelectedNodeId === node.id || designerSelectedNodeIds.includes(node.id);
     const debugClass = designerDebugMode ? getNodeDebugClass(node) : '';
     const hasWarning = getNodeWarnings(node).length;
+    const isPlaceholder = node.type === 'placeholder';
+    const inputConns = designerConnections.filter(c => c.to === node.id);
+    const mergeIndicator = inputConns.length > 1 && node.type !== 'end' ? `<div class="merge-strategy-badge" onclick="event.stopPropagation();showMergeStrategyConfig(${node.id})" title="汇合策略: ${node.config?._mergeStrategy === 'any' ? '任一完成' : '等待全部'}">${node.config?._mergeStrategy === 'any' ? '任一' : '全部'}</div>` : '';
 
     let portsHtml = '';
     if (node.type !== 'trigger') portsHtml += `<div class="canvas-node-port port-in" data-port="in" data-node="${node.id}"></div>`;
@@ -366,20 +369,22 @@ function renderCanvasNodes() {
       portsHtml += `<div class="canvas-node-port port-out" data-port="out" data-node="${node.id}"></div>`;
     }
 
-    return `<div class="canvas-node ${isSelected ? 'selected' : ''} ${debugClass}" id="node-${node.id}"
+    return `<div class="canvas-node ${isSelected ? 'selected' : ''} ${debugClass} ${isPlaceholder ? 'node-placeholder' : ''}" id="node-${node.id}"
       style="left:${node.x}px;top:${node.y}px"
       onmousedown="onNodeMouseDown(event, ${node.id})"
-      onclick="selectNode(${node.id})"
+      onclick="onNodeClick(event, ${node.id})"
       oncontextmenu="onNodeContextMenu(event, ${node.id})">
       ${hasWarning > 0 ? `<div class="canvas-node-warning" title="${hasWarning} 个问题">${hasWarning}</div>` : ''}
       ${node._breakpoint ? '<div class="canvas-node-breakpoint"></div>' : ''}
       ${debugClass ? renderNodeDebugStatus(node) : ''}
+      ${mergeIndicator}
       <div class="canvas-node-header">
         <div class="canvas-node-icon ${nt.color || ''}">${nt.icon || '?'}</div>
         <span class="canvas-node-title">${node.name}</span>
       </div>
       <div class="canvas-node-body">
         <span class="canvas-node-code">${node.code}</span>
+        ${isPlaceholder ? '<div class="placeholder-tag">待完善</div>' : ''}
         ${node.config?.condition ? `<div style="margin-top:4px;font-size:10px;color:var(--md-on-surface-variant)">${truncate(node.config.condition, 30)}</div>` : ''}
         ${node.config?.url ? `<div style="margin-top:4px;font-size:10px;color:var(--md-on-surface-variant)">${truncate(node.config.url, 30)}</div>` : ''}
       </div>
@@ -501,6 +506,7 @@ function renderNodeConfigPanel() {
   const node = designerNodes.find(n => n.id === designerSelectedNodeId);
   if (!node) { designerRightPanel = 'overview'; return renderOverviewPanel(); }
   const nt = nodeTypes.find(t => t.type === node.type) || {};
+  const hasAdvancedValues = node.config?._mergeStrategy || node.config?._retryCount || node.config?._timeout;
 
   return `
     <div class="right-panel-header">
@@ -508,10 +514,10 @@ function renderNodeConfigPanel() {
       <button class="right-panel-close" onclick="deselectNode()">${icons.close}</button>
     </div>
     <div class="right-panel-tabs">
-      <div class="right-panel-tab active">基础配置</div>
-      <div class="right-panel-tab" onclick="showToast('info','提示','高级配置开发中')">高级配置</div>
+      <div class="right-panel-tab active" id="rpTabBasic" onclick="switchNodeConfigTab('basic')">基础配置</div>
+      <div class="right-panel-tab" id="rpTabAdvanced" onclick="switchNodeConfigTab('advanced')">高级配置${hasAdvancedValues ? '<span class="advanced-dot"></span>' : ''}</div>
     </div>
-    <div class="right-panel-body">
+    <div class="right-panel-body" id="nodeConfigBody">
       ${renderNodeConfigFields(node, nt)}
     </div>`;
 }
@@ -1139,12 +1145,32 @@ function onNodeMouseDown(e, nodeId) {
 function onNodeContextMenu(e, nodeId) {
   e.preventDefault();
   e.stopPropagation();
-  // Toggle breakpoint
+  if (designerReadonly) return;
   const node = designerNodes.find(n => n.id === nodeId);
-  if (node) {
-    node._breakpoint = !node._breakpoint;
-    showToast('info', node._breakpoint ? '已设置断点' : '已移除断点', node.name);
+  if (!node) return;
+  designerSelectedNodeId = nodeId;
+  designerRightPanel = 'node';
+  const shell = document.getElementById('designerShell');
+  const rect = shell.getBoundingClientRect();
+  designerContextMenu = { x: e.clientX - rect.left, y: e.clientY - rect.top, nodeId, nodeType: node.type };
+  renderDesigner();
+}
+
+// --- Node Click with Multi-Select (Ctrl+Click) ---
+function onNodeClick(e, nodeId) {
+  e.stopPropagation();
+  if (e.ctrlKey || e.metaKey) {
+    // Multi-select toggle
+    const idx = designerSelectedNodeIds.indexOf(nodeId);
+    if (idx > -1) { designerSelectedNodeIds.splice(idx, 1); }
+    else { designerSelectedNodeIds.push(nodeId); }
+    designerSelectedNodeId = designerSelectedNodeIds.length > 0 ? designerSelectedNodeIds[designerSelectedNodeIds.length - 1] : null;
+    if (designerSelectedNodeIds.length === 1) designerRightPanel = 'node';
+    else designerRightPanel = 'overview';
     renderDesigner();
+  } else {
+    designerSelectedNodeIds = [nodeId];
+    selectNode(nodeId);
   }
 }
 
