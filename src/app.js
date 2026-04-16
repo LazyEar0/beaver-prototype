@@ -177,14 +177,18 @@ let wsContentSearch = '';
 let wsContentStatusFilter = 'all';
 let wsContentSortField = 'editedAt';
 let wsContentSortAsc = false;
-let wsContentCreatorFilter = 'all';
+let wsContentCreatorFilter = [];
+let wsCreatorDropdownOpen = false;
+let wsCreatorSearch = '';
+let wsContentOwnerFilter = [];
+let wsOwnerDropdownOpen = false;
+let wsOwnerSearch = '';
+let wsContentTypeFilter = 'all';
 let wsExecSearch = '';
 let wsExecStatusFilter = 'all';
 let wsExecTriggerFilter = 'all';
-let wsExecWfFilter = 'all';
 let wsExecTimeRange = 'all';
 let wsExecDetailId = null;
-let wsExecShowArchive = false;
 let wfNextId = 100;
 let folderNextId = 200;
 
@@ -855,7 +859,7 @@ function renderWorkspaceModule(content, breadcrumb) {
 }
 function wsNavigateTo(view, wsId) {
   wsCurrentView = view; wsCurrentId = wsId || null;
-  if (view === 'detail') { wsInternalTab = 'workflows'; wsMemberTab = 'admin'; wsCurrentFolderId = null; wsFolderPath = []; wsContentSearch = ''; wsContentStatusFilter = 'all'; wsContentCreatorFilter = 'all'; wsContentSortField = 'editedAt'; wsContentSortAsc = false; wsExecSearch = ''; wsExecStatusFilter = 'all'; wsExecTriggerFilter = 'all'; wsExecWfFilter = 'all'; wsExecTimeRange = 'all'; wsExecDetailId = null; wsExecShowArchive = false; batchMode = false; batchSelectedIds.clear(); }
+  if (view === 'detail') { wsInternalTab = 'workflows'; wsMemberTab = 'admin'; wsCurrentFolderId = null; wsFolderPath = []; wsContentSearch = ''; wsContentStatusFilter = 'all'; wsContentCreatorFilter = []; wsCreatorDropdownOpen = false; wsCreatorSearch = ''; wsContentOwnerFilter = []; wsOwnerDropdownOpen = false; wsOwnerSearch = ''; wsContentTypeFilter = 'all'; wsContentSortField = 'editedAt'; wsContentSortAsc = false; wsExecSearch = ''; wsExecStatusFilter = 'all'; wsExecTriggerFilter = 'all'; wsExecTimeRange = 'all'; wsExecDetailId = null; }
   render();
 }
 
@@ -881,7 +885,7 @@ function renderWsListPage() {
       const cc = wsCardColors[ws.id % wsCardColors.length];
       const rl = { admin: '管理员', member: '成员', viewer: '只读查看者' };
       const rc = { admin: 'role-badge-admin', member: 'role-badge-member', viewer: 'role-badge-viewer' };
-      return `<div class="workspace-card spotlight-card glare-hover" onclick="wsNavigateTo('detail', ${ws.id})"><div class="workspace-card-header"><div class="workspace-card-icon" style="background:${cc.bg};color:${cc.color}">${ws.name.charAt(0)}</div><div class="workspace-card-title-group"><div class="workspace-card-name">${ws.name}</div><span class="workspace-card-code">${icons.hash} ${ws.code}</span></div><div class="workspace-card-actions" onclick="event.stopPropagation()">${ws.myRole === 'admin' ? `<button class="table-action-btn" title="编辑" onclick="showEditWsModal(${ws.id})">${icons.edit}</button><button class="table-action-btn danger" title="删除" onclick="showDeleteWsStep1(${ws.id})">${icons.trash}</button>` : ''}</div></div><div class="workspace-card-desc" title="${ws.desc}">${ws.desc || '暂无描述'}</div><div class="workspace-card-stats"><span class="ws-stat-item">${icons.users} <span class="ws-stat-value" data-count-up="${ws.members.length}">${ws.members.length}</span> 成员</span><span class="ws-stat-item">${icons.workflow} <span class="ws-stat-value" data-count-up="${ws.workflowCount}">${ws.workflowCount}</span> 工作流</span>${ws.runningInstances > 0 ? `<span class="ws-stat-item" style="color:var(--md-success)">${icons.sync} <span class="ws-stat-value" data-count-up="${ws.runningInstances}">${ws.runningInstances}</span> 运行中</span>` : ''}</div><div class="workspace-card-footer"><span class="role-badge ${rc[ws.myRole]}">${icons.shield} ${rl[ws.myRole]}</span><span class="workspace-card-time">${icons.clock} ${ws.lastActiveAt}</span></div></div>`;
+      return `<div class="workspace-card spotlight-card glare-hover" onclick="wsNavigateTo('detail', ${ws.id})"><div class="workspace-card-header"><div class="workspace-card-icon" style="background:${cc.bg};color:${cc.color}">${ws.name.charAt(0)}</div><div class="workspace-card-title-group"><div class="workspace-card-name">${ws.name}</div><span class="workspace-card-code">${icons.hash} ${ws.code}</span></div><div class="workspace-card-actions" onclick="event.stopPropagation()">${ws.myRole === 'admin' ? `<button class="table-action-btn" title="编辑" onclick="showEditWsModal(${ws.id})">${icons.edit}</button>` : ''}</div></div><div class="workspace-card-desc" title="${ws.desc}">${ws.desc || '暂无描述'}</div><div class="workspace-card-stats"><span class="ws-stat-item">${icons.users} <span class="ws-stat-value" data-count-up="${ws.members.length}">${ws.members.length}</span> 成员</span><span class="ws-stat-item">${icons.workflow} <span class="ws-stat-value" data-count-up="${ws.workflowCount}">${ws.workflowCount}</span> 工作流</span>${ws.runningInstances > 0 ? `<span class="ws-stat-item" style="color:var(--md-success)">${icons.sync} <span class="ws-stat-value" data-count-up="${ws.runningInstances}">${ws.runningInstances}</span> 运行中</span>` : ''}</div><div class="workspace-card-footer"><span class="role-badge ${rc[ws.myRole]}">${icons.shield} ${rl[ws.myRole]}</span><span class="workspace-card-time">${icons.clock} ${ws.lastActiveAt}</span></div></div>`;
     }).join('')}</div>
     ${totalPages > 1 || total > 12 ? `<div class="pagination"><div class="pagination-info">第 ${start + 1}-${Math.min(start + wsListState.pageSize, total)} 条，共 ${total} 条</div><div class="pagination-controls">${wsListState.page > 1 ? `<button class="pagination-btn" onclick="wsListState.page--;render()">${icons.chevronLeft}</button>` : `<button class="pagination-btn disabled">${icons.chevronLeft}</button>`}${Array.from({length: totalPages}, (_, i) => `<button class="pagination-btn ${wsListState.page === i + 1 ? 'active' : ''}" onclick="wsListState.page=${i + 1};render()">${i + 1}</button>`).join('')}${wsListState.page < totalPages ? `<button class="pagination-btn" onclick="wsListState.page++;render()">${icons.chevronRight}</button>` : `<button class="pagination-btn disabled">${icons.chevronRight}</button>`}</div><div class="pagination-size"><span>每页</span><select onchange="wsListState.pageSize=parseInt(this.value);wsListState.page=1;render()"><option value="12" ${wsListState.pageSize === 12 ? 'selected' : ''}>12</option><option value="24" ${wsListState.pageSize === 24 ? 'selected' : ''}>24</option><option value="48" ${wsListState.pageSize === 48 ? 'selected' : ''}>48</option></select><span>条</span></div></div>` : ''}`}`;
 }
@@ -912,8 +916,8 @@ function renderWsDetailPage(ws) {
 }
 function switchWsTab(tab) {
   wsInternalTab = tab;
-  if (tab === 'workflows') { wsCurrentFolderId = null; wsFolderPath = []; wsContentSearch = ''; wsContentStatusFilter = 'all'; }
-  if (tab === 'executions') { wsExecDetailId = null; wsExecSearch = ''; wsExecStatusFilter = 'all'; wsExecTriggerFilter = 'all'; wsExecShowArchive = false; }
+  if (tab === 'workflows') { wsCurrentFolderId = null; wsFolderPath = []; wsContentSearch = ''; wsContentStatusFilter = 'all'; wsContentCreatorFilter = []; wsCreatorDropdownOpen = false; wsContentOwnerFilter = []; wsOwnerDropdownOpen = false; wsContentTypeFilter = 'all'; }
+  if (tab === 'executions') { wsExecDetailId = null; wsExecSearch = ''; wsExecStatusFilter = 'all'; wsExecTriggerFilter = 'all'; }
   render();
 }
 
@@ -938,15 +942,20 @@ function renderWsWorkflowsTab(ws) {
   let workflows = (wsWorkflows[ws.id] || []).filter(wf => wf.folderId === wsCurrentFolderId);
   const allWsWorkflows = wsWorkflows[ws.id] || [];
   const creators = [...new Set(allWsWorkflows.map(wf => wf.creator))].sort();
+  const allOwnerIds = [...new Set(allWsWorkflows.flatMap(wf => wf.owners || []))];
+  const ownerNames = allOwnerIds.map(oid => { const u = ssoUsers.find(x => x.id === oid); return u ? u.name : ''; }).filter(Boolean).sort();
   const depth = getFolderDepth();
   const canCreateFolder = isMemberOrAbove && depth < 5;
   let isSearchMode = false;
 
   // Status filter
   if (wsContentStatusFilter !== 'all') workflows = workflows.filter(wf => wf.status === wsContentStatusFilter);
-
-  // Creator filter
-  if (wsContentCreatorFilter !== 'all') workflows = workflows.filter(wf => wf.creator === wsContentCreatorFilter);
+  // Creator filter (multi-select)
+  if (wsContentCreatorFilter.length > 0) workflows = workflows.filter(wf => wsContentCreatorFilter.includes(wf.creator));
+  // Owner filter (multi-select)
+  if (wsContentOwnerFilter.length > 0) workflows = workflows.filter(wf => (wf.owners || []).some(oid => { const u = ssoUsers.find(x => x.id === oid); return u && wsContentOwnerFilter.includes(u.name); }));
+  // Type filter
+  if (wsContentTypeFilter !== 'all') workflows = workflows.filter(wf => wf.type === wsContentTypeFilter);
 
   // Search mode - search across entire space
   if (wsContentSearch) {
@@ -954,7 +963,9 @@ function renderWsWorkflowsTab(ws) {
     const q = wsContentSearch.toLowerCase();
     workflows = allWsWorkflows.filter(wf => wf.name.toLowerCase().includes(q) || wf.code.toLowerCase().includes(q));
     if (wsContentStatusFilter !== 'all') workflows = workflows.filter(wf => wf.status === wsContentStatusFilter);
-    if (wsContentCreatorFilter !== 'all') workflows = workflows.filter(wf => wf.creator === wsContentCreatorFilter);
+    if (wsContentCreatorFilter.length > 0) workflows = workflows.filter(wf => wsContentCreatorFilter.includes(wf.creator));
+    if (wsContentOwnerFilter.length > 0) workflows = workflows.filter(wf => (wf.owners || []).some(oid => { const u = ssoUsers.find(x => x.id === oid); return u && wsContentOwnerFilter.includes(u.name); }));
+    if (wsContentTypeFilter !== 'all') workflows = workflows.filter(wf => wf.type === wsContentTypeFilter);
   }
 
   // Sort
@@ -979,9 +990,35 @@ function renderWsWorkflowsTab(ws) {
   // Status labels
   const statusLabel = { draft: '草稿', published: '已发布', disabled: '已停用' };
   const statusClass = { draft: 'status-draft', published: 'status-published', disabled: 'status-disabled' };
-  const lastRunLabel = { success: '成功', failed: '失败', running: '运行中' };
-  const lastRunClass = { success: 'exec-completed', failed: 'exec-failed', running: 'exec-running' };
   const typeLabel = { app: '应用流', chat: '对话流' };
+
+  // Multi-select creator dropdown trigger
+  const creatorTriggerHtml = wsContentCreatorFilter.length === 0
+    ? '<span style="color:var(--md-on-surface-variant)">创建者</span>'
+    : wsContentCreatorFilter.length <= 2
+      ? `<span class="creator-mini-tags">${wsContentCreatorFilter.map(c => `<span class="creator-mini-tag">${c}</span>`).join('')}</span>`
+      : `<span class="creator-mini-tags"><span class="creator-mini-tag">${wsContentCreatorFilter[0]}</span><span class="creator-mini-tag-more">+${wsContentCreatorFilter.length - 1}</span></span>`;
+  const filteredWsCreators = wsCreatorSearch ? creators.filter(c => c.toLowerCase().includes(wsCreatorSearch.toLowerCase())) : creators;
+  const creatorPanelHtml = wsCreatorDropdownOpen ? `<div class="creator-dropdown-panel" onclick="event.stopPropagation()">
+    <div class="creator-dropdown-search">${icons.search}<input type="text" placeholder="搜索创建人..." value="${wsCreatorSearch}" oninput="onWsCreatorSearch(this.value)" autofocus /></div>
+    <div class="creator-dropdown-list" id="wsCreatorList">${filteredWsCreators.length === 0 ? '<div class="creator-dropdown-empty">无匹配结果</div>' : filteredWsCreators.map(c => {
+      const sel = wsContentCreatorFilter.includes(c);
+      return `<div class="creator-dropdown-item ${sel ? 'selected' : ''}" onclick="toggleWsCreatorSelection('${c}')"><span class="creator-avatar-sm">${c.charAt(0)}</span><span>${c}</span><span class="check-icon">${icons.check}</span></div>`;
+    }).join('')}</div></div>` : '';
+
+  // Multi-select owner dropdown trigger
+  const ownerTriggerHtml = wsContentOwnerFilter.length === 0
+    ? '<span style="color:var(--md-on-surface-variant)">负责人</span>'
+    : wsContentOwnerFilter.length <= 2
+      ? `<span class="creator-mini-tags">${wsContentOwnerFilter.map(c => `<span class="creator-mini-tag">${c}</span>`).join('')}</span>`
+      : `<span class="creator-mini-tags"><span class="creator-mini-tag">${wsContentOwnerFilter[0]}</span><span class="creator-mini-tag-more">+${wsContentOwnerFilter.length - 1}</span></span>`;
+  const filteredWsOwners = wsOwnerSearch ? ownerNames.filter(c => c.toLowerCase().includes(wsOwnerSearch.toLowerCase())) : ownerNames;
+  const ownerPanelHtml = wsOwnerDropdownOpen ? `<div class="creator-dropdown-panel" onclick="event.stopPropagation()">
+    <div class="creator-dropdown-search">${icons.search}<input type="text" placeholder="搜索负责人..." value="${wsOwnerSearch}" oninput="onWsOwnerSearch(this.value)" autofocus /></div>
+    <div class="creator-dropdown-list" id="wsOwnerList">${filteredWsOwners.length === 0 ? '<div class="creator-dropdown-empty">无匹配结果</div>' : filteredWsOwners.map(c => {
+      const sel = wsContentOwnerFilter.includes(c);
+      return `<div class="creator-dropdown-item ${sel ? 'selected' : ''}" onclick="toggleWsOwnerSelection('${c}')"><span class="creator-avatar-sm">${c.charAt(0)}</span><span>${c}</span><span class="check-icon">${icons.check}</span></div>`;
+    }).join('')}</div></div>` : '';
 
   return `
     ${breadcrumb}
@@ -993,54 +1030,54 @@ function renderWsWorkflowsTab(ws) {
         <span class="filter-chip ${wsContentStatusFilter === 'published' ? 'active' : ''}" onclick="onWsStatusFilter('published')">已发布</span>
         <span class="filter-chip ${wsContentStatusFilter === 'disabled' ? 'active' : ''}" onclick="onWsStatusFilter('disabled')">已停用</span>
       </div>
-      <div class="filter-actions">
-        <select class="form-input" style="width:auto;padding:4px 8px;font-size:var(--font-size-sm)" onchange="onWsCreatorFilter(this.value)">
-          <option value="all" ${wsContentCreatorFilter === 'all' ? 'selected' : ''}>全部创建者</option>
-          ${creators.map(c => `<option value="${c}" ${wsContentCreatorFilter === c ? 'selected' : ''}>${c}</option>`).join('')}
+      <div class="filter-actions" style="display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap">
+        <div class="creator-dropdown"><div class="creator-dropdown-trigger ${wsCreatorDropdownOpen ? 'open' : ''}" onclick="event.stopPropagation();toggleWsCreatorDropdown()">${creatorTriggerHtml}</div>${creatorPanelHtml}</div>
+        <div class="creator-dropdown"><div class="creator-dropdown-trigger ${wsOwnerDropdownOpen ? 'open' : ''}" onclick="event.stopPropagation();toggleWsOwnerDropdown()">${ownerTriggerHtml}</div>${ownerPanelHtml}</div>
+        <select class="form-input" style="width:auto;padding:4px 8px;font-size:var(--font-size-sm)" onchange="onWsTypeFilter(this.value)">
+          <option value="all" ${wsContentTypeFilter === 'all' ? 'selected' : ''}>全部类型</option>
+          <option value="app" ${wsContentTypeFilter === 'app' ? 'selected' : ''}>应用流</option>
+          <option value="chat" ${wsContentTypeFilter === 'chat' ? 'selected' : ''}>对话流</option>
         </select>
         <div class="sort-dropdown"><select onchange="onWsContentSort(this.value)"><option value="editedAt" ${wsContentSortField === 'editedAt' ? 'selected' : ''}>最后编辑</option><option value="createdAt" ${wsContentSortField === 'createdAt' ? 'selected' : ''}>创建时间</option><option value="name" ${wsContentSortField === 'name' ? 'selected' : ''}>名称</option></select><button class="sort-toggle-btn" onclick="toggleWsContentSort()">${wsContentSortAsc ? icons.arrowUp : icons.arrowDown}</button></div>
-        ${isMemberOrAbove ? `<button class="btn btn-secondary btn-sm" onclick="toggleBatchMode()" style="${batchMode ? 'background:var(--md-primary);color:white' : ''}">${icons.check}<span>${batchMode ? '退出批量' : '批量操作'}</span></button>` : ''}
         ${isMemberOrAbove ? `<button class="btn btn-primary btn-sm" onclick="showCreateWfModal()">${icons.plus}<span>新建工作流</span></button>` : ''}
         ${canCreateFolder ? `<button class="btn btn-secondary btn-sm" onclick="showCreateFolderModal()">${icons.folder}<span>新建文件夹</span></button>` : ''}
       </div>
     </div>
 
-    ${batchMode && batchSelectedIds.size > 0 ? `<div class="batch-action-bar" style="display:flex;align-items:center;gap:var(--space-3);padding:var(--space-2) var(--space-4);background:var(--md-primary-container);border-radius:var(--radius-md);margin-top:var(--space-2);font-size:var(--font-size-sm)"><span style="color:var(--md-on-primary-container);font-weight:500">已选中 ${batchSelectedIds.size} 项</span><div style="margin-left:auto;display:flex;gap:var(--space-2)"><button class="btn btn-secondary btn-sm" onclick="batchMove()">${icons.move}<span>批量移动</span></button><button class="btn btn-secondary btn-sm" onclick="batchDisable()">${icons.disable}<span>批量停用</span></button>${isAdmin ? `<button class="btn btn-danger btn-sm" onclick="batchDelete()">${icons.trash}<span>批量删除</span></button>` : ''}</div></div>` : ''}
-
     ${isEmpty ? (isSearchMode ? renderEmptyState('searchNoResult') : (wsCurrentFolderId !== null ? `<div class="empty-state" style="padding:var(--space-10)"><img src="./public/images/empty-folder-content.png" class="empty-state-img" /><div class="empty-state-title">该文件夹为空</div><div class="empty-state-desc">在此文件夹中创建工作流或子文件夹</div><div style="display:flex;gap:var(--space-2);margin-top:var(--space-4)">${isMemberOrAbove ? `<button class="btn btn-primary btn-sm" onclick="showCreateWfModal()">${icons.plus}<span>新建工作流</span></button>` : ''}${canCreateFolder ? `<button class="btn btn-secondary btn-sm" onclick="showCreateFolderModal()">${icons.folder}<span>新建子文件夹</span></button>` : ''}</div></div>` : `<div class="empty-state" style="padding:var(--space-10)"><img src="./public/images/empty-folder-content.png" class="empty-state-img" /><div class="empty-state-title">暂无内容</div><div class="empty-state-desc">创建工作流或文件夹来组织您的空间</div><div style="display:flex;gap:var(--space-2);margin-top:var(--space-4)">${isMemberOrAbove ? `<button class="btn btn-primary btn-sm" onclick="showCreateWfModal()">${icons.plus}<span>新建工作流</span></button><button class="btn btn-secondary btn-sm" onclick="showCreateFolderModal()">${icons.folder}<span>新建文件夹</span></button>` : ''}</div></div>`)) : `
-    <div class="content-list-header">${batchMode ? `<span style="display:flex;align-items:center;padding-right:var(--space-2)"><input type="checkbox" ${batchSelectedIds.size === sortedWf.length && sortedWf.length > 0 ? 'checked' : ''} onchange="toggleBatchSelectAll(${ws.id})" style="width:16px;height:16px;accent-color:var(--md-primary);cursor:pointer" /></span>` : ''}<span style="flex:2">名称</span><span style="flex:1">状态</span><span style="flex:1">创建者</span><span style="flex:1">最后编辑</span><span style="width:170px">操作</span></div>
+    <div class="content-list-header"><span style="flex:2.5">名称</span><span style="flex:0.7">状态</span><span style="flex:0.6">版本</span><span style="flex:0.6">类型</span><span style="flex:0.8">创建者</span><span style="flex:0.8">负责人</span><span style="flex:0.9">最后编辑</span><span style="width:80px">操作</span></div>
     <div class="content-list">
       ${showFolders ? sortedFolders.map(f => {
         const subF = getSubFolderCount(ws.id, f.id), subW = getSubWfCount(ws.id, f.id);
         return `<div class="content-list-item" ondblclick="navigateIntoFolder(${f.id}, '${f.name.replace(/'/g, "\\'")}')">
-          <div class="content-item-main" style="flex:2"><div class="content-item-icon folder-icon">${icons.folder}</div><div><div class="content-item-name" onclick="navigateIntoFolder(${f.id}, '${f.name.replace(/'/g, "\\'")}')" style="cursor:pointer">${f.name}</div><div class="content-item-desc">${subW} 个工作流${subF > 0 ? `，${subF} 个子文件夹` : ''}</div></div></div>
-          <div style="flex:1"><span class="badge badge-type" style="font-size:11px">${icons.folder} 文件夹</span></div>
-          <div style="flex:1;font-size:var(--font-size-sm);color:var(--md-on-surface-variant)">${f.creator}</div>
-          <div style="flex:1;font-size:var(--font-size-sm);color:var(--md-outline)">${f.editedAt}</div>
-          <div class="content-item-actions" style="width:140px">
-            ${isMemberOrAbove ? `<button class="table-action-btn" title="编辑" onclick="showEditFolderModal(${f.id})">${icons.edit}</button><button class="table-action-btn" title="移动" onclick="showMoveFolderModal(${f.id})">${icons.move}</button><button class="table-action-btn danger" title="删除" onclick="showDeleteFolderModal(${f.id})">${icons.trash}</button>` : ''}
+          <div class="content-item-main" style="flex:2.5"><div class="content-item-icon folder-icon">${icons.folder}</div><div><div class="content-item-name" onclick="navigateIntoFolder(${f.id}, '${f.name.replace(/'/g, "\\'")}')" style="cursor:pointer">${f.name}</div><div class="content-item-desc">${subW} 个工作流${subF > 0 ? `，${subF} 个子文件夹` : ''}</div></div></div>
+          <div style="flex:0.7"><span class="badge badge-type" style="font-size:11px">${icons.folder} 文件夹</span></div>
+          <div style="flex:0.6"></div><div style="flex:0.6"></div>
+          <div style="flex:0.8;font-size:var(--font-size-sm);color:var(--md-on-surface-variant)">${f.creator}</div>
+          <div style="flex:0.8"></div>
+          <div style="flex:0.9;font-size:var(--font-size-sm);color:var(--md-outline)">${f.editedAt}</div>
+          <div class="content-item-actions" style="width:80px">
+            ${isMemberOrAbove ? `<button class="table-action-btn" title="编辑" onclick="showEditFolderModal(${f.id})">${icons.edit}</button><div class="more-menu-wrapper"><button class="table-action-btn" title="更多" onclick="event.stopPropagation();toggleMoreMenu(this)">${icons.chevronDown}</button><div class="more-menu-panel hidden"><div class="more-menu-item" onclick="showMoveFolderModal(${f.id})">${icons.move}<span>移动</span></div></div></div>` : ''}
           </div></div>`;
       }).join('') : ''}
       ${sortedWf.map(wf => {
-        const canDelete = isAdmin || wf.owners.includes(101);
         const canExec = wf.status === 'published';
-        const ownerNames = wf.owners.map(oid => { const u = ssoUsers.find(x => x.id === oid); return u ? u.name : ''; }).filter(Boolean).join(', ');
-        const isChecked = batchSelectedIds.has(wf.id);
-        return `<div class="content-list-item${isChecked ? ' batch-selected' : ''}" style="${isChecked ? 'background:var(--md-primary-container-low, rgba(103,80,164,0.05))' : ''}">
-          ${batchMode ? `<div style="display:flex;align-items:center;padding-right:var(--space-2)"><input type="checkbox" ${isChecked ? 'checked' : ''} onchange="toggleBatchSelect(${wf.id})" style="width:16px;height:16px;accent-color:var(--md-primary);cursor:pointer" /></div>` : ''}
-          <div class="content-item-main" style="flex:2"><div class="content-item-icon wf-icon">${icons.workflow}</div><div><div class="content-item-name">${wf.name}${isSearchMode ? `<span style="font-size:11px;color:var(--md-outline);margin-left:8px">${getFolderPath(ws.id, wf.folderId) || '根目录'}</span>` : ''}</div><div class="content-item-desc">${icons.hash} ${wf.code}${wf.desc ? ` · ${wf.desc}` : ''}</div></div></div>
-          <div style="flex:1;display:flex;align-items:center;gap:6px"><span class="status-badge ${statusClass[wf.status]}">${statusLabel[wf.status]}</span>${wf.version > 0 ? `<span class="version-badge">v${wf.version}</span>` : ''}<span class="badge badge-type" style="font-size:10px">${typeLabel[wf.type]}</span>${wf.lastRun ? `<span class="last-run"><span class="last-run-dot ${lastRunClass[wf.lastRun]}"></span>${lastRunLabel[wf.lastRun]}</span>` : ''}</div>
-          <div style="flex:1;font-size:var(--font-size-sm);color:var(--md-on-surface-variant)">${wf.creator}</div>
-          <div style="flex:1;font-size:var(--font-size-sm);color:var(--md-outline)">${wf.editedAt}</div>
-          <div class="content-item-actions" style="width:170px">
-            ${isMemberOrAbove ? `<button class="table-action-btn" title="编辑流程" onclick="openDesigner(${ws.id}, ${wf.id})" style="color:var(--md-primary)">${icons.edit}</button>` : ''}
-            ${wf.status === 'draft' && isMemberOrAbove ? `<button class="table-action-btn" title="发布" onclick="showPublishWfModal(${wf.id})" style="color:var(--md-success)">${icons.arrowUp}</button>` : ''}
-            <button class="table-action-btn ${!canExec ? 'disabled' : ''}" title="执行" onclick="${canExec ? `executeWf(${wf.id})` : ''}" ${!canExec ? 'style="opacity:0.4;cursor:not-allowed"' : ''}>${icons.play}</button>
-            ${isMemberOrAbove ? `<button class="table-action-btn" title="复制" onclick="copyWf(${wf.id})">${icons.copy}</button><button class="table-action-btn" title="移动" onclick="showMoveWfModal(${wf.id})">${icons.move}</button>` : ''}
-            ${wf.status === 'published' && isMemberOrAbove ? `<button class="table-action-btn" title="停用" onclick="showDisableWfModal(${wf.id})">${icons.disable}</button>` : ''}
-            ${wf.status === 'disabled' && isMemberOrAbove ? `<button class="table-action-btn" title="启用" onclick="enableWf(${wf.id})">${icons.checkCircle}</button>` : ''}
-            ${wf.versions && wf.versions.length > 0 ? `<button class="table-action-btn" title="版本历史" onclick="showVersionHistory(${wf.id})">${icons.history}</button>` : ''}
-            ${canDelete ? `<button class="table-action-btn danger" title="删除" onclick="showDeleteWfModal(${wf.id})">${icons.trash}</button>` : ''}
+        const wfOwnerNames = wf.owners.map(oid => { const u = ssoUsers.find(x => x.id === oid); return u ? u.name : ''; }).filter(Boolean).join(', ');
+        return `<div class="content-list-item">
+          <div class="content-item-main" style="flex:2.5"><div class="content-item-icon wf-icon">${icons.workflow}</div><div><div class="content-item-name" onclick="openDesigner(${ws.id}, ${wf.id})" style="cursor:pointer;color:var(--md-primary)">${wf.name}${isSearchMode ? `<span style="font-size:11px;color:var(--md-outline);margin-left:8px">${getFolderPath(ws.id, wf.folderId) || '根目录'}</span>` : ''}</div><div class="content-item-desc">${icons.hash} ${wf.code}${wf.desc ? ` · ${wf.desc}` : ''}</div></div></div>
+          <div style="flex:0.7"><span class="status-badge ${statusClass[wf.status]}">${statusLabel[wf.status]}</span></div>
+          <div style="flex:0.6">${wf.version > 0 ? `<span class="version-badge">v${wf.version}</span>` : '<span style="color:var(--md-outline);font-size:var(--font-size-xs)">-</span>'}</div>
+          <div style="flex:0.6"><span class="badge badge-type" style="font-size:11px">${typeLabel[wf.type]}</span></div>
+          <div style="flex:0.8;font-size:var(--font-size-sm);color:var(--md-on-surface-variant)">${wf.creator}</div>
+          <div style="flex:0.8;font-size:var(--font-size-sm);color:var(--md-on-surface-variant)">${wfOwnerNames || '-'}</div>
+          <div style="flex:0.9;font-size:var(--font-size-sm);color:var(--md-outline)">${wf.editedAt}</div>
+          <div class="content-item-actions" style="width:80px">
+            ${isMemberOrAbove ? `<button class="table-action-btn" title="编辑流程" onclick="openDesigner(${ws.id}, ${wf.id})" style="color:var(--md-primary)">${icons.edit}</button>` : `<button class="table-action-btn" title="查看流程" onclick="openDesigner(${ws.id}, ${wf.id})">${icons.eye}</button>`}
+            <div class="more-menu-wrapper"><button class="table-action-btn" title="更多" onclick="event.stopPropagation();toggleMoreMenu(this)">${icons.chevronDown}</button><div class="more-menu-panel hidden">
+              ${canExec ? `<div class="more-menu-item" onclick="executeWf(${wf.id})">${icons.play}<span>执行</span></div>` : ''}
+              ${isMemberOrAbove ? `<div class="more-menu-item" onclick="showCopyWfModal(${wf.id})">${icons.copy}<span>复制</span></div>` : ''}
+              ${isMemberOrAbove ? `<div class="more-menu-item" onclick="showMoveWfModal(${wf.id})">${icons.move}<span>移动</span></div>` : ''}
+            </div></div>
           </div></div>`;
       }).join('')}
     </div>`}`;
@@ -1051,6 +1088,28 @@ function onWsStatusFilter(val) { wsContentStatusFilter = val; render(); }
 function onWsCreatorFilter(val) { wsContentCreatorFilter = val; render(); }
 function onWsContentSort(val) { wsContentSortField = val; render(); }
 function toggleWsContentSort() { wsContentSortAsc = !wsContentSortAsc; render(); }
+function onWsTypeFilter(val) { wsContentTypeFilter = val; render(); }
+function toggleWsCreatorDropdown() { wsCreatorDropdownOpen = !wsCreatorDropdownOpen; wsCreatorSearch = ''; wsOwnerDropdownOpen = false; render(); }
+function onWsCreatorSearch(val) { wsCreatorSearch = val; render(); }
+function toggleWsCreatorSelection(name) {
+  const idx = wsContentCreatorFilter.indexOf(name);
+  if (idx > -1) wsContentCreatorFilter.splice(idx, 1); else wsContentCreatorFilter.push(name);
+  render();
+}
+function toggleWsOwnerDropdown() { wsOwnerDropdownOpen = !wsOwnerDropdownOpen; wsOwnerSearch = ''; wsCreatorDropdownOpen = false; render(); }
+function onWsOwnerSearch(val) { wsOwnerSearch = val; render(); }
+function toggleWsOwnerSelection(name) {
+  const idx = wsContentOwnerFilter.indexOf(name);
+  if (idx > -1) wsContentOwnerFilter.splice(idx, 1); else wsContentOwnerFilter.push(name);
+  render();
+}
+function toggleMoreMenu(btn) {
+  const panel = btn.nextElementSibling;
+  document.querySelectorAll('.more-menu-panel').forEach(p => { if (p !== panel) p.classList.add('hidden'); });
+  panel.classList.toggle('hidden');
+  const close = (e) => { if (!btn.parentElement.contains(e.target)) { panel.classList.add('hidden'); document.removeEventListener('click', close); } };
+  if (!panel.classList.contains('hidden')) setTimeout(() => document.addEventListener('click', close), 0);
+}
 function openDesigner(wsId, wfId) { showToast('info', '流程设计器', '流程设计器将在 Phase 2 中实现（当前为原型占位）'); }
 function navigateIntoFolder(folderId, folderName) { wsFolderPath.push({ id: folderId, name: folderName }); wsCurrentFolderId = folderId; wsContentSearch = ''; render(); }
 function navigateToWsFolder(folderId) { wsCurrentFolderId = folderId; if (folderId === null) wsFolderPath = []; render(); }
@@ -1195,15 +1254,15 @@ function moveFolder(folderId, targetParentId) {
 // --- Workflow CRUD ---
 function showCreateWfModal() {
   const ws = workspaces.find(w => w.id === wsCurrentId);
-  showModal(`<div class="modal" style="max-width:560px"><div class="modal-header"><h2 class="modal-title">新建工作流</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
-  <div class="form-row"><div class="form-group" style="flex:1"><label class="form-label">工作流名称 <span class="required">*</span></label><input type="text" class="form-input" id="wfName" placeholder="请输入工作流名称" maxlength="50" oninput="this.classList.remove('error');document.getElementById('wfNameError').classList.add('hidden')" /><div class="form-error hidden" id="wfNameError"></div></div></div>
-  <div class="form-row"><div class="form-group" style="flex:1"><label class="form-label">工作流编号 <span class="required">*</span></label><input type="text" class="form-input" id="wfCode" placeholder="英文、数字、下划线、连字符" maxlength="30" oninput="this.classList.remove('error');document.getElementById('wfCodeError').classList.add('hidden')" /><div class="form-error hidden" id="wfCodeError"></div></div></div>
-  <div class="form-row"><div class="form-group" style="flex:1"><label class="form-label">描述</label><textarea class="form-textarea" id="wfDesc" placeholder="选填" maxlength="500"></textarea></div></div>
-  <div class="form-row" style="gap:var(--space-4)">
+  showModal(`<div class="modal" style="max-width:520px"><div class="modal-header"><h2 class="modal-title">新建工作流</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
+  <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">工作流名称 <span class="required">*</span></label><input type="text" class="form-input" id="wfName" placeholder="请输入工作流名称" maxlength="50" oninput="this.classList.remove('error');document.getElementById('wfNameError').classList.add('hidden')" /><div class="form-error hidden" id="wfNameError"></div></div>
+  <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">工作流编号 <span class="required">*</span></label><input type="text" class="form-input" id="wfCode" placeholder="英文、数字、下划线、连字符" maxlength="30" oninput="this.classList.remove('error');document.getElementById('wfCodeError').classList.add('hidden')" /><div class="form-error hidden" id="wfCodeError"></div></div>
+  <div style="display:flex;gap:var(--space-4);margin-bottom:var(--space-4)">
     <div class="form-group" style="flex:1"><label class="form-label">工作流类型 <span class="required">*</span></label><select class="form-input" id="wfType"><option value="app">应用流</option><option value="chat">对话流</option></select></div>
-    <div class="form-group" style="flex:1"><label class="form-label">允许被引用</label><div class="toggle-inline"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="wfAllowRef" /><span style="font-size:var(--font-size-sm)">开启后可作为子流程</span></label></div></div>
+    <div class="form-group" style="flex:1"><label class="form-label">流程负责人 <span class="required">*</span></label><select class="form-input" id="wfOwner">${ws.members.filter(m => m.role !== 'viewer').map(m => `<option value="${m.userId}">${m.name}</option>`).join('')}</select></div>
   </div>
-  <div class="form-row"><div class="form-group" style="flex:1"><label class="form-label">流程负责人 <span class="required">*</span></label><select class="form-input" id="wfOwner">${ws.members.filter(m => m.role !== 'viewer').map(m => `<option value="${m.userId}">${m.name}</option>`).join('')}</select></div></div>
+  <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">描述</label><textarea class="form-textarea" id="wfDesc" placeholder="选填，500字以内" maxlength="500" rows="2"></textarea></div>
+  <div class="form-group"><label class="form-label">允许被引用</label><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="wfAllowRef" /><span style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant)">开启后该流程可作为子流程被其他工作流引用</span></label></div>
   </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="createWf()">保存</button></div></div>`);
   setTimeout(() => document.getElementById('wfName')?.focus(), 300);
 }
@@ -1248,17 +1307,39 @@ function deleteWf(wfId) {
   wsExecutions[wsCurrentId] = (wsExecutions[wsCurrentId] || []).filter(e => e.wfId !== wfId);
   closeModal(); showToast('success', '删除成功', `工作流「${wf.name}」已删除`); render();
 }
-function copyWf(wfId) {
+function showCopyWfModal(wfId) {
   const wf = (wsWorkflows[wsCurrentId] || []).find(x => x.id === wfId); if (!wf) return;
+  const ws = workspaces.find(w => w.id === wsCurrentId);
   const allNames = (wsWorkflows[wsCurrentId] || []).map(x => x.name);
   let copyName = `${wf.name} - 副本`;
   let i = 2; while (allNames.includes(copyName)) { copyName = `${wf.name} - 副本 ${i++}`; }
   const allCodes = Object.values(wsWorkflows).flat().map(x => x.code);
   let copyCode = `${wf.code}_copy`; i = 2; while (allCodes.includes(copyCode)) { copyCode = `${wf.code}_copy${i++}`; }
+  showModal(`<div class="modal" style="max-width:480px"><div class="modal-header"><h2 class="modal-title">复制工作流</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
+  <div style="padding:var(--space-3);background:var(--md-surface);border-radius:var(--radius-lg);margin-bottom:var(--space-4);font-size:var(--font-size-sm);color:var(--md-on-surface-variant)">将基于「${wf.name}」创建副本，副本为草稿状态，不继承原负责人。</div>
+  <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">副本名称 <span class="required">*</span></label><input type="text" class="form-input" id="copyWfName" value="${copyName}" maxlength="50" oninput="this.classList.remove('error');document.getElementById('copyWfNameError').classList.add('hidden')" /><div class="form-error hidden" id="copyWfNameError"></div></div>
+  <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">副本编号 <span class="required">*</span></label><input type="text" class="form-input" id="copyWfCode" value="${copyCode}" maxlength="30" oninput="this.classList.remove('error');document.getElementById('copyWfCodeError').classList.add('hidden')" /><div class="form-error hidden" id="copyWfCodeError"></div></div>
+  <div class="form-group"><label class="form-label">流程负责人 <span class="required">*</span></label><select class="form-input" id="copyWfOwner">${ws.members.filter(m => m.role !== 'viewer').map(m => `<option value="${m.userId}">${m.name}</option>`).join('')}</select></div>
+  </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="doCopyWf(${wfId})">确认复制</button></div></div>`);
+}
+function doCopyWf(wfId) {
+  const wf = (wsWorkflows[wsCurrentId] || []).find(x => x.id === wfId); if (!wf) return;
+  const rawName = document.getElementById('copyWfName').value, rawCode = document.getElementById('copyWfCode').value;
+  const name = rawName.trim(), code = rawCode.trim();
+  const ownerId = parseInt(document.getElementById('copyWfOwner').value);
+  let hasError = false;
+  const ni = document.getElementById('copyWfName'), ne = document.getElementById('copyWfNameError'); ni.classList.remove('error'); ne.classList.add('hidden');
+  const ci = document.getElementById('copyWfCode'), ce = document.getElementById('copyWfCodeError'); ci.classList.remove('error'); ce.classList.add('hidden');
+  if (!name) { ni.classList.add('error'); ne.textContent = '请输入副本名称'; ne.classList.remove('hidden'); hasError = true; }
+  else if ((wsWorkflows[wsCurrentId] || []).some(x => x.name === name)) { ni.classList.add('error'); ne.textContent = '该空间内已存在同名工作流'; ne.classList.remove('hidden'); hasError = true; }
+  if (!code) { ci.classList.add('error'); ce.textContent = '请输入副本编号'; ce.classList.remove('hidden'); hasError = true; }
+  else if (!/^[a-zA-Z0-9_-]+$/.test(code)) { ci.classList.add('error'); ce.textContent = '编号仅支持英文、数字、下划线和连字符'; ce.classList.remove('hidden'); hasError = true; }
+  else { const allCodes = Object.values(wsWorkflows).flat().map(x => x.code); if (allCodes.includes(code)) { ci.classList.add('error'); ce.textContent = '该编号已被使用'; ce.classList.remove('hidden'); hasError = true; } }
+  if (hasError) return;
   if (!wsWorkflows[wsCurrentId]) wsWorkflows[wsCurrentId] = [];
   const now = new Date().toISOString();
-  wsWorkflows[wsCurrentId].push({ ...wf, id: wfNextId++, name: copyName, code: copyCode, status: 'draft', version: 0, creator: 'Sukey Wu', owners: [101], execCount: 0, runningCount: 0, lastRun: null, debugPassed: false, versions: [], createdAt: now.slice(0, 10), editedAt: now.slice(0, 16).replace('T', ' ') });
-  showToast('success', '复制成功', `已创建副本「${copyName}」`); render();
+  wsWorkflows[wsCurrentId].push({ ...wf, id: wfNextId++, name, code, status: 'draft', version: 0, creator: 'Sukey Wu', owners: [ownerId], execCount: 0, runningCount: 0, lastRun: null, debugPassed: false, versions: [], createdAt: now.slice(0, 10), editedAt: now.slice(0, 16).replace('T', ' ') });
+  closeModal(); showToast('success', '复制成功', `已创建副本「${name}」`); render();
 }
 function showMoveWfModal(wfId) {
   const wf = (wsWorkflows[wsCurrentId] || []).find(x => x.id === wfId); if (!wf) return;
@@ -1419,8 +1500,7 @@ function renderWsExecutionsTab(ws) {
   if (wsExecDetailId !== null) return renderExecDetail(ws);
 
   const allExecs = wsExecutions[ws.id] || [];
-  const wfNames = [...new Set(allExecs.map(e => e.wfName))].sort();
-  let execs = allExecs.filter(e => wsExecShowArchive ? e.archived : !e.archived);
+  let execs = [...allExecs];
 
   // Filters
   if (wsExecSearch) { const q = wsExecSearch.toLowerCase(); execs = execs.filter(e => e.wfName.toLowerCase().includes(q) || String(e.id).includes(q)); }
@@ -1429,7 +1509,6 @@ function renderWsExecutionsTab(ws) {
     else execs = execs.filter(e => e.status === wsExecStatusFilter);
   }
   if (wsExecTriggerFilter !== 'all') execs = execs.filter(e => e.trigger === wsExecTriggerFilter);
-  if (wsExecWfFilter !== 'all') execs = execs.filter(e => e.wfName === wsExecWfFilter);
   if (wsExecTimeRange !== 'all') {
     const now = new Date();
     let from;
@@ -1448,22 +1527,17 @@ function renderWsExecutionsTab(ws) {
   const triggerLabel = { manual: '手动', scheduled: '定时', event: '事件触发', subflow: '子流程调用' };
 
   return `
-    ${wsExecShowArchive ? `<div class="archive-banner">${icons.archive} 以下为归档数据，仅供查阅 <button class="btn btn-ghost btn-sm" onclick="toggleExecArchive()" style="margin-left:auto">返回在线记录</button></div>` : ''}
     <div class="filter-bar" style="margin-top:var(--space-3)">
-      <div class="filter-search" style="flex:1;max-width:300px">${icons.search}<input type="text" placeholder="搜索工作流或实例ID..." value="${wsExecSearch}" oninput="onExecSearch(this.value)" /></div>
-      <div class="filter-chips">
-        <span class="filter-chip ${wsExecStatusFilter === 'all' ? 'active' : ''}" onclick="onExecStatusFilter('all')">全部</span>
-        <span class="filter-chip ${wsExecStatusFilter === 'running' ? 'active' : ''}" onclick="onExecStatusFilter('running')">运行中</span>
-        <span class="filter-chip ${wsExecStatusFilter === 'paused' ? 'active' : ''}" onclick="onExecStatusFilter('paused')">已暂停</span>
-        <span class="filter-chip ${wsExecStatusFilter === 'completed' ? 'active' : ''}" onclick="onExecStatusFilter('completed')">已完成</span>
-        <span class="filter-chip ${wsExecStatusFilter === 'failed' ? 'active' : ''}" onclick="onExecStatusFilter('failed')">失败</span>
-        <span class="filter-chip ${wsExecStatusFilter === 'cancelled' ? 'active' : ''}" onclick="onExecStatusFilter('cancelled')">已取消</span>
-        <span class="filter-chip ${wsExecStatusFilter === 'stale' ? 'active' : ''}" onclick="onExecStatusFilter('stale')">异常滞留</span>
-      </div>
-      <div class="filter-actions">
-        <select class="form-input" style="width:auto;padding:4px 8px;font-size:var(--font-size-sm)" onchange="onExecWfFilter(this.value)">
-          <option value="all" ${wsExecWfFilter === 'all' ? 'selected' : ''}>全部工作流</option>
-          ${wfNames.map(n => `<option value="${n}" ${wsExecWfFilter === n ? 'selected' : ''}>${n}</option>`).join('')}
+      <div class="filter-search" style="flex:1;max-width:300px">${icons.search}<input type="text" placeholder="搜索工作流名称或实例ID..." value="${wsExecSearch}" oninput="onExecSearch(this.value)" /></div>
+      <div class="filter-actions" style="display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap">
+        <select class="form-input" style="width:auto;padding:4px 8px;font-size:var(--font-size-sm)" onchange="onExecStatusFilter(this.value)">
+          <option value="all" ${wsExecStatusFilter === 'all' ? 'selected' : ''}>全部状态</option>
+          <option value="running" ${wsExecStatusFilter === 'running' ? 'selected' : ''}>运行中</option>
+          <option value="paused" ${wsExecStatusFilter === 'paused' ? 'selected' : ''}>已暂停</option>
+          <option value="completed" ${wsExecStatusFilter === 'completed' ? 'selected' : ''}>已完成</option>
+          <option value="failed" ${wsExecStatusFilter === 'failed' ? 'selected' : ''}>失败</option>
+          <option value="cancelled" ${wsExecStatusFilter === 'cancelled' ? 'selected' : ''}>已取消</option>
+          <option value="stale" ${wsExecStatusFilter === 'stale' ? 'selected' : ''}>异常滞留</option>
         </select>
         <select class="form-input" style="width:auto;padding:4px 8px;font-size:var(--font-size-sm)" onchange="onExecTriggerFilter(this.value)">
           <option value="all" ${wsExecTriggerFilter === 'all' ? 'selected' : ''}>全部触发方式</option>
@@ -1478,11 +1552,10 @@ function renderWsExecutionsTab(ws) {
           <option value="7d" ${wsExecTimeRange === '7d' ? 'selected' : ''}>最近7天</option>
           <option value="30d" ${wsExecTimeRange === '30d' ? 'selected' : ''}>最近30天</option>
         </select>
-        ${!wsExecShowArchive ? `<button class="btn btn-secondary btn-sm" onclick="toggleExecArchive()">${icons.archive}<span>查看归档</span></button>` : ''}
         <span class="item-count">共 <strong>${execs.length}</strong> 条</span>
       </div>
     </div>
-    ${execs.length === 0 ? (wsExecSearch ? renderEmptyState('execSearchNoResult') : wsExecShowArchive ? renderEmptyState('archiveEmpty') : renderEmptyState('executions')) : `
+    ${execs.length === 0 ? (wsExecSearch ? renderEmptyState('execSearchNoResult') : renderEmptyState('executions')) : `
     <div class="table-wrapper"><table class="exec-table"><thead><tr><th>实例ID</th><th>工作流</th><th>版本</th><th>触发方式</th><th>状态</th><th>开始时间</th><th>结束时间</th><th>耗时</th><th>触发人</th><th>操作</th></tr></thead><tbody>
     ${execs.map(e => `<tr${e.stale ? ' style="background:rgba(234,179,8,0.05)"' : ''}>
       <td><code style="font-size:var(--font-size-xs)">#${e.id}</code></td>
@@ -1508,9 +1581,7 @@ function renderWsExecutionsTab(ws) {
 function onExecSearch(val) { wsExecSearch = val; render(); }
 function onExecStatusFilter(val) { wsExecStatusFilter = val; render(); }
 function onExecTriggerFilter(val) { wsExecTriggerFilter = val; render(); }
-function onExecWfFilter(val) { wsExecWfFilter = val; render(); }
 function onExecTimeRange(val) { wsExecTimeRange = val; render(); }
-function toggleExecArchive() { wsExecShowArchive = !wsExecShowArchive; wsExecSearch = ''; wsExecStatusFilter = 'all'; wsExecTriggerFilter = 'all'; wsExecWfFilter = 'all'; wsExecTimeRange = 'all'; wsExecDetailId = null; render(); }
 function viewExecDetail(execId) { wsExecDetailId = execId; render(); }
 
 function renderExecDetail(ws) {
@@ -1608,18 +1679,12 @@ function renderWsSettingsTab(ws) {
 
   return `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-4)">
-      <div><h3 style="font-size:var(--font-size-md);font-weight:500;margin:0">空间信息</h3></div>
+      <div><h3 style="font-size:var(--font-size-md);font-weight:500;margin:0">空间设置</h3></div>
       <div style="display:flex;gap:var(--space-2)">
         ${isAdmin ? `<button class="btn btn-secondary btn-sm" onclick="showEditWsModal(${ws.id})">${icons.edit}<span>编辑信息</span></button>` : ''}
         ${currentUserIsOnlyAdmin ? `<button class="btn btn-secondary btn-sm" onclick="showTransferAdminModal(${ws.id})">${icons.transfer}<span>转让管理员</span></button>` : ''}
         ${isAdmin ? `<button class="btn btn-danger btn-sm" onclick="showDeleteWsStep1(${ws.id})">${icons.trash}<span>删除空间</span></button>` : ''}
       </div>
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:var(--space-3);padding:var(--space-4);background:var(--md-surface);border-radius:var(--radius-lg);margin-bottom:var(--space-6)">
-      <div class="exec-detail-field"><span class="exec-detail-field-label">空间名称</span><span style="font-weight:500">${ws.name}</span></div>
-      <div class="exec-detail-field"><span class="exec-detail-field-label">空间编号</span><span>${ws.code}</span></div>
-      <div class="exec-detail-field"><span class="exec-detail-field-label">创建时间</span><span>${ws.createdAt}</span></div>
-      <div class="exec-detail-field"><span class="exec-detail-field-label">描述</span><span>${ws.desc || '-'}</span></div>
     </div>
 
     <h3 style="font-size:var(--font-size-md);font-weight:500;margin-bottom:var(--space-3)">成员管理</h3>
@@ -1653,8 +1718,8 @@ function switchMemberTab(tab) { wsMemberTab = tab; render(); }
 function showCreateWsModal() {
   showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">创建空间</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
   <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">空间名称 <span class="required">*</span></label><input type="text" class="form-input" id="wsName" placeholder="请输入空间名称" maxlength="50" oninput="this.classList.remove('error');document.getElementById('wsNameError').classList.add('hidden')" /><div class="form-error hidden" id="wsNameError"></div></div>
-  <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">空间描述</label><textarea class="form-textarea" id="wsDesc" placeholder="选填" maxlength="200"></textarea></div>
-  <div class="form-group"><label class="form-label">空间编号 <span class="required">*</span></label><input type="text" class="form-input" id="wsCode" placeholder="英文、数字、下划线、连字符" maxlength="30" oninput="this.classList.remove('error');document.getElementById('wsCodeError').classList.add('hidden')" /><div class="form-error hidden" id="wsCodeError"></div></div>
+  <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">空间编号 <span class="required">*</span></label><input type="text" class="form-input" id="wsCode" placeholder="英文、数字、下划线、连字符" maxlength="30" oninput="this.classList.remove('error');document.getElementById('wsCodeError').classList.add('hidden')" /><div class="form-error hidden" id="wsCodeError"></div></div>
+  <div class="form-group"><label class="form-label">空间描述</label><textarea class="form-textarea" id="wsDesc" placeholder="选填，200字以内" maxlength="200"></textarea></div>
   </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="createWorkspace()">保存</button></div></div>`);
   setTimeout(() => document.getElementById('wsName')?.focus(), 300);
 }
@@ -1682,8 +1747,8 @@ function showEditWsModal(id) {
   const ws = workspaces.find(w => w.id === id); if (!ws) return;
   showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">编辑空间</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
   <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">空间名称 <span class="required">*</span></label><input type="text" class="form-input" id="wsName" value="${ws.name}" maxlength="50" oninput="this.classList.remove('error');document.getElementById('wsNameError').classList.add('hidden')" /><div class="form-error hidden" id="wsNameError"></div></div>
-  <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">空间描述</label><textarea class="form-textarea" id="wsDesc" maxlength="200">${ws.desc}</textarea></div>
-  <div class="form-group"><label class="form-label">空间编号 <span style="font-size:var(--font-size-xs);color:var(--md-outline);font-weight:400">创建后不可修改</span></label><input type="text" class="form-input" id="wsCode" value="${ws.code}" disabled style="background:var(--md-surface);color:var(--md-outline);cursor:not-allowed" /></div>
+  <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">空间编号 <span style="font-size:var(--font-size-xs);color:var(--md-outline);font-weight:400">创建后不可修改</span></label><input type="text" class="form-input" id="wsCode" value="${ws.code}" disabled style="background:var(--md-surface);color:var(--md-outline);cursor:not-allowed" /></div>
+  <div class="form-group"><label class="form-label">空间描述</label><textarea class="form-textarea" id="wsDesc" maxlength="200">${ws.desc}</textarea></div>
   </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="updateWorkspace(${id})">保存</button></div></div>`);
 }
 function updateWorkspace(id) {
@@ -1729,19 +1794,70 @@ function showAddMemberModal() {
   const available = ssoUsers.filter(u => !existingIds.includes(u.id));
   const roleLabels = { admin: '管理员', member: '成员', viewer: '只读查看者' };
   const targetRole = wsMemberTab;
-  showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">添加${roleLabels[targetRole]}</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
-  <div class="people-picker-search">${icons.search}<input type="text" placeholder="搜索用户名..." oninput="filterPeoplePicker(this.value)" /></div>
-  <div class="people-picker-list" id="peoplePickerList" style="max-height:320px;overflow-y:auto">${available.length === 0 ? '<div style="text-align:center;color:var(--md-outline);padding:var(--space-8)">暂无可添加的用户</div>' :
-    available.map(u => `<div class="people-picker-item" data-name="${u.name}" onclick="addMember(${ws.id}, ${u.id}, '${targetRole}')"><div class="member-avatar avatar-${targetRole}">${u.avatar}</div><div class="people-picker-item-info"><div class="people-picker-item-name">${u.name}</div><div class="people-picker-item-dept">${u.dept}</div></div><div class="people-picker-item-add">${icons.plus}</div></div>`).join('')}
-  </div></div></div>`);
+  // Use a temp set to track selected users in the modal
+  window._addMemberSelected = window._addMemberSelected || new Set();
+  window._addMemberSelected.clear();
+  showModal(`<div class="modal" style="max-width:680px"><div class="modal-header"><h2 class="modal-title">添加${roleLabels[targetRole]}</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body" style="padding:0">
+  <div style="display:flex;min-height:360px">
+    <div style="flex:1;border-right:1px solid var(--color-border);display:flex;flex-direction:column">
+      <div class="people-picker-search" style="border-bottom:1px solid var(--color-border);padding:var(--space-3)">${icons.search}<input type="text" placeholder="搜索用户名或部门..." oninput="filterDualPicker(this.value)" /></div>
+      <div class="people-picker-list" id="dualPickerLeft" style="flex:1;overflow-y:auto;padding:var(--space-2)">${available.length === 0 ? '<div style="text-align:center;color:var(--md-outline);padding:var(--space-8)">暂无可添加的用户</div>' :
+        available.map(u => `<div class="people-picker-item" data-name="${u.name}" data-dept="${u.dept}" data-uid="${u.id}" onclick="toggleDualPickerSelect(${u.id})" style="cursor:pointer"><div class="member-avatar avatar-${targetRole}">${u.avatar}</div><div class="people-picker-item-info"><div class="people-picker-item-name">${u.name}</div><div class="people-picker-item-dept">${u.dept}</div></div><span class="dual-picker-check" id="dpCheck${u.id}" style="display:none;color:var(--md-primary)">${icons.check}</span></div>`).join('')}
+      </div>
+    </div>
+    <div style="width:240px;display:flex;flex-direction:column;background:var(--md-surface)">
+      <div style="padding:var(--space-3);border-bottom:1px solid var(--color-border);font-size:var(--font-size-sm);font-weight:500;color:var(--md-on-surface-variant)">已选择 <span id="dualPickerCount">0</span> 人</div>
+      <div id="dualPickerRight" style="flex:1;overflow-y:auto;padding:var(--space-2)"><div style="text-align:center;color:var(--md-outline);padding:var(--space-6);font-size:var(--font-size-sm)">从左侧选择要添加的用户</div></div>
+    </div>
+  </div>
+  </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" id="dualPickerConfirmBtn" onclick="confirmDualPickerAdd(${ws.id}, '${targetRole}')" disabled style="opacity:0.5;cursor:not-allowed">确认添加</button></div></div>`);
 }
-function filterPeoplePicker(val) { document.querySelectorAll('#peoplePickerList .people-picker-item').forEach(item => { item.style.display = item.getAttribute('data-name').toLowerCase().includes(val.toLowerCase()) ? 'flex' : 'none'; }); }
-function addMember(wsId, userId, role) {
+function filterDualPicker(val) {
+  const q = val.toLowerCase();
+  document.querySelectorAll('#dualPickerLeft .people-picker-item').forEach(item => {
+    const name = item.getAttribute('data-name').toLowerCase();
+    const dept = item.getAttribute('data-dept').toLowerCase();
+    item.style.display = (name.includes(q) || dept.includes(q)) ? 'flex' : 'none';
+  });
+}
+function toggleDualPickerSelect(uid) {
+  const sel = window._addMemberSelected;
+  if (sel.has(uid)) sel.delete(uid); else sel.add(uid);
+  // Update left side check marks
+  document.querySelectorAll('#dualPickerLeft .people-picker-item').forEach(item => {
+    const id = parseInt(item.getAttribute('data-uid'));
+    const check = document.getElementById('dpCheck' + id);
+    if (check) check.style.display = sel.has(id) ? 'inline-flex' : 'none';
+    item.style.background = sel.has(id) ? 'var(--md-primary-container)' : '';
+  });
+  // Update right side
+  const right = document.getElementById('dualPickerRight');
+  const countEl = document.getElementById('dualPickerCount');
+  const btn = document.getElementById('dualPickerConfirmBtn');
+  countEl.textContent = sel.size;
+  if (sel.size === 0) {
+    right.innerHTML = '<div style="text-align:center;color:var(--md-outline);padding:var(--space-6);font-size:var(--font-size-sm)">从左侧选择要添加的用户</div>';
+    btn.disabled = true; btn.style.opacity = '0.5'; btn.style.cursor = 'not-allowed';
+  } else {
+    const users = [...sel].map(id => ssoUsers.find(u => u.id === id)).filter(Boolean);
+    right.innerHTML = users.map(u => `<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:var(--radius-md)"><div class="member-avatar" style="width:28px;height:28px;font-size:11px">${u.avatar}</div><span style="flex:1;font-size:var(--font-size-sm)">${u.name}</span><button class="table-action-btn" onclick="event.stopPropagation();toggleDualPickerSelect(${u.id})" style="color:var(--md-error)">${icons.close}</button></div>`).join('');
+    btn.disabled = false; btn.style.opacity = '1'; btn.style.cursor = 'pointer';
+  }
+}
+function confirmDualPickerAdd(wsId, role) {
   const ws = workspaces.find(w => w.id === wsId); if (!ws) return;
-  if (ws.members.some(m => m.userId === userId)) { showToast('warning', '提示', '该用户已是空间成员'); return; }
-  const user = ssoUsers.find(u => u.id === userId);
-  ws.members.push({ userId: user.id, name: user.name, avatar: user.avatar, role, joinedAt: new Date().toISOString().slice(0, 10) });
-  closeModal(); showToast('success', '添加成功', `已将「${user.name}」添加为${role === 'admin' ? '管理员' : role === 'member' ? '成员' : '只读查看者'}`); render();
+  const sel = window._addMemberSelected;
+  if (sel.size === 0) return;
+  const roleLabel = { admin: '管理员', member: '成员', viewer: '只读查看者' };
+  let added = 0;
+  sel.forEach(uid => {
+    if (ws.members.some(m => m.userId === uid)) return;
+    const user = ssoUsers.find(u => u.id === uid); if (!user) return;
+    ws.members.push({ userId: user.id, name: user.name, avatar: user.avatar, role, joinedAt: new Date().toISOString().slice(0, 10) });
+    added++;
+  });
+  sel.clear();
+  closeModal(); showToast('success', '添加成功', `已添加 ${added} 位${roleLabel[role]}`); render();
 }
 function changeMemberRole(wsId, userId, newRole) {
   const ws = workspaces.find(w => w.id === wsId); if (!ws) return;
