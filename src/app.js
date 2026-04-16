@@ -184,7 +184,10 @@ let wsContentOwnerFilter = [];
 let wsOwnerDropdownOpen = false;
 let wsOwnerSearch = '';
 let wsContentTypeFilter = 'all';
+let wsFilterPanelOpen = false;
 let wsExecSearch = '';
+let wsExecPage = 1;
+let wsExecPageSize = 10;
 let wsExecStatusFilter = 'all';
 let wsExecTriggerFilter = 'all';
 let wsExecTimeRange = 'all';
@@ -495,7 +498,7 @@ function renderEmptyState(type) {
     dsSearchEmpty: { img: './public/images/empty-datasource.png', title: '未找到匹配的数据源', desc: '请调整搜索或筛选条件', btn: '' },
     dataItems: { img: './public/images/empty-dataitems.png', title: '暂无数据项', desc: '添加数据项来定义数据源内容', btn: `<button class="btn btn-primary" onclick="showAddItemModal(${typeof currentDsId !== 'undefined' ? currentDsId : 0})">${icons.plus}<span>添加数据项</span></button>` },
     syncLog: { img: './public/images/empty-sync-log.png', title: '暂无同步记录', desc: '执行 API 同步后将在此记录历史', btn: '' },
-    workspace: { img: './public/images/empty-workspace.png', title: '暂无工作空间', desc: '创建工作空间来组织工作流', btn: `<button class="btn btn-primary" onclick="showCreateWsModal()">${icons.plus}<span>创建空间</span></button>` },
+    workspace: { img: './public/images/empty-workspace.png', title: '暂无工作空间', desc: '创建工作空间来组织工作流', btn: `<button class="btn btn-primary" onclick="showCreateWsModal()">${icons.plus}<span>新建空间</span></button>` }
     wsSearchEmpty: { img: './public/images/empty-workspace.png', title: '未找到匹配空间', desc: '请调整搜索或筛选条件', btn: '' },
     folderContent: { img: './public/images/empty-folder-content.png', title: '暂无内容', desc: '创建工作流或文件夹来组织您的空间', btn: '' },
     folderEmpty: { img: './public/images/empty-folder-content.png', title: '该文件夹为空', desc: '在此文件夹中创建工作流或子文件夹', btn: '' },
@@ -859,7 +862,7 @@ function renderWorkspaceModule(content, breadcrumb) {
 }
 function wsNavigateTo(view, wsId) {
   wsCurrentView = view; wsCurrentId = wsId || null;
-  if (view === 'detail') { wsInternalTab = 'workflows'; wsMemberTab = 'admin'; wsCurrentFolderId = null; wsFolderPath = []; wsContentSearch = ''; wsContentStatusFilter = 'all'; wsContentCreatorFilter = []; wsCreatorDropdownOpen = false; wsCreatorSearch = ''; wsContentOwnerFilter = []; wsOwnerDropdownOpen = false; wsOwnerSearch = ''; wsContentTypeFilter = 'all'; wsFilterPanelOpen = false; wsContentSortField = 'editedAt'; wsContentSortAsc = false; wsExecSearch = ''; wsExecStatusFilter = 'all'; wsExecTriggerFilter = 'all'; wsExecTimeRange = 'all'; wsExecDetailId = null; }
+  if (view === 'detail') { wsInternalTab = 'workflows'; wsMemberTab = 'admin'; wsCurrentFolderId = null; wsFolderPath = []; wsContentSearch = ''; wsContentStatusFilter = 'all'; wsContentCreatorFilter = []; wsCreatorDropdownOpen = false; wsCreatorSearch = ''; wsContentOwnerFilter = []; wsOwnerDropdownOpen = false; wsOwnerSearch = ''; wsContentTypeFilter = 'all'; wsFilterPanelOpen = false; wsContentSortField = 'editedAt'; wsContentSortAsc = false; wsExecSearch = ''; wsExecStatusFilter = 'all'; wsExecTriggerFilter = 'all'; wsExecTimeRange = 'all'; wsExecDetailId = null; wsExecPage = 1; }
   render();
 }
 
@@ -869,7 +872,7 @@ function renderWsListPage() {
   const paged = filtered.slice(start, start + wsListState.pageSize);
   const totalPages = Math.ceil(total / wsListState.pageSize);
   return `
-    <div class="page-header"><div class="page-title-section"><h1 class="page-title shiny-text">空间管理</h1></div><button class="btn btn-primary magnet-btn" onclick="showCreateWsModal()">${icons.plus}<span>创建空间</span></button></div>
+    <div class="page-header"><div class="page-title-section"><h1 class="page-title shiny-text">空间管理</h1></div><button class="btn btn-primary magnet-btn" onclick="showCreateWsModal()">${icons.plus}<span>新建空间</span></button></div>
     <div class="filter-bar">
       <div class="filter-search">${icons.search}<input type="text" placeholder="搜索空间名称或编号..." value="${wsListState.search}" oninput="onWsSearchInput(this.value)" /></div>
       <div class="filter-chips">
@@ -931,7 +934,7 @@ function renderWsDetailPage(ws) {
 function switchWsTab(tab) {
   wsInternalTab = tab;
   if (tab === 'workflows') { wsCurrentFolderId = null; wsFolderPath = []; wsContentSearch = ''; wsContentStatusFilter = 'all'; wsContentCreatorFilter = []; wsCreatorDropdownOpen = false; wsContentOwnerFilter = []; wsOwnerDropdownOpen = false; wsContentTypeFilter = 'all'; wsFilterPanelOpen = false; }
-  if (tab === 'executions') { wsExecDetailId = null; wsExecSearch = ''; wsExecStatusFilter = 'all'; wsExecTriggerFilter = 'all'; }
+  if (tab === 'executions') { wsExecDetailId = null; wsExecSearch = ''; wsExecStatusFilter = 'all'; wsExecTriggerFilter = 'all'; wsExecPage = 1; }
   render();
 }
 
@@ -1081,7 +1084,7 @@ function renderWsWorkflowsTab(ws) {
     </div>
 
     ${isEmpty ? (isSearchMode ? renderEmptyState('searchNoResult') : (wsCurrentFolderId !== null ? `<div class="empty-state" style="padding:var(--space-10)"><img src="./public/images/empty-folder-content.png" class="empty-state-img" /><div class="empty-state-title">该文件夹为空</div><div class="empty-state-desc">在此文件夹中创建工作流或子文件夹</div><div style="display:flex;gap:var(--space-2);margin-top:var(--space-4)">${isMemberOrAbove ? `<button class="btn btn-primary btn-sm" onclick="showCreateWfModal()">${icons.plus}<span>新建工作流</span></button>` : ''}${canCreateFolder ? `<button class="btn btn-secondary btn-sm" onclick="showCreateFolderModal()">${icons.folder}<span>新建子文件夹</span></button>` : ''}</div></div>` : `<div class="empty-state" style="padding:var(--space-10)"><img src="./public/images/empty-folder-content.png" class="empty-state-img" /><div class="empty-state-title">暂无内容</div><div class="empty-state-desc">创建工作流或文件夹来组织您的空间</div><div style="display:flex;gap:var(--space-2);margin-top:var(--space-4)">${isMemberOrAbove ? `<button class="btn btn-primary btn-sm" onclick="showCreateWfModal()">${icons.plus}<span>新建工作流</span></button><button class="btn btn-secondary btn-sm" onclick="showCreateFolderModal()">${icons.folder}<span>新建文件夹</span></button>` : ''}</div></div>`)) : `
-    <div class="content-list-header"><span class="col-header ${sortCls('name')}" style="flex:2.5" onclick="onWsContentSort('name')">名称 ${sortIcon('name')}</span><span style="flex:0.7">状态</span><span style="flex:0.6">版本</span><span style="flex:0.6">类型</span><span style="flex:0.8">创建者</span><span style="flex:0.8">负责人</span><span class="col-header ${sortCls('editedAt')}" style="flex:0.9" onclick="onWsContentSort('editedAt')">最后编辑 ${sortIcon('editedAt')}</span><span style="width:80px">操作</span></div>
+    <div class="content-list-header"><span class="col-header ${sortCls('name')}" style="flex:2.5" onclick="onWsContentSort('name')">名称 ${sortIcon('name')}</span><span style="flex:0.7">状态</span><span style="flex:0.6">发布版本</span><span style="flex:0.6">类型</span><span style="flex:0.8">创建者</span><span style="flex:0.8">负责人</span><span class="col-header ${sortCls('editedAt')}" style="flex:0.9" onclick="onWsContentSort('editedAt')">最后编辑 ${sortIcon('editedAt')}</span><span style="width:80px">操作</span></div>
     <div class="content-list">
       ${showFolders ? sortedFolders.map(f => {
         const subF = getSubFolderCount(ws.id, f.id), subW = getSubWfCount(ws.id, f.id);
@@ -1403,9 +1406,10 @@ function moveWf(wfId, targetFolderId) {
 }
 function showDisableWfModal(wfId) {
   const wf = (wsWorkflows[wsCurrentId] || []).find(x => x.id === wfId); if (!wf) return;
-  if (wf.runningCount > 0) {
-    showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">停用工作流</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body"><div class="delete-warning"><span class="delete-warning-icon">${icons.alertTriangle}</span><div class="delete-warning-text">当前有 ${wf.runningCount} 个运行中实例，停用后不影响运行中的实例，但不允许启动新的实例。是否继续？</div></div></div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-danger" onclick="disableWf(${wfId})">确认停用</button></div></div>`);
-  } else { disableWf(wfId); }
+  const hasRunning = wf.runningCount > 0;
+  showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">停用工作流</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
+  ${hasRunning ? `<div class="delete-warning"><span class="delete-warning-icon">${icons.alertTriangle}</span><div class="delete-warning-text">当前有 ${wf.runningCount} 个运行中实例，停用后不影响运行中的实例，但不允许启动新的实例。是否继续？</div></div>` : `<p style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant)">确定停用工作流「${wf.name}」吗？停用后将不允许启动新的执行实例。</p>`}
+  </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-danger" onclick="disableWf(${wfId})">确认停用</button></div></div>`);
 }
 function disableWf(wfId) {
   const wf = (wsWorkflows[wsCurrentId] || []).find(x => x.id === wfId); if (!wf) return;
@@ -1417,12 +1421,19 @@ function enableWf(wfId) {
 }
 function executeWf(wfId) {
   const wf = (wsWorkflows[wsCurrentId] || []).find(x => x.id === wfId); if (!wf || wf.status !== 'published') return;
+  showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">确认执行</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
+  <p style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant)">确定手动执行工作流「${wf.name}」（v${wf.version}）吗？</p>
+  ${wf.runningCount > 0 ? `<div style="margin-top:var(--space-3);padding:var(--space-3);background:rgba(234,179,8,0.06);border:1px solid rgba(234,179,8,0.15);border-radius:var(--radius-md);font-size:var(--font-size-sm);color:var(--md-on-surface-variant);line-height:1.6">当前已有 <strong>${wf.runningCount}</strong> 个运行中实例。</div>` : ''}
+  </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="confirmExecuteWf(${wfId})">确认执行</button></div></div>`);
+}
+function confirmExecuteWf(wfId) {
+  const wf = (wsWorkflows[wsCurrentId] || []).find(x => x.id === wfId); if (!wf || wf.status !== 'published') return;
   if (!wsExecutions[wsCurrentId]) wsExecutions[wsCurrentId] = [];
   const now = new Date(); const ts = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
   const execId = 3000 + wsExecutions[wsCurrentId].length;
   wsExecutions[wsCurrentId].unshift({ id: execId, wfId: wf.id, wfName: wf.name, wfCode: wf.code, version: wf.version, trigger: 'manual', status: 'running', startTime: ts, endTime: '-', duration: '进行中', triggerUser: 'Sukey Wu', archived: false, nodes: [{ name: '触发节点', type: '手动触发', status: 'success', duration: '0.1秒', startTime: ts.slice(11) }, { name: '执行中...', type: '处理节点', status: 'running', duration: '进行中', startTime: ts.slice(11) }] });
   wf.runningCount++; wf.lastRun = 'running';
-  showToast('success', '工作流已启动', `实例 ID: ${execId}`); render();
+  closeModal(); showToast('success', '工作流已启动', `实例 ID: ${execId}`); render();
 }
 function showVersionHistory(wfId) {
   const wf = (wsWorkflows[wsCurrentId] || []).find(x => x.id === wfId); if (!wf) return;
@@ -1561,9 +1572,24 @@ function renderWsExecutionsTab(ws) {
   // Sort: stale first, then by startTime desc
   execs.sort((a, b) => { if (a.stale && !b.stale) return -1; if (!a.stale && b.stale) return 1; return b.startTime.localeCompare(a.startTime); });
 
+  // Pagination
+  const totalExecs = execs.length;
+  const totalExecPages = Math.max(1, Math.ceil(totalExecs / wsExecPageSize));
+  if (wsExecPage > totalExecPages) wsExecPage = totalExecPages;
+  const execStart = (wsExecPage - 1) * wsExecPageSize;
+  const pagedExecs = execs.slice(execStart, execStart + wsExecPageSize);
+
   const statusLabel = { running: '运行中', paused: '已暂停', completed: '已完成', failed: '失败', cancelled: '已取消' };
   const statusClass = { running: 'exec-running', paused: 'exec-paused', completed: 'exec-completed', failed: 'exec-failed', cancelled: 'exec-cancelled' };
   const triggerLabel = { manual: '手动', scheduled: '定时', event: '事件触发', subflow: '子流程调用' };
+
+  // Pagination controls HTML
+  let execPaginationHtml = '';
+  if (totalExecs > 0) {
+    let pageButtons = '';
+    for (let i = 1; i <= totalExecPages; i++) pageButtons += `<button class="pagination-btn ${i === wsExecPage ? 'active' : ''}" onclick="goToExecPage(${i})">${i}</button>`;
+    execPaginationHtml = `<div class="pagination"><div class="pagination-info"><span>共 ${totalExecs} 条记录</span><div class="pagination-divider"></div><span class="pagination-size"><label>每页</label><select onchange="onExecPageSizeChange(this.value)">${[10,20,50].map(n => `<option value="${n}" ${wsExecPageSize === n ? 'selected' : ''}>${n}</option>`).join('')}</select><label>条</label></span></div><div class="pagination-controls"><button class="pagination-btn" ${wsExecPage <= 1 ? 'disabled' : ''} onclick="goToExecPage(${wsExecPage - 1})">${icons.chevronLeft}</button>${pageButtons}<button class="pagination-btn" ${wsExecPage >= totalExecPages ? 'disabled' : ''} onclick="goToExecPage(${wsExecPage + 1})">${icons.chevronRight}</button></div></div>`;
+  }
 
   return `
     <div class="filter-bar" style="margin-top:var(--space-3)">
@@ -1591,12 +1617,12 @@ function renderWsExecutionsTab(ws) {
           <option value="7d" ${wsExecTimeRange === '7d' ? 'selected' : ''}>最近7天</option>
           <option value="30d" ${wsExecTimeRange === '30d' ? 'selected' : ''}>最近30天</option>
         </select>
-        <span class="item-count">共 <strong>${execs.length}</strong> 条</span>
+        <span class="item-count">共 <strong>${totalExecs}</strong> 条</span>
       </div>
     </div>
-    ${execs.length === 0 ? (wsExecSearch ? renderEmptyState('execSearchNoResult') : renderEmptyState('executions')) : `
-    <div class="table-wrapper"><table class="exec-table"><thead><tr><th>实例ID</th><th>工作流</th><th>版本</th><th>触发方式</th><th>状态</th><th>开始时间</th><th>结束时间</th><th>耗时</th><th>触发人</th><th>操作</th></tr></thead><tbody>
-    ${execs.map(e => `<tr${e.stale ? ' style="background:rgba(234,179,8,0.05)"' : ''}>
+    ${totalExecs === 0 ? (wsExecSearch ? renderEmptyState('execSearchNoResult') : renderEmptyState('executions')) : `
+    <div class="table-wrapper"><table class="exec-table"><thead><tr><th>实例ID</th><th>工作流</th><th>发布版本</th><th>触发方式</th><th>状态</th><th>开始时间</th><th>结束时间</th><th>耗时</th><th>触发人</th><th>操作</th></tr></thead><tbody>
+    ${pagedExecs.map(e => `<tr${e.stale ? ' style="background:rgba(234,179,8,0.05)"' : ''}>
       <td><code style="font-size:var(--font-size-xs)">#${e.id}</code></td>
       <td style="font-weight:500">${e.wfName}</td>
       <td><span class="version-badge">v${e.version}</span></td>
@@ -1610,17 +1636,20 @@ function renderWsExecutionsTab(ws) {
         <button class="table-action-btn" title="查看详情" onclick="viewExecDetail(${e.id})">${icons.eye}</button>
         ${(e.status === 'running' || e.status === 'paused') && ws.myRole !== 'viewer' ? `<button class="table-action-btn danger" title="取消" onclick="showCancelExecModal(${e.id})">${icons.stop}</button>` : ''}
         ${e.status === 'running' && ws.myRole !== 'viewer' ? `<button class="table-action-btn" title="暂停" onclick="showPauseExecModal(${e.id})">${icons.pause}</button>` : ''}
-        ${e.status === 'paused' && ws.myRole !== 'viewer' ? `<button class="table-action-btn" title="恢复" onclick="resumeExec(${e.id})">${icons.play}</button>` : ''}
-        ${['completed','failed','cancelled'].includes(e.status) && ws.myRole !== 'viewer' ? `<button class="table-action-btn" title="重新执行" onclick="reExecute(${e.id})">${icons.redo}</button>` : ''}
+        ${e.status === 'paused' && ws.myRole !== 'viewer' ? `<button class="table-action-btn" title="恢复" onclick="showResumeExecModal(${e.id})">${icons.play}</button>` : ''}
+        ${['completed','failed','cancelled'].includes(e.status) && ws.myRole !== 'viewer' ? `<button class="table-action-btn" title="重新执行" onclick="showReExecuteModal(${e.id})">${icons.redo}</button>` : ''}
       </div></td>
     </tr>`).join('')}
-    </tbody></table></div>`}`;
+    </tbody></table></div>
+    ${execPaginationHtml}`};
 }
 
-function onExecSearch(val) { wsExecSearch = val; render(); }
-function onExecStatusFilter(val) { wsExecStatusFilter = val; render(); }
-function onExecTriggerFilter(val) { wsExecTriggerFilter = val; render(); }
-function onExecTimeRange(val) { wsExecTimeRange = val; render(); }
+function onExecSearch(val) { wsExecSearch = val; wsExecPage = 1; render(); }
+function onExecStatusFilter(val) { wsExecStatusFilter = val; wsExecPage = 1; render(); }
+function onExecTriggerFilter(val) { wsExecTriggerFilter = val; wsExecPage = 1; render(); }
+function onExecTimeRange(val) { wsExecTimeRange = val; wsExecPage = 1; render(); }
+function goToExecPage(p) { wsExecPage = p; render(); }
+function onExecPageSizeChange(val) { wsExecPageSize = parseInt(val); wsExecPage = 1; render(); }
 function viewExecDetail(execId) { wsExecDetailId = execId; render(); }
 
 function renderExecDetail(ws) {
@@ -1641,9 +1670,9 @@ function renderExecDetail(ws) {
       </div>
       <div style="display:flex;gap:var(--space-2)">
         ${exec.status === 'running' && ws.myRole !== 'viewer' ? `<button class="btn btn-secondary btn-sm" onclick="showPauseExecModal(${exec.id})">${icons.pause}<span>暂停</span></button>` : ''}
-        ${exec.status === 'paused' && ws.myRole !== 'viewer' ? `<button class="btn btn-primary btn-sm" onclick="resumeExec(${exec.id})">${icons.play}<span>恢复</span></button>` : ''}
+        ${exec.status === 'paused' && ws.myRole !== 'viewer' ? `<button class="btn btn-primary btn-sm" onclick="showResumeExecModal(${exec.id})">${icons.play}<span>恢复</span></button>` : ''}
         ${(exec.status === 'running' || exec.status === 'paused') && ws.myRole !== 'viewer' ? `<button class="btn btn-danger btn-sm" onclick="showCancelExecModal(${exec.id})">${icons.stop}<span>取消</span></button>` : ''}
-        ${['completed','failed','cancelled'].includes(exec.status) && ws.myRole !== 'viewer' ? `<button class="btn btn-primary btn-sm" onclick="reExecute(${exec.id})">${icons.redo}<span>重新执行</span></button>` : ''}
+        ${['completed','failed','cancelled'].includes(exec.status) && ws.myRole !== 'viewer' ? `<button class="btn btn-primary btn-sm" onclick="showReExecuteModal(${exec.id})">${icons.redo}<span>重新执行</span></button>` : ''}
       </div>
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:var(--space-4);margin:var(--space-4) 0;padding:var(--space-4);background:var(--md-surface);border-radius:var(--radius-lg)">
@@ -1692,17 +1721,31 @@ function pauseExec(execId) {
 }
 function resumeExec(execId) {
   const exec = (wsExecutions[wsCurrentId] || []).find(e => e.id === execId); if (!exec) return;
-  exec.status = 'running'; exec.stale = false; showToast('success', '执行已恢复', ''); render();
+  exec.status = 'running'; exec.stale = false; closeModal(); showToast('success', '执行已恢复', ''); render();
+}
+function showResumeExecModal(execId) {
+  const exec = (wsExecutions[wsCurrentId] || []).find(e => e.id === execId); if (!exec) return;
+  showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">确认恢复执行</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
+  <p style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant)">确定恢复执行实例 <strong>#${exec.id}</strong>（${exec.wfName}）吗？恢复后将继续从暂停点执行。</p>
+  </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="resumeExec(${execId})">确认恢复</button></div></div>`);
 }
 function reExecute(execId) {
   const exec = (wsExecutions[wsCurrentId] || []).find(e => e.id === execId); if (!exec) return;
   const wf = (wsWorkflows[wsCurrentId] || []).find(x => x.id === exec.wfId);
   if (wf && wf.status === 'published') {
-    executeWf(wf.id);
+    confirmExecuteWf(wf.id);
     showToast('success', '重新执行', '已基于当前版本重新启动');
   } else {
     showToast('warning', '无法执行', '工作流当前状态不支持执行');
   }
+}
+function showReExecuteModal(execId) {
+  const exec = (wsExecutions[wsCurrentId] || []).find(e => e.id === execId); if (!exec) return;
+  const wf = (wsWorkflows[wsCurrentId] || []).find(x => x.id === exec.wfId);
+  if (!wf || wf.status !== 'published') { showToast('warning', '无法执行', '工作流当前状态不支持执行'); return; }
+  showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">确认重新执行</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
+  <p style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant)">确定基于工作流「${wf.name}」当前版本（v${wf.version}）重新执行吗？将创建一个新的执行实例。</p>
+  </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="reExecute(${execId})">确认执行</button></div></div>`);
 }
 
 // ============================================
@@ -1755,7 +1798,7 @@ function switchMemberTab(tab) { wsMemberTab = tab; render(); }
 
 // --- Workspace CRUD ---
 function showCreateWsModal() {
-  showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">创建空间</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
+  showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">新建空间</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
   <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">空间名称 <span class="required">*</span></label><input type="text" class="form-input" id="wsName" placeholder="请输入空间名称" maxlength="50" oninput="this.classList.remove('error');document.getElementById('wsNameError').classList.add('hidden')" /><div class="form-error hidden" id="wsNameError"></div></div>
   <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">空间编号 <span class="required">*</span></label><input type="text" class="form-input" id="wsCode" placeholder="英文、数字、下划线、连字符" maxlength="30" oninput="this.classList.remove('error');document.getElementById('wsCodeError').classList.add('hidden')" /><div class="form-error hidden" id="wsCodeError"></div></div>
   <div class="form-group"><label class="form-label">空间描述</label><textarea class="form-textarea" id="wsDesc" placeholder="选填，200字以内" maxlength="200"></textarea></div>
@@ -1901,8 +1944,19 @@ function confirmDualPickerAdd(wsId, role) {
 function changeMemberRole(wsId, userId, newRole) {
   const ws = workspaces.find(w => w.id === wsId); if (!ws) return;
   const member = ws.members.find(m => m.userId === userId); if (!member) return;
+  if (member.role === newRole) return;
   if (member.role === 'admin' && newRole !== 'admin') { if (ws.members.filter(m => m.role === 'admin').length <= 1) { showToast('error', '操作失败', '至少保留一名管理员'); render(); return; } }
-  member.role = newRole; showToast('success', '角色变更', `已变更为${{ admin: '管理员', member: '成员', viewer: '只读查看者' }[newRole]}`); render();
+  const roleLabelsMap = { admin: '管理员', member: '成员', viewer: '只读查看者' };
+  showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">确认变更角色</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
+  <p style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant)">确定将「${member.name}」的角色从 <strong>${roleLabelsMap[member.role]}</strong> 变更为 <strong>${roleLabelsMap[newRole]}</strong> 吗？</p>
+  ${member.role === 'admin' ? '<div style="margin-top:var(--space-3);padding:var(--space-3);background:rgba(220,38,38,0.06);border:1px solid rgba(220,38,38,0.15);border-radius:var(--radius-md);font-size:var(--font-size-sm);color:var(--md-error);line-height:1.6"><strong>⚠ 降级管理员后，该用户将失去空间管理权限。</strong></div>' : ''}
+  <div style="margin-top:var(--space-4);display:flex;align-items:center;gap:var(--space-3);padding:var(--space-3);background:var(--md-surface);border-radius:var(--radius-lg)"><div class="member-avatar avatar-${member.role}">${member.avatar}</div><div><div style="font-size:var(--font-size-sm);font-weight:500">${member.name}</div></div></div>
+  </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal();render()">取消</button><button class="btn btn-primary" onclick="confirmChangeMemberRole(${wsId}, ${userId}, '${newRole}')">确认变更</button></div></div>`);
+}
+function confirmChangeMemberRole(wsId, userId, newRole) {
+  const ws = workspaces.find(w => w.id === wsId); if (!ws) return;
+  const member = ws.members.find(m => m.userId === userId); if (!member) return;
+  member.role = newRole; closeModal(); showToast('success', '角色变更', `已变更为${{ admin: '管理员', member: '成员', viewer: '只读查看者' }[newRole]}`); render();
 }
 function showRemoveMemberModal(wsId, userId) {
   const ws = workspaces.find(w => w.id === wsId); if (!ws) return;
