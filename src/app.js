@@ -58,9 +58,9 @@ let currentModule = 'datasource';
 //   DATA SOURCE MODULE - Mock Data & State
 // ============================================
 let dataSources = [
-  { id: 1, name: '酒店星级字典', desc: '定义酒店星级分类标准', createdAt: '2025-03-15', creator: 'Admin', isPublic: true, referenced: true, referenceCount: 3, items: [{ key: 'ONE_STAR', value: '一星级', type: 'String' }, { key: 'TWO_STAR', value: '二星级', type: 'String' }, { key: 'STAR_COUNT', value: '5', type: 'Integer' }, { key: 'IS_ACTIVE', value: 'true', type: 'Boolean' }, { key: 'AVG_PRICE', value: '688.50', type: 'Double' }, { key: 'LAST_SYNC', value: '2025-04-10T14:30', type: 'DateTime' }], authorizedSpaces: [], syncConfig: { url: '', keyField: '', valueField: '' }, syncLogs: [] },
-  { id: 2, name: '货币代码', desc: '国际标准货币代码对照表', createdAt: '2025-03-18', creator: 'Sukey Wu', isPublic: true, referenced: true, referenceCount: 8, items: [{ key: 'CNY', value: '人民币', type: 'String' }, { key: 'USD', value: '美元', type: 'String' }, { key: 'EUR', value: '欧元', type: 'String' }], authorizedSpaces: [], syncConfig: { url: 'https://api.example.com/currencies', keyField: 'code', valueField: 'name_cn' }, syncLogs: [{ time: '2025-04-10 14:30', operator: 'Sukey Wu', strategy: '全量覆盖', result: 'success', summary: '新增 0 条、更新 7 条、删除 0 条', reason: '' }] },
-  { id: 3, name: '房型代码', desc: '酒店房型编码与中文名称映射', createdAt: '2025-03-22', creator: 'Admin', isPublic: false, referenced: true, referenceCount: 2, items: [{ key: 'SGL', value: '单人房', type: 'String' }, { key: 'DBL', value: '双人房', type: 'String' }, { key: 'TWN', value: '双床房', type: 'String' }], authorizedSpaces: ['酒店预订流程', '数据清洗工作区'], syncConfig: { url: 'https://api.hotel.com/room-types', keyField: 'code', valueField: 'name_cn' }, syncLogs: [
+  { id: 1, name: '酒店星级字典', desc: '定义酒店星级分类标准', createdAt: '2025-03-15', creator: 'Admin', isPublic: true, referenced: true, referenceCount: 3, items: [{ key: 'ONE_STAR', value: '一星级', type: 'String', updatedAt: '2025-04-12 10:00' }, { key: 'TWO_STAR', value: '二星级', type: 'String', updatedAt: '2025-04-11 15:30' }, { key: 'STAR_COUNT', value: '5', type: 'Integer', updatedAt: '2025-04-10 09:00' }, { key: 'IS_ACTIVE', value: 'true', type: 'Boolean', updatedAt: '2025-04-09 14:20' }, { key: 'AVG_PRICE', value: '688.50', type: 'Double', updatedAt: '2025-04-08 11:00' }, { key: 'LAST_SYNC', value: '2025-04-10T14:30', type: 'DateTime', updatedAt: '2025-04-10 14:30' }], authorizedSpaces: [], syncConfig: { url: '', keyField: '', valueField: '' }, syncLogs: [] },
+  { id: 2, name: '货币代码', desc: '国际标准货币代码对照表', createdAt: '2025-03-18', creator: 'Sukey Wu', isPublic: true, referenced: true, referenceCount: 8, items: [{ key: 'CNY', value: '人民币', type: 'String', updatedAt: '2025-04-10 14:30' }, { key: 'USD', value: '美元', type: 'String', updatedAt: '2025-04-10 14:30' }, { key: 'EUR', value: '欧元', type: 'String', updatedAt: '2025-04-10 14:30' }], authorizedSpaces: [], syncConfig: { url: 'https://api.example.com/currencies', keyField: 'code', valueField: 'name_cn' }, syncLogs: [{ time: '2025-04-10 14:30', operator: 'Sukey Wu', strategy: '全量覆盖', result: 'success', summary: '新增 0 条、更新 7 条、删除 0 条', reason: '' }] },
+  { id: 3, name: '房型代码', desc: '酒店房型编码与中文名称映射', createdAt: '2025-03-22', creator: 'Admin', isPublic: false, referenced: true, referenceCount: 2, items: [{ key: 'SGL', value: '单人房', type: 'String', updatedAt: '2026-04-16 11:20' }, { key: 'DBL', value: '双人房', type: 'String', updatedAt: '2026-04-15 09:30' }, { key: 'TWN', value: '双床房', type: 'String', updatedAt: '2026-04-14 16:45' }], authorizedSpaces: ['酒店预订流程', '数据清洗工作区'], syncConfig: { url: 'https://api.hotel.com/room-types', keyField: 'code', valueField: 'name_cn' }, syncLogs: [
     { time: '2026-04-16 11:20', operator: 'Sukey Wu', strategy: '全量覆盖', result: 'error', summary: '', reason: 'API 返回格式异常' },
     { time: '2026-04-16 11:20', operator: 'Sukey Wu', strategy: '增量更新', result: 'success', summary: '新增 2 条、更新 8 条', reason: '' },
     { time: '2026-04-15 09:30', operator: 'Admin', strategy: '全量覆盖', result: 'success', summary: '新增 0 条、更新 12 条', reason: '' },
@@ -77,8 +77,8 @@ let dataSources = [
     { time: '2026-04-04 16:00', operator: 'Sukey Wu', strategy: '增量更新', result: 'success', summary: '新增 1 条、更新 2 条', reason: '' },
     { time: '2026-04-03 08:45', operator: 'Admin', strategy: '全量覆盖', result: 'error', summary: '', reason: 'API 认证失败' },
   ] },
-  { id: 4, name: '供应商列表', desc: '酒店供应商接入方清单', createdAt: '2025-04-01', creator: 'Sukey Wu', isPublic: false, referenced: false, referenceCount: 0, items: [{ key: 'SUPPLIER_A', value: 'Expedia', type: 'String' }, { key: 'SUPPLIER_B', value: 'Booking.com', type: 'String' }], authorizedSpaces: ['酒店预订流程'], syncConfig: { url: '', keyField: '', valueField: '' }, syncLogs: [] },
-  { id: 5, name: '订单状态码', desc: '订单生命周期各阶段状态定义', createdAt: '2025-04-05', creator: 'Admin', isPublic: true, referenced: true, referenceCount: 5, items: [{ key: 'PENDING', value: '待处理', type: 'String' }, { key: 'CONFIRMED', value: '已确认', type: 'String' }, { key: 'CANCELLED', value: '已取消', type: 'String' }], authorizedSpaces: [], syncConfig: { url: '', keyField: '', valueField: '' }, syncLogs: [] },
+  { id: 4, name: '供应商列表', desc: '酒店供应商接入方清单', createdAt: '2025-04-01', creator: 'Sukey Wu', isPublic: false, referenced: false, referenceCount: 0, items: [{ key: 'SUPPLIER_A', value: 'Expedia', type: 'String', updatedAt: '2025-04-01 10:00' }, { key: 'SUPPLIER_B', value: 'Booking.com', type: 'String', updatedAt: '2025-04-01 10:00' }], authorizedSpaces: ['酒店预订流程'], syncConfig: { url: '', keyField: '', valueField: '' }, syncLogs: [] },
+  { id: 5, name: '订单状态码', desc: '订单生命周期各阶段状态定义', createdAt: '2025-04-05', creator: 'Admin', isPublic: true, referenced: true, referenceCount: 5, items: [{ key: 'PENDING', value: '待处理', type: 'String', updatedAt: '2025-04-05 09:00' }, { key: 'CONFIRMED', value: '已确认', type: 'String', updatedAt: '2025-04-05 09:00' }, { key: 'CANCELLED', value: '已取消', type: 'String', updatedAt: '2025-04-05 09:00' }], authorizedSpaces: [], syncConfig: { url: '', keyField: '', valueField: '' }, syncLogs: [] },
 ];
 
 const allSpaces = ['酒店预订流程', '机票同步流程', '数据清洗工作区', '报表统计空间', '通知推送流程'];
@@ -87,9 +87,11 @@ const spaceColors = ['bg-blue', 'bg-green', 'bg-purple', 'bg-orange', 'bg-pink',
 let currentView = 'list';
 let currentDsId = null;
 let currentTab = 'items';
-let listState = { search: '', authFilter: 'all', refFilter: 'all', page: 1, pageSize: 10 };
+let listState = { search: '', authFilter: 'all', refFilter: 'all', creatorFilter: 'all', page: 1, pageSize: 10 };
 let itemSortField = null;
 let itemSortAsc = true;
+let itemPage = 1;
+let itemPageSize = 10;
 let syncLogPage = 1;
 let syncLogPageSize = 10;
 let nextId = 11;
@@ -317,9 +319,12 @@ function navigateTo(view, dsId) { currentView = view; currentDsId = dsId || null
 function renderDsListPage() {
   const filtered = getFilteredDataSources();
   const total = filtered.length;
+  const allTotal = dataSources.length;
   const start = (listState.page - 1) * listState.pageSize;
   const paged = filtered.slice(start, start + listState.pageSize);
   const totalPages = Math.ceil(total / listState.pageSize);
+  const creators = [...new Set(dataSources.map(d => d.creator))];
+  const hasFilters = listState.search || listState.authFilter !== 'all' || listState.refFilter !== 'all' || listState.creatorFilter !== 'all';
   return `
     <div class="page-header"><div class="page-title-section"><h1 class="page-title shiny-text">数据源管理</h1><p class="page-subtitle">管理和维护系统数据字典及配置数据</p></div><button class="btn btn-primary magnet-btn" onclick="showCreateDsModal()">${icons.plus}<span>新建数据源</span></button></div>
     <div class="filter-bar">
@@ -329,25 +334,41 @@ function renderDsListPage() {
         <span class="filter-chip ${listState.authFilter === 'public' ? 'active' : ''}" onclick="onFilterAuth('public')">公开</span>
         <span class="filter-chip ${listState.authFilter === 'private' ? 'active' : ''}" onclick="onFilterAuth('private')">指定空间</span>
       </div>
-      <div class="filter-actions"><span class="item-count">共 <strong>${total}</strong> 条</span></div>
+      <div class="filter-chips">
+        <span class="filter-chip ${listState.refFilter === 'all' ? 'active' : ''}" onclick="onFilterRef('all')">全部</span>
+        <span class="filter-chip ${listState.refFilter === 'referenced' ? 'active' : ''}" onclick="onFilterRef('referenced')">已引用</span>
+        <span class="filter-chip ${listState.refFilter === 'unreferenced' ? 'active' : ''}" onclick="onFilterRef('unreferenced')">未引用</span>
+      </div>
+      <div class="filter-actions">
+        <select class="pagination-size-select" onchange="onFilterCreator(this.value)"><option value="all" ${listState.creatorFilter === 'all' ? 'selected' : ''}>全部创建人</option>${creators.map(c => `<option value="${c}" ${listState.creatorFilter === c ? 'selected' : ''}>${c}</option>`).join('')}</select>
+        <span class="item-count">共 <strong>${total}</strong> 条</span>
+      </div>
     </div>
-    ${total === 0 ? renderEmptyState('datasource') : `
+    ${total === 0 ? (hasFilters ? renderEmptyState('dsSearchEmpty') : renderEmptyState('datasource')) : `
     <div class="table-wrapper"><table class="data-table"><thead><tr><th>名称</th><th style="width:100px">授权方式</th><th style="width:80px">数据项</th><th style="width:90px">被引用</th><th style="width:100px">创建者</th><th style="width:110px">创建时间</th><th style="width:90px">操作</th></tr></thead><tbody>
       ${paged.map(ds => `<tr onclick="navigateTo('detail', ${ds.id})"><td><div class="ds-name-cell"><span class="ds-name">${ds.name}</span>${ds.desc ? `<span class="ds-desc">${ds.desc}</span>` : ''}</div></td><td><span class="badge ${ds.isPublic ? 'badge-public' : 'badge-private'}">${ds.isPublic ? `${icons.globe} 公开` : `${icons.lock} 指定空间`}</span></td><td>${ds.items.length} 条</td><td>${ds.referenced ? `<span class="ref-count">${icons.link} ${ds.referenceCount}</span>` : '<span class="ref-none">未引用</span>'}</td><td>${ds.creator}</td><td>${ds.createdAt}</td><td onclick="event.stopPropagation()"><div class="table-actions"><button class="table-action-btn" title="编辑" onclick="showEditDsModal(${ds.id})">${icons.edit}</button><button class="table-action-btn danger" title="删除" onclick="showDeleteDsModal(${ds.id})">${icons.trash}</button></div></td></tr>`).join('')}
     </tbody></table></div>
-    ${totalPages > 1 ? renderPagination(listState.page, totalPages) : ''}`}`;
+    <div class="pagination"><div class="pagination-info"><span>共 ${total} 条记录</span><span class="pagination-size"><label>每页</label><select onchange="onDsPageSizeChange(this.value)">${[10,20,50].map(n => `<option value="${n}" ${listState.pageSize === n ? 'selected' : ''}>${n}</option>`).join('')}</select><label>条</label></span></div><div class="pagination-controls"><button class="pagination-btn" ${listState.page <= 1 ? 'disabled' : ''} onclick="goToPage(${listState.page - 1})">${icons.chevronLeft}</button>${Array.from({length: totalPages}, (_, i) => i + 1).map(p => `<button class="pagination-btn ${p === listState.page ? 'active' : ''}" onclick="goToPage(${p})">${p}</button>`).join('')}<button class="pagination-btn" ${listState.page >= totalPages ? 'disabled' : ''} onclick="goToPage(${listState.page + 1})">${icons.chevronRight}</button></div></div>`}`;
 }
 function getFilteredDataSources() {
   return dataSources.filter(ds => {
     if (listState.search && !ds.name.toLowerCase().includes(listState.search.toLowerCase())) return false;
     if (listState.authFilter === 'public' && !ds.isPublic) return false;
     if (listState.authFilter === 'private' && ds.isPublic) return false;
+    if (listState.refFilter === 'referenced' && !ds.referenced) return false;
+    if (listState.refFilter === 'unreferenced' && ds.referenced) return false;
+    if (listState.creatorFilter !== 'all' && ds.creator !== listState.creatorFilter) return false;
     return true;
   });
 }
 function onSearchInput(val) { listState.search = val; listState.page = 1; render(); }
 function onFilterAuth(val) { listState.authFilter = val; listState.page = 1; render(); }
 function goToPage(p) { listState.page = p; render(); }
+function onFilterRef(val) { listState.refFilter = val; listState.page = 1; render(); }
+function onFilterCreator(val) { listState.creatorFilter = val; listState.page = 1; render(); }
+function onDsPageSizeChange(val) { listState.pageSize = parseInt(val); listState.page = 1; render(); }
+function onItemPageChange(page) { itemPage = page; render(); }
+function onItemPageSizeChange(size) { itemPageSize = parseInt(size); itemPage = 1; render(); }
 function renderPagination(current, total) {
   let pages = '';
   for (let i = 1; i <= total; i++) pages += `<button class="pagination-btn ${i === current ? 'active' : ''}" onclick="goToPage(${i})">${i}</button>`;
@@ -357,6 +378,7 @@ function renderPagination(current, total) {
 function renderEmptyState(type) {
   const s = {
     datasource: { img: './public/images/empty-datasource.png', title: '暂无数据源', desc: '创建您的第一个数据源来管理配置数据', btn: `<button class="btn btn-primary" onclick="showCreateDsModal()">${icons.plus}<span>新建数据源</span></button>` },
+    dsSearchEmpty: { img: './public/images/empty-datasource.png', title: '未找到匹配的数据源', desc: '请调整搜索或筛选条件', btn: '' },
     dataItems: { img: './public/images/empty-dataitems.png', title: '暂无数据项', desc: '添加数据项来定义数据源内容', btn: `<button class="btn btn-primary" onclick="showAddItemModal(${typeof currentDsId !== 'undefined' ? currentDsId : 0})">${icons.plus}<span>添加数据项</span></button>` },
     syncLog: { img: './public/images/empty-sync-log.png', title: '暂无同步记录', desc: '执行 API 同步后将在此记录历史', btn: '' },
     workspace: { img: './public/images/empty-workspace.png', title: '暂无工作空间', desc: '创建工作空间来组织工作流', btn: `<button class="btn btn-primary" onclick="showCreateWsModal()">${icons.plus}<span>创建空间</span></button>` },
@@ -379,16 +401,28 @@ function renderDsDetailPage(ds) {
     <div class="detail-header-actions"><button class="btn btn-secondary" onclick="showEditDsModal(${ds.id})">${icons.edit}<span>编辑</span></button><button class="btn btn-danger" onclick="showDeleteDsModal(${ds.id})">${icons.trash}<span>删除</span></button></div></div>
     <div class="tabs-container"><div class="tabs-header">${tabItems.map(t => `<div class="tab-item ${currentTab === t.key ? 'active' : ''}" onclick="switchTab('${t.key}')">${t.label}${t.count !== '' ? ` <span class="badge badge-type">${t.count}</span>` : ''}</div>`).join('')}</div><div class="tab-content">${currentTab === 'items' ? renderDataItemsTab(ds) : currentTab === 'auth' ? renderAuthTab(ds) : renderSyncTab(ds)}</div></div>`;
 }
-function switchTab(tab) { currentTab = tab; syncLogPage = 1; render(); }
+function switchTab(tab) { currentTab = tab; syncLogPage = 1; itemPage = 1; render(); }
 
 function renderDataItemsTab(ds) {
   if (ds.items.length === 0) return renderEmptyState('dataItems');
-  const sorted = [...ds.items]; if (itemSortField) sorted.sort((a, b) => { const va = a[itemSortField].toLowerCase(), vb = b[itemSortField].toLowerCase(); return itemSortAsc ? va.localeCompare(vb) : vb.localeCompare(va); });
+  const sorted = [...ds.items];
+  if (itemSortField) sorted.sort((a, b) => { const va = String(a[itemSortField]).toLowerCase(), vb = String(b[itemSortField]).toLowerCase(); return itemSortAsc ? va.localeCompare(vb) : vb.localeCompare(va); });
+  else sorted.sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
+  const total = sorted.length;
+  const totalPages = Math.ceil(total / itemPageSize);
+  if (itemPage > totalPages) itemPage = totalPages;
+  const start = (itemPage - 1) * itemPageSize;
+  const paged = sorted.slice(start, start + itemPageSize);
   const si = (f) => itemSortField === f ? (itemSortAsc ? icons.arrowUp : icons.arrowDown) : icons.arrowUpDown;
-  return `<div class="tab-toolbar"><div class="tab-toolbar-left"><span class="item-count">共 <strong>${ds.items.length}</strong> 条</span></div><div class="tab-toolbar-right"><button class="btn btn-primary btn-sm" onclick="showAddItemModal(${ds.id})">${icons.plus}<span>添加数据项</span></button></div></div>
-  <div class="table-wrapper"><table class="data-table"><thead><tr><th class="sortable" onclick="toggleItemSort('key')">Key <span class="sort-icon">${si('key')}</span></th><th class="sortable" onclick="toggleItemSort('value')">Value <span class="sort-icon">${si('value')}</span></th><th style="width:90px">类型</th><th style="width:90px">操作</th></tr></thead><tbody>
-  ${sorted.map(item => `<tr><td><code class="item-key">${item.key}</code></td><td>${item.value}</td><td><span class="badge badge-type">${item.type}</span></td><td><div class="table-actions"><button class="table-action-btn" title="编辑" onclick="showEditItemModal(${ds.id}, '${item.key}')">${icons.edit}</button><button class="table-action-btn danger" title="删除" onclick="deleteItem(${ds.id}, '${item.key}')">${icons.trash}</button></div></td></tr>`).join('')}
-  </tbody></table></div>`;
+  const addBtnDisabled = ds.items.length >= 500;
+  const addBtn = addBtnDisabled
+    ? `<span title="已达数据项上限（500条）" style="cursor:not-allowed"><button class="btn btn-primary btn-sm" disabled style="opacity:0.5;cursor:not-allowed;pointer-events:none">${icons.plus}<span>添加数据项</span></button></span>`
+    : `<button class="btn btn-primary btn-sm" onclick="showAddItemModal(${ds.id})">${icons.plus}<span>添加数据项</span></button>`;
+  return `<div class="tab-toolbar"><div class="tab-toolbar-left"><span class="item-count">共 <strong>${ds.items.length}</strong> 条</span></div><div class="tab-toolbar-right">${addBtn}</div></div>
+  <div class="table-wrapper"><table class="data-table"><thead><tr><th class="sortable" onclick="toggleItemSort('key')">Key <span class="sort-icon">${si('key')}</span></th><th class="sortable" onclick="toggleItemSort('value')">Value <span class="sort-icon">${si('value')}</span></th><th style="width:90px">类型</th><th style="width:130px">更新时间</th><th style="width:90px">操作</th></tr></thead><tbody>
+  ${paged.map(item => `<tr><td><code class="item-key">${item.key}</code></td><td>${item.value}</td><td><span class="badge badge-type">${item.type}</span></td><td style="font-size:var(--font-size-xs);color:var(--md-outline)">${item.updatedAt || '-'}</td><td><div class="table-actions"><button class="table-action-btn" title="编辑" onclick="showEditItemModal(${ds.id}, '${item.key}')">${icons.edit}</button><button class="table-action-btn danger" title="删除" onclick="deleteItem(${ds.id}, '${item.key}')">${icons.trash}</button></div></td></tr>`).join('')}
+  </tbody></table></div>
+  ${totalPages > 1 ? `<div class="pagination"><div class="pagination-info"><span>共 ${total} 条记录</span><span class="pagination-size"><label>每页</label><select onchange="onItemPageSizeChange(this.value)">${[10,20,50].map(n => `<option value="${n}" ${itemPageSize === n ? 'selected' : ''}>${n}</option>`).join('')}</select><label>条</label></span></div><div class="pagination-controls"><button class="pagination-btn" ${itemPage <= 1 ? 'disabled' : ''} onclick="onItemPageChange(${itemPage - 1})">${icons.chevronLeft}</button>${Array.from({length: totalPages}, (_, i) => i + 1).map(p => `<button class="pagination-btn ${p === itemPage ? 'active' : ''}" onclick="onItemPageChange(${p})">${p}</button>`).join('')}<button class="pagination-btn" ${itemPage >= totalPages ? 'disabled' : ''} onclick="onItemPageChange(${itemPage + 1})">${icons.chevronRight}</button></div></div>` : ''}`;
 }
 function toggleItemSort(field) { if (itemSortField === field) itemSortAsc = !itemSortAsc; else { itemSortField = field; itemSortAsc = true; } render(); }
 
@@ -462,6 +496,7 @@ function createDataSource() {
   const name = document.getElementById('dsName').value.trim(), desc = document.getElementById('dsDesc').value.trim(), isPublic = document.querySelector('input[name="dsAuth"]:checked').value === 'public';
   const ni = document.getElementById('dsName'), ne = document.getElementById('nameError'); ni.classList.remove('error'); ne.classList.add('hidden');
   if (!name) { ni.classList.add('error'); ne.textContent = '请输入数据源名称'; ne.classList.remove('hidden'); return; }
+  if (!/^[\u4e00-\u9fa5a-zA-Z0-9_-]+$/.test(name)) { ni.classList.add('error'); ne.textContent = '仅支持中文、英文、数字、下划线和连字符'; ne.classList.remove('hidden'); return; }
   if (dataSources.some(d => d.name === name)) { ni.classList.add('error'); ne.textContent = '该名称已存在'; ne.classList.remove('hidden'); return; }
   dataSources.push({ id: nextId++, name, desc, createdAt: new Date().toISOString().slice(0, 10), creator: 'Sukey Wu', isPublic, referenced: false, referenceCount: 0, items: [], authorizedSpaces: [], syncConfig: { url: '', keyField: '', valueField: '' }, syncLogs: [] });
   const newId = nextId - 1;
@@ -480,6 +515,7 @@ function updateDataSource(id) {
   const ds = dataSources.find(d => d.id === id), name = document.getElementById('dsName').value.trim();
   const ni = document.getElementById('dsName'), ne = document.getElementById('nameError'); ni.classList.remove('error'); ne.classList.add('hidden');
   if (!name) { ni.classList.add('error'); ne.textContent = '请输入名称'; ne.classList.remove('hidden'); return; }
+  if (!/^[\u4e00-\u9fa5a-zA-Z0-9_-]+$/.test(name)) { ni.classList.add('error'); ne.textContent = '仅支持中文、英文、数字、下划线和连字符'; ne.classList.remove('hidden'); return; }
   if (dataSources.some(d => d.id !== id && d.name === name)) { ni.classList.add('error'); ne.textContent = '名称已存在'; ne.classList.remove('hidden'); return; }
   ds.name = name; ds.desc = document.getElementById('dsDesc').value.trim();
   closeModal(); showToast('success', '保存成功', `数据源已更新`); render();
@@ -565,7 +601,7 @@ function addItem(dsId) {
     else { showToast('warning', '校验失败', valErr); }
     return;
   }
-  ds.items.push({ key, value, type }); closeModal(); showToast('success', '添加成功', `数据项已添加`); render();
+  ds.items.push({ key, value, type, updatedAt: new Date().toISOString().slice(0, 16).replace('T', ' ') }); closeModal(); showToast('success', '添加成功', `数据项已添加`); render();
 }
 function showEditItemModal(dsId, key) {
   const ds = dataSources.find(d => d.id === dsId); if (!ds) return;
@@ -589,6 +625,7 @@ function updateItem(dsId, key) {
     return;
   }
   item.value = value;
+  item.updatedAt = new Date().toISOString().slice(0, 16).replace('T', ' ');
   closeModal(); showToast('success', '保存成功', '数据项已更新'); render();
 }
 function deleteItem(dsId, key) {
@@ -624,8 +661,11 @@ function filterSpaceList(dsId) {
 function addSpace(dsId, space) { const ds = dataSources.find(d => d.id === dsId); if (!ds) return; ds.authorizedSpaces.push(space); closeModal(); showToast('success', '授权成功', `已授权「${space}」`); render(); }
 function removeSpace(dsId, space) {
   const ds = dataSources.find(d => d.id === dsId); if (!ds) return;
+  const ws = workspaces.find(w => w.name === space);
+  const hasRunning = ws && ws.runningInstances > 0;
   showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">移除授权</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
   <div class="delete-warning"><span class="delete-warning-icon">${icons.alertTriangle}</span><div class="delete-warning-text">确定要移除「${space}」的授权吗？</div></div>
+  ${hasRunning ? `<div style="margin-top:var(--space-3);padding:var(--space-3);background:rgba(220,38,38,0.06);border:1px solid rgba(220,38,38,0.15);border-radius:var(--radius-md);font-size:var(--font-size-sm);color:var(--md-error);line-height:1.6"><strong>⚠ 该空间当前有 ${ws.runningInstances} 个运行中的实例</strong>，已运行的实例不受影响，但移除授权后新实例将无法启动。</div>` : ''}
   <div style="margin-top:var(--space-3);padding:var(--space-3);background:var(--md-surface-container);border-radius:var(--radius-md);font-size:var(--font-size-sm);color:var(--md-on-surface-variant);line-height:1.6">
   <div style="font-weight:500;color:var(--md-error);margin-bottom:4px">移除后的影响：</div>
   <ul style="margin:0;padding-left:var(--space-4)"><li>该空间内引用此数据源的工作流<strong>新实例将无法启动</strong></li><li>已运行的实例不受影响</li><li>重新授权后可恢复访问</li></ul></div>
@@ -685,7 +725,7 @@ function executeSyncFromModal(dsId) {
   executeSync(dsId, selectedSyncStrategy);
   selectedSyncStrategy = null;
 }
-function executeSync(dsId, strategy) { const ds = dataSources.find(d => d.id === dsId); if (!ds) return; const isSuccess = Math.random() > 0.3; const strategyText = strategy === 'full' ? '全量覆盖' : '增量更新'; const now = new Date(); const timeStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`; ds.syncLogs.unshift({ time: timeStr, operator: 'Sukey Wu', strategy: strategyText, result: isSuccess ? 'success' : 'error', summary: isSuccess ? `新增 ${Math.floor(Math.random() * 5)} 条、更新 ${Math.floor(Math.random() * 10)} 条` : '', reason: isSuccess ? '' : 'API 返回格式异常' }); closeModal(); showToast(isSuccess ? 'success' : 'error', isSuccess ? '同步成功' : '同步失败', ''); render(); }
+function executeSync(dsId, strategy) { const ds = dataSources.find(d => d.id === dsId); if (!ds) return; const isSuccess = Math.random() > 0.3; const strategyText = strategy === 'full' ? '全量覆盖' : '增量更新'; const now = new Date(); const timeStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`; ds.syncLogs.unshift({ time: timeStr, operator: 'Sukey Wu', strategy: strategyText, result: isSuccess ? 'success' : 'error', summary: isSuccess ? `新增 ${Math.floor(Math.random() * 5)} 条、更新 ${Math.floor(Math.random() * 10)} 条${strategy === 'full' ? `、删除 ${Math.floor(Math.random() * 3)} 条` : ''}` : '', reason: isSuccess ? '' : 'API 返回格式异常' }); closeModal(); showToast(isSuccess ? 'success' : 'error', isSuccess ? '同步成功' : '同步失败', ''); render(); }
 
 // ============================================
 //   WORKSPACE MODULE - Rendering
