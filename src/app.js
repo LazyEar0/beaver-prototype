@@ -707,68 +707,10 @@ function showAddSpaceModal(dsId) {
   const ds = dataSources.find(d => d.id === dsId); if (!ds) return;
   const available = allSpaces.filter(s => !ds.authorizedSpaces.includes(s));
   if (available.length === 0) { showToast('info', '提示', '所有空间均已授权'); return; }
-  // Group spaces into categories for org-tree style
-  const categories = [
-    { name: '研发部门', icon: '研', color: '#4F46E5', spaces: available.filter((_, i) => i % 3 === 0) },
-    { name: '产品运营', icon: '产', color: '#059669', spaces: available.filter((_, i) => i % 3 === 1) },
-    { name: '其他团队', icon: '他', color: '#D97706', spaces: available.filter((_, i) => i % 3 === 2) },
-  ].filter(c => c.spaces.length > 0);
-  let pendingSpaces = [];
-  const renderPickerContent = () => {
-    const searchVal = document.getElementById('pickerSearchInput')?.value?.toLowerCase() || '';
-    // Left panel
-    let leftHtml = categories.map(cat => {
-      const filtered = searchVal ? cat.spaces.filter(s => s.toLowerCase().includes(searchVal)) : cat.spaces;
-      if (filtered.length === 0) return '';
-      const allSelected = filtered.every(s => pendingSpaces.includes(s));
-      return `<div class="people-picker-dept" onclick="togglePickerCategory('${cat.name}')">
-        <div class="people-picker-dept-checkbox ${allSelected ? 'checked' : ''}">${allSelected ? icons.check : ''}</div>
-        <div class="people-picker-dept-icon" style="background:${cat.color}">${cat.icon}</div>
-        <div class="people-picker-dept-info"><div class="people-picker-dept-name">${cat.name}</div><div class="people-picker-dept-count">${filtered.length} 个空间</div></div>
-        <span class="people-picker-dept-arrow">${icons.chevronRight}</span>
-      </div>
-      ${filtered.map(s => {
-        const sel = pendingSpaces.includes(s);
-        const idx = allSpaces.indexOf(s);
-        return `<div class="people-picker-dept" style="padding-left:var(--space-8)" onclick="togglePickerSpace('${s}')">
-          <div class="people-picker-dept-checkbox ${sel ? 'checked' : ''}">${sel ? icons.check : ''}</div>
-          <div class="people-picker-dept-icon" style="background:var(--md-primary);width:28px;height:28px;font-size:11px">${s.charAt(0)}</div>
-          <div class="people-picker-dept-info"><div class="people-picker-dept-name" style="font-weight:400">${s}</div></div>
-        </div>`;
-      }).join('')}`;
-    }).join('');
-    // Right panel
-    const rightHtml = pendingSpaces.length === 0
-      ? '<div class="creator-dropdown-empty" style="padding:var(--space-8)">点击左侧选择要授权的空间</div>'
-      : pendingSpaces.map(s => `<div class="people-picker-selected-item">
-          <div class="people-picker-dept-icon" style="background:var(--md-primary);width:28px;height:28px;font-size:11px">${s.charAt(0)}</div>
-          <span class="name">${s}</span>
-          <button class="remove-btn" onclick="removePickerSpace('${s}')">×</button>
-        </div>`).join('');
-    document.getElementById('pickerLeft').innerHTML = leftHtml;
-    document.getElementById('pickerRight').innerHTML = rightHtml;
-    document.getElementById('pickerCount').textContent = `已选：${pendingSpaces.length} 个空间`;
-  };
-  // Expose functions to window
-  window.renderPickerContent = renderPickerContent;
-  window.togglePickerSpace = (s) => { const i = pendingSpaces.indexOf(s); if (i > -1) pendingSpaces.splice(i, 1); else pendingSpaces.push(s); renderPickerContent(); };
-  window.removePickerSpace = (s) => { pendingSpaces = pendingSpaces.filter(x => x !== s); renderPickerContent(); };
-  window.togglePickerCategory = (catName) => { const cat = categories.find(c => c.name === catName); if (!cat) return; const allSel = cat.spaces.every(s => pendingSpaces.includes(s)); if (allSel) { pendingSpaces = pendingSpaces.filter(s => !cat.spaces.includes(s)); } else { cat.spaces.forEach(s => { if (!pendingSpaces.includes(s)) pendingSpaces.push(s); }); } renderPickerContent(); };
-  window.confirmPickerSpaces = () => { if (pendingSpaces.length === 0) return; pendingSpaces.forEach(s => ds.authorizedSpaces.push(s)); closeModal(); showToast('success', '授权成功', `已授权 ${pendingSpaces.length} 个空间`); render(); };
-
-  showModal(`<div class="modal" style="max-width:640px"><div class="modal-header"><h2 class="modal-title">添加授权空间</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body" style="padding:0">
-  <div class="people-picker">
-    <div class="people-picker-left">
-      <div class="people-picker-search"><input type="text" id="pickerSearchInput" placeholder="搜索空间名称..." oninput="if(window.renderPickerContent)renderPickerContent()" /></div>
-      <div class="people-picker-tree" id="pickerLeft"></div>
-    </div>
-    <div class="people-picker-right">
-      <div class="people-picker-selected-header"><span id="pickerCount">已选：0 个空间</span><button class="clear-link" onclick="pendingSpaces=[];renderPickerContent();" style="display:none">清空</button></div>
-      <div class="people-picker-selected-list" id="pickerRight"></div>
-    </div>
-  </div>
-  </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="confirmPickerSpaces()">确认授权</button></div></div>`);
-  setTimeout(() => renderPickerContent(), 100);
+  showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">添加授权空间</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
+  <div style="margin-bottom:var(--space-3)"><div class="filter-search" style="width:100%">${icons.search}<input type="text" id="spaceSearchInput" placeholder="搜索空间名称..." oninput="filterSpaceList(${dsId})" /></div></div>
+  <div style="max-height:320px;overflow-y:auto"><div class="auth-space-list" id="spaceListContainer">${available.map(space => `<div class="clickable-list-item" data-space-name="${space}" onclick="addSpace(${dsId}, '${space}')"><div class="auth-space-info"><div class="auth-space-icon ${spaceColors[allSpaces.indexOf(space) % spaceColors.length]}">${space.charAt(0)}</div><div><div class="auth-space-name">${space}</div></div></div>${icons.plus}</div>`).join('')}</div></div>
+  </div></div>`);
 }
 function filterSpaceList(dsId) {
   const keyword = document.getElementById('spaceSearchInput').value.trim().toLowerCase();

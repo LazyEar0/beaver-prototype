@@ -810,7 +810,6 @@ img { display: block; max-width: 100%; }
   border-radius: var(--radius-lg);
   border: 1px solid var(--md-outline-variant);
   margin-bottom: var(--space-5);
-  overflow: hidden;
 }
 
 .filter-toolbar {
@@ -926,14 +925,15 @@ img { display: block; max-width: 100%; }
 
 /* Collapsible filter panel */
 .filter-panel {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: var(--space-3) var(--space-5);
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  flex-wrap: wrap;
   padding: var(--space-3) var(--space-4) var(--space-4);
   border-top: 1px solid var(--md-outline-variant);
-  max-height: 200px;
-  overflow: hidden;
-  transition: max-height 0.3s cubic-bezier(0.2, 0, 0, 1), padding 0.3s cubic-bezier(0.2, 0, 0, 1), opacity 0.2s ease, border-top-width 0.2s ease;
+  max-height: 120px;
+  overflow: visible;
+  transition: max-height 0.3s cubic-bezier(0.2, 0, 0, 1), padding 0.3s cubic-bezier(0.2, 0, 0, 1), opacity 0.2s ease;
   opacity: 1;
 }
 
@@ -942,12 +942,13 @@ img { display: block; max-width: 100%; }
   padding-top: 0;
   padding-bottom: 0;
   opacity: 0;
-  border-top-width: 0;
+  overflow: hidden;
+  border-top-color: transparent;
 }
 
 .filter-panel .filter-group {
   display: flex;
-  flex-direction: column;
+  align-items: center;
   gap: var(--space-2);
 }
 
@@ -955,8 +956,7 @@ img { display: block; max-width: 100%; }
   font-size: var(--font-size-xs);
   color: var(--md-outline);
   font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  white-space: nowrap;
 }
 
 .filter-panel .filter-chips {
@@ -1466,7 +1466,7 @@ img { display: block; max-width: 100%; }
   }
 
   .filter-container .filter-panel {
-    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-3);
   }
 
   .filter-toolbar .filter-search {
@@ -1499,8 +1499,7 @@ img { display: block; max-width: 100%; }
   }
 
   .filter-container .filter-panel {
-    grid-template-columns: 1fr 1fr;
-    gap: var(--space-2) var(--space-4);
+    gap: var(--space-2) var(--space-3);
   }
 
   .filter-toolbar .filter-search {
