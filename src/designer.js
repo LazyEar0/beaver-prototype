@@ -188,13 +188,24 @@ function generateRealisticNodes(wf) {
 }
 
 // --- Auto Save ---
+// Helper: sync designer state back to workflow object after mutations
+function syncDesignerState() {
+  if (designerWf) {
+    designerWf._designerNodes = designerNodes;
+    designerWf._designerConns = designerConnections;
+    designerWf._designerVars = designerVariables;
+    designerWf._designerNodeIdCounter = designerNodeIdCounter;
+    designerWf._designerConnIdCounter = designerConnIdCounter;
+  }
+}
 function startAutoSave() {
   designerAutoSaveTimer = setInterval(() => {
     const indicator = document.getElementById('designerSaveIndicator');
     if (indicator) {
       indicator.innerHTML = `${icons.check} <span>草稿已自动保存</span>`;
       setTimeout(() => {
-        if (indicator) indicator.innerHTML = `${icons.check} <span>已保存</span>`;
+        const el = document.getElementById('designerSaveIndicator');
+        if (el) el.innerHTML = `${icons.check} <span>已保存</span>`;
       }, 2000);
     }
   }, 30000);
@@ -258,7 +269,7 @@ function renderDesigner() {
       <div class="canvas-area" id="canvasArea">
         <div class="canvas-container" id="canvasContainer" onmousedown="onCanvasMouseDown(event)" onmousemove="onCanvasMouseMove(event)" onmouseup="onCanvasMouseUp(event)" onwheel="onCanvasWheel(event)" ondblclick="onCanvasDblClick(event)" oncontextmenu="onCanvasContextMenu(event)">
           <div class="canvas-grid" style="transform: translate(${designerPanX % 20}px, ${designerPanY % 20}px)"></div>
-          ${designerIsBoxSelecting && designerBoxSelectRect ? `<div class="box-select-rect" style="left:${designerBoxSelectRect.x}px;top:${designerBoxSelectRect.y}px;width:${designerBoxSelectRect.w}px;height:${designerBoxSelectRect.h}px"></div>` : ''}
+          <div class="box-select-rect" id="boxSelectRect"></div>
           <svg class="canvas-svg" id="canvasSvg">
             <defs>
               <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
@@ -1055,6 +1066,7 @@ function onCanvasMouseDown(e) {
 
   // Shift+drag = box selection
   if (e.shiftKey) {
+    e.preventDefault();
     const canvasRect = document.getElementById('canvasContainer').getBoundingClientRect();
     designerIsBoxSelecting = true;
     designerBoxSelectStart = { x: e.clientX - canvasRect.left, y: e.clientY - canvasRect.top };
@@ -1084,7 +1096,7 @@ function onCanvasMouseMove(e) {
       w: Math.abs(cx - designerBoxSelectStart.x),
       h: Math.abs(cy - designerBoxSelectStart.y),
     };
-    const el = document.querySelector('.box-select-rect');
+    const el = document.getElementById('boxSelectRect');
     if (el) {
       el.style.left = designerBoxSelectRect.x + 'px';
       el.style.top = designerBoxSelectRect.y + 'px';
@@ -1130,7 +1142,7 @@ function onCanvasMouseUp(e) {
         const sx = node.x * designerZoom + designerPanX;
         const sy = node.y * designerZoom + designerPanY;
         const sw = 180 * designerZoom;
-        const sh = 60 * designerZoom;
+        const sh = 72 * designerZoom;
         if (sx + sw > r.x && sx < r.x + r.w && sy + sh > r.y && sy < r.y + r.h) {
           designerSelectedNodeIds.push(node.id);
         }
@@ -1233,6 +1245,7 @@ function onNodeContextMenu(e, nodeId) {
 // --- Node Click with Multi-Select (Ctrl+Click) ---
 function onNodeClick(e, nodeId) {
   e.stopPropagation();
+  designerContextMenu = null; // Close any open context menu
   if (e.ctrlKey || e.metaKey) {
     // Multi-select toggle
     const idx = designerSelectedNodeIds.indexOf(nodeId);
@@ -1256,6 +1269,7 @@ function selectNode(nodeId) {
 
 function deselectNode() {
   designerSelectedNodeId = null;
+  designerSelectedNodeIds = [];
   designerRightPanel = 'overview';
   renderDesigner();
 }
@@ -1318,6 +1332,7 @@ function deleteSelectedNode() {
     if (deletable.length === 0) { showToast('warning', '无法删除', '不能删除触发器或结束节点'); return; }
     designerNodes = designerNodes.filter(n => !deletable.includes(n.id));
     designerConnections = designerConnections.filter(c => !deletable.includes(c.from) && !deletable.includes(c.to));
+    syncDesignerState();
     designerSelectedNodeIds = designerSelectedNodeIds.filter(id => !deletable.includes(id));
     designerSelectedNodeId = null;
     designerRightPanel = 'overview';
@@ -1338,6 +1353,7 @@ function deleteSelectedNode() {
 
   designerNodes = designerNodes.filter(n => n.id !== designerSelectedNodeId);
   designerConnections = designerConnections.filter(c => c.from !== designerSelectedNodeId && c.to !== designerSelectedNodeId);
+  syncDesignerState();
   designerSelectedNodeId = null;
   designerSelectedNodeIds = [];
   designerRightPanel = 'overview';
@@ -1393,6 +1409,7 @@ function onConnectionClick(e, connId) {
   if (designerDebugMode) return;
   if (confirm('删除此连线？')) {
     designerConnections = designerConnections.filter(c => c.id !== connId);
+    syncDesignerState();
     renderDesigner();
     showToast('success', '连线已删除', '');
   }
@@ -1669,6 +1686,7 @@ function showDeleteVarConfirm(varName) {
 
 function deleteVariable(varName) {
   designerVariables = designerVariables.filter(v => v.name !== varName);
+  syncDesignerState();
   closeModal();
   renderDesigner();
   showToast('success', '已删除', `变量「${varName}」已删除`);
@@ -1793,6 +1811,7 @@ function deleteNodeById(nodeId) {
   }
   designerNodes = designerNodes.filter(n => n.id !== nodeId);
   designerConnections = designerConnections.filter(c => c.from !== nodeId && c.to !== nodeId);
+  syncDesignerState();
   if (designerSelectedNodeId === nodeId) {
     designerSelectedNodeId = null;
     designerRightPanel = 'overview';
@@ -1805,6 +1824,9 @@ function deleteNodeById(nodeId) {
 function duplicateNode(nodeId) {
   const node = designerNodes.find(n => n.id === nodeId);
   if (!node) return;
+  if (node.type === 'trigger' || node.type === 'end') {
+    showToast('warning', '限制', '不能复制触发器或结束节点'); return;
+  }
   const newNode = {
     ...JSON.parse(JSON.stringify(node)),
     id: designerNodeIdCounter++,
@@ -1859,7 +1881,8 @@ function designerSave() {
     indicator.innerHTML = `<svg class="spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M21 12a9 9 0 11-6.219-8.56"/></svg> <span>保存中…</span>`;
   }
   setTimeout(() => {
-    if (indicator) indicator.innerHTML = `${icons.check} <span>已保存</span>`;
+    const el = document.getElementById('designerSaveIndicator');
+    if (el) el.innerHTML = `${icons.check} <span>已保存</span>`;
     showToast('success', '已保存', '草稿已手动保存');
   }, 600);
 }
@@ -1975,6 +1998,8 @@ function designerPasteNodes() {
   if (designerClipboard.length === 0) { showToast('warning', '提示', '剪贴板为空'); return; }
   const newIds = [];
   designerClipboard.forEach(src => {
+    // Skip trigger/end nodes
+    if (src.type === 'trigger' || src.type === 'end') return;
     const newNode = {
       ...JSON.parse(JSON.stringify(src)),
       id: designerNodeIdCounter++,
@@ -1988,6 +2013,7 @@ function designerPasteNodes() {
     designerNodes.push(newNode);
     newIds.push(newNode.id);
   });
+  syncDesignerState();
   designerSelectedNodeIds = newIds;
   designerSelectedNodeId = newIds[newIds.length - 1];
   renderDesigner();
