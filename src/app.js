@@ -368,7 +368,8 @@ function renderDsListPage() {
     <div class="creator-dropdown-list">${filteredCreators.length === 0 ? '<div class="creator-dropdown-empty">无匹配结果</div>' : filteredCreators.map(c => {
       const sel = listState.creatorFilter.includes(c);
       return `<div class="creator-dropdown-item ${sel ? 'selected' : ''}" onclick="toggleCreatorSelection('${c}')"><span class="creator-avatar-sm">${c.charAt(0)}</span><span>${c}</span><span class="check-icon">${icons.check}</span></div>`;
-    }).join('')}</div></div>` : '';
+    }).join('')}</div>
+    <div class="creator-dropdown-footer">${listState.creatorFilter.length > 0 ? `<button class="creator-dropdown-clear" onclick="event.stopPropagation();clearDsCreatorFilter()">清空</button>` : ''}<button class="creator-dropdown-done" onclick="event.stopPropagation();toggleCreatorDropdown()">确定</button></div></div>` : '';
 
   return `
     <div class="page-header"><div class="page-title-section"><h1 class="page-title shiny-text">数据源管理</h1><p class="page-subtitle">管理和维护系统数据字典及配置数据</p></div><button class="btn btn-primary magnet-btn" onclick="showCreateDsModal()">${icons.plus}<span>新建数据源</span></button></div>
@@ -421,6 +422,7 @@ function onFilterDateFrom(val) { listState.dateFrom = val; listState.page = 1; r
 function onFilterDateTo(val) { listState.dateTo = val; listState.page = 1; render(); }
 function toggleFilterPanel() { listState.filterPanelOpen = !listState.filterPanelOpen; render(); }
 function toggleCreatorDropdown() { listState.creatorDropdownOpen = !listState.creatorDropdownOpen; listState.creatorSearch = ''; render(); }
+function clearDsCreatorFilter() { listState.creatorFilter = []; listState.page = 1; render(); }
 function toggleCreatorSelection(name) {
   const idx = listState.creatorFilter.indexOf(name);
   if (idx > -1) listState.creatorFilter.splice(idx, 1); else listState.creatorFilter.push(name);
@@ -1021,7 +1023,8 @@ function renderWsWorkflowsTab(ws) {
     <div class="creator-dropdown-list" id="wsCreatorList">${filteredWsCreators.length === 0 ? '<div class="creator-dropdown-empty">无匹配结果</div>' : filteredWsCreators.map(c => {
       const sel = wsContentCreatorFilter.includes(c);
       return `<div class="creator-dropdown-item ${sel ? 'selected' : ''}" onclick="toggleWsCreatorSelection('${c}')"><span class="creator-avatar-sm">${c.charAt(0)}</span><span>${c}</span><span class="check-icon">${icons.check}</span></div>`;
-    }).join('')}</div></div>` : '';
+    }).join('')}</div>
+    <div class="creator-dropdown-footer">${wsContentCreatorFilter.length > 0 ? `<button class="creator-dropdown-clear" onclick="event.stopPropagation();clearWsCreatorFilter()">清空</button>` : ''}<button class="creator-dropdown-done" onclick="event.stopPropagation();toggleWsCreatorDropdown()">确定</button></div></div>` : '';
 
   // Multi-select owner dropdown trigger
   const ownerTriggerHtml = wsContentOwnerFilter.length === 0
@@ -1035,7 +1038,8 @@ function renderWsWorkflowsTab(ws) {
     <div class="creator-dropdown-list" id="wsOwnerList">${filteredWsOwners.length === 0 ? '<div class="creator-dropdown-empty">无匹配结果</div>' : filteredWsOwners.map(c => {
       const sel = wsContentOwnerFilter.includes(c);
       return `<div class="creator-dropdown-item ${sel ? 'selected' : ''}" onclick="toggleWsOwnerSelection('${c}')"><span class="creator-avatar-sm">${c.charAt(0)}</span><span>${c}</span><span class="check-icon">${icons.check}</span></div>`;
-    }).join('')}</div></div>` : '';
+    }).join('')}</div>
+    <div class="creator-dropdown-footer">${wsContentOwnerFilter.length > 0 ? `<button class="creator-dropdown-clear" onclick="event.stopPropagation();clearWsOwnerFilter()">清空</button>` : ''}<button class="creator-dropdown-done" onclick="event.stopPropagation();toggleWsOwnerDropdown()">确定</button></div></div>` : '';
 
   // Build active filter count & tags (reuse DS pattern)
   const wsHasFilters = wsContentSearch || wsContentStatusFilter !== 'all' || wsContentCreatorFilter.length > 0 || wsContentOwnerFilter.length > 0 || wsContentTypeFilter !== 'all';
@@ -1058,7 +1062,7 @@ function renderWsWorkflowsTab(ws) {
     ${breadcrumb}
     <div class="filter-container" style="margin-top:var(--space-3)">
       <div class="filter-toolbar">
-        <div class="filter-search">${icons.search}<input type="text" placeholder="搜索名称或编号..." value="${wsContentSearch}" oninput="onWsContentSearch(this.value)" /></div>
+        <div class="filter-search">${icons.search}<input type="text" id="wsSearchInput" placeholder="搜索名称或编号..." value="${wsContentSearch}" oninput="onWsContentSearch(this.value)" /></div>
         <button class="filter-toggle-btn ${wsFilterPanelOpen ? 'active' : ''}" onclick="toggleWsFilterPanel()">${icons.filter}<span>筛选</span>${wsActiveFilterCount > 0 ? `<span class="filter-badge">${wsActiveFilterCount}</span>` : ''}</button>
         ${wsFilterTagsHtml}
         ${wsHasFilters ? `<button class="filter-reset-btn" onclick="clearAllWsFilters()">${icons.close}<span>清除</span></button>` : ''}
@@ -1131,6 +1135,8 @@ function onWsTypeFilter(val) { wsContentTypeFilter = val; render(); }
 function toggleWsFilterPanel() { wsFilterPanelOpen = !wsFilterPanelOpen; render(); }
 function removeWsFilterTag(type) { if (type === 'status') wsContentStatusFilter = 'all'; else if (type === 'creator') { wsContentCreatorFilter = []; } else if (type === 'owner') { wsContentOwnerFilter = []; } else if (type === 'type') wsContentTypeFilter = 'all'; render(); }
 function clearAllWsFilters() { wsContentSearch = ''; wsContentStatusFilter = 'all'; wsContentCreatorFilter = []; wsContentOwnerFilter = []; wsContentTypeFilter = 'all'; wsCreatorDropdownOpen = false; wsOwnerDropdownOpen = false; wsFilterPanelOpen = false; render(); }
+function clearWsCreatorFilter() { wsContentCreatorFilter = []; render(); }
+function clearWsOwnerFilter() { wsContentOwnerFilter = []; render(); }
 function toggleWsCreatorDropdown() { wsCreatorDropdownOpen = !wsCreatorDropdownOpen; wsCreatorSearch = ''; wsOwnerDropdownOpen = false; render(); }
 function onWsCreatorSearch(val) { wsCreatorSearch = val; render(); }
 function toggleWsCreatorSelection(name) {
@@ -1153,9 +1159,10 @@ function toggleMoreMenu(btn) {
   if (!panel.classList.contains('hidden')) setTimeout(() => document.addEventListener('click', close), 0);
 }
 function openDesigner(wsId, wfId) { showToast('info', '流程设计器', '流程设计器将在 Phase 2 中实现（当前为原型占位）'); }
-function navigateIntoFolder(folderId, folderName) { wsFolderPath.push({ id: folderId, name: folderName }); wsCurrentFolderId = folderId; wsContentSearch = ''; render(); }
-function navigateToWsFolder(folderId) { wsCurrentFolderId = folderId; if (folderId === null) wsFolderPath = []; render(); }
-function navigateToWsFolderByIndex(idx) { if (idx < 0 || idx >= wsFolderPath.length) return; wsFolderPath = wsFolderPath.slice(0, idx + 1); wsCurrentFolderId = wsFolderPath[idx].id; render(); }
+function resetWsFilters() { wsContentSearch = ''; wsContentStatusFilter = 'all'; wsContentCreatorFilter = []; wsContentOwnerFilter = []; wsContentTypeFilter = 'all'; wsCreatorDropdownOpen = false; wsOwnerDropdownOpen = false; wsCreatorSearch = ''; wsOwnerSearch = ''; wsFilterPanelOpen = false; }
+function navigateIntoFolder(folderId, folderName) { wsFolderPath.push({ id: folderId, name: folderName }); wsCurrentFolderId = folderId; resetWsFilters(); render(); }
+function navigateToWsFolder(folderId) { wsCurrentFolderId = folderId; if (folderId === null) wsFolderPath = []; resetWsFilters(); render(); }
+function navigateToWsFolderByIndex(idx) { if (idx < 0 || idx >= wsFolderPath.length) return; wsFolderPath = wsFolderPath.slice(0, idx + 1); wsCurrentFolderId = wsFolderPath[idx].id; resetWsFilters(); render(); }
 
 // --- Folder CRUD ---
 function showCreateFolderModal() {
@@ -2177,6 +2184,10 @@ render = function() {
   const _creatorInputEl = document.querySelector('.creator-dropdown-search input');
   const _creatorWasFocused = document.activeElement && document.activeElement === _creatorInputEl;
   const _creatorCursorPos = (_creatorWasFocused && _creatorInputEl) ? (_creatorInputEl.selectionStart || 0) : 0;
+  // Workspace search input
+  const _wsSearchEl = document.getElementById('wsSearchInput');
+  const _wsSearchWasFocused = document.activeElement && document.activeElement === _wsSearchEl;
+  const _wsSearchCursorPos = (_wsSearchWasFocused && _wsSearchEl) ? (_wsSearchEl.selectionStart || 0) : 0;
 
   // Detect actual view/page change (not just filter operations)
   const newViewKey = `${currentModule}-${currentView}-${currentDsId || ''}-${wsCurrentView}-${wsCurrentId || ''}-${wsInternalTab || ''}-${currentTab || ''}`;
@@ -2206,14 +2217,39 @@ render = function() {
         if (si) { si.focus(); si.setSelectionRange(_searchCursorPos, _searchCursorPos); }
       }
     }
+    // Workspace: restore search / creator / owner dropdown focus
+    if (currentModule === 'workspace' && wsCurrentView === 'detail' && wsInternalTab === 'workflows') {
+      if ((wsCreatorDropdownOpen || wsOwnerDropdownOpen) && _creatorWasFocused) {
+        const cs = document.querySelector('.creator-dropdown-search input');
+        if (cs) { cs.focus(); cs.setSelectionRange(_creatorCursorPos, _creatorCursorPos); }
+      } else if (_wsSearchWasFocused && !wsCreatorDropdownOpen && !wsOwnerDropdownOpen) {
+        const si = document.getElementById('wsSearchInput');
+        if (si) { si.focus(); si.setSelectionRange(_wsSearchCursorPos, _wsSearchCursorPos); }
+      }
+    }
   });
 };
 
 // --- 11. Close creator dropdown on outside click ---
 document.addEventListener('click', (e) => {
+  let needRender = false;
+  // Data source creator dropdown
   if (listState.creatorDropdownOpen && !e.target.closest('.creator-dropdown')) {
     listState.creatorDropdownOpen = false;
     listState.creatorSearch = '';
-    render();
+    needRender = true;
   }
+  // Workspace creator dropdown
+  if (wsCreatorDropdownOpen && !e.target.closest('.creator-dropdown')) {
+    wsCreatorDropdownOpen = false;
+    wsCreatorSearch = '';
+    needRender = true;
+  }
+  // Workspace owner dropdown
+  if (wsOwnerDropdownOpen && !e.target.closest('.creator-dropdown')) {
+    wsOwnerDropdownOpen = false;
+    wsOwnerSearch = '';
+    needRender = true;
+  }
+  if (needRender) render();
 });

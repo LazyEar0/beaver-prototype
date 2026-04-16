@@ -12,6 +12,7 @@ let designerNodes = [];
 let designerConnections = [];
 let designerVariables = [];
 let designerSelectedNodeId = null;
+let designerSelectedNodeIds = []; // Multi-select support
 let designerZoom = 1;
 let designerPanX = 0;
 let designerPanY = 0;
@@ -22,6 +23,7 @@ let designerConnIdCounter = 1;
 let designerRightPanel = 'overview'; // overview | node | settings | version
 let designerBottomPanel = null; // null | problems | debug | variables
 let designerBottomTab = 'problems';
+let designerBottomPanelHeight = 240; // Draggable height
 let designerNodePanelExpanded = false;
 let designerDebugMode = false;
 let designerDebugLog = [];
@@ -30,6 +32,16 @@ let designerDraggingExistingNode = null;
 let designerDragOffset = { x: 0, y: 0 };
 let designerConnecting = null; // { fromNodeId, fromPort }
 let designerAutoSaveTimer = null;
+let designerReadonly = false; // Edit lock
+let designerReadonlyUser = ''; // Who holds the lock
+let designerGridSnap = false; // Grid snap toggle
+let designerMinimapVisible = true; // Minimap toggle
+let designerClipboard = []; // Copy/paste buffer
+let designerIsBoxSelecting = false; // Box selection
+let designerBoxSelectStart = null;
+let designerBoxSelectRect = null;
+let designerContextMenu = null; // Right-click context menu
+let designerBottomResizing = false; // Bottom panel resize
 
 // --- Node Type Definitions ---
 const nodeTypes = [
@@ -45,6 +57,7 @@ const nodeTypes = [
   { type: 'http', name: 'HTTP 请求', icon: '🌐', color: 'node-color-integration', category: '集成', desc: 'HTTP接口调用', code: 'http' },
   { type: 'mq', name: 'MQ 消息', icon: '📨', color: 'node-color-integration', category: '集成', desc: '消息队列', code: 'mq' },
   { type: 'workflow', name: '子工作流', icon: '🔗', color: 'node-color-flow', category: '集成', desc: '调用子流程', code: 'wf' },
+  { type: 'placeholder', name: '占位节点', icon: '⬜', color: 'node-color-placeholder', category: '其他', desc: '待完善节点', code: 'placeholder' },
 ];
 
 // --- Open / Close Designer ---
@@ -58,6 +71,7 @@ function openDesigner(wsId, wfId) {
   designerWf = wf;
   designerActive = true;
   designerSelectedNodeId = null;
+  designerSelectedNodeIds = [];
   designerRightPanel = 'overview';
   designerBottomPanel = null;
   designerBottomTab = 'problems';
@@ -67,6 +81,19 @@ function openDesigner(wsId, wfId) {
   designerDebugMode = false;
   designerDebugLog = [];
   designerNodePanelExpanded = false;
+  designerClipboard = [];
+  designerContextMenu = null;
+  designerGridSnap = false;
+  designerMinimapVisible = true;
+
+  // Simulate edit lock: some workflows are "locked" by another user for demo
+  if (wfId === 7) {
+    designerReadonly = true;
+    designerReadonlyUser = '钱七';
+  } else {
+    designerReadonly = false;
+    designerReadonlyUser = '';
+  }
 
   // Initialize default nodes if empty
   initDesignerNodes(wf);
@@ -75,6 +102,21 @@ function openDesigner(wsId, wfId) {
   shell.classList.add('active');
   renderDesigner();
   startAutoSave();
+
+  // Simulate abnormal exit recovery dialog for draft workflows
+  if (wf.status === 'draft' && wf._hasUnsavedDraft) {
+    setTimeout(() => {
+      showModal(`<div class="modal" style="max-width:440px"><div class="modal-header"><h2 class="modal-title">${icons.alertTriangle} 检测到未保存的草稿</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
+        <p style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant);line-height:1.6">检测到您上次编辑的未保存草稿，是否恢复？</p>
+        <div style="margin-top:var(--space-3);padding:var(--space-3);background:var(--md-surface-container);border-radius:var(--radius-sm)">
+          <div style="font-size:var(--font-size-xs);color:var(--md-outline);display:flex;gap:var(--space-3)">
+            <span>上次编辑：2026-04-16 14:35</span><span>节点数：${designerNodes.length + 2}</span>
+          </div>
+        </div>
+      </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal();showToast('info','已放弃','将加载最新保存版本')">不恢复</button><button class="btn btn-primary" onclick="closeModal();showToast('success','已恢复','草稿已恢复到上次编辑状态')">恢复草稿</button></div></div>`);
+    }, 500);
+  }
+  wf._hasUnsavedDraft = true;
 }
 
 function closeDesigner() {
@@ -172,6 +214,7 @@ function renderDesigner() {
   const statusClass = { draft: 'status-draft', published: 'status-published', disabled: 'status-disabled' };
 
   shell.innerHTML = `
+    ${designerReadonly ? `<div class="readonly-banner">${icons.lock} <span>当前 ${designerReadonlyUser} 正在编辑，您处于只读模式</span> <button class="btn btn-sm" style="height:24px;padding:0 12px;background:rgba(217,119,6,0.15);color:var(--md-warning);border-radius:var(--radius-full);font-size:11px;margin-left:var(--space-2)" onclick="showToast('info','提示','刷新页面可重新尝试获取编辑权限')">刷新重试</button></div>` : ''}
     ${designerDebugMode ? `<div class="debug-mode-bar active">${icons.play} <span>调试模式 - 画布只读</span> <button class="btn btn-sm" style="height:24px;padding:0 12px;background:rgba(0,90,193,0.15);color:var(--md-info);border-radius:var(--radius-full);font-size:11px" onclick="exitDebugMode()">退出调试</button></div>` : ''}
     <div class="designer-toolbar">
       <div class="designer-toolbar-left">
@@ -183,9 +226,18 @@ function renderDesigner() {
       </div>
       <div class="designer-toolbar-center">
         <button class="toolbar-btn" onclick="designerUndo()" title="撤销 (Ctrl+Z)">${icons.arrowLeft} <span>撤销</span></button>
-        <button class="toolbar-btn" onclick="designerRedo()" title="重做 (Ctrl+Y)">${icons.arrowLeft} <span>重做</span></button>
+        <button class="toolbar-btn" onclick="designerRedo()" title="重做 (Ctrl+Y)">${icons.redo} <span>重做</span></button>
         <span class="toolbar-divider"></span>
         <button class="toolbar-btn" onclick="autoLayout()" title="优化排列">${icons.workflow} <span>优化排列</span></button>
+        <button class="toolbar-btn ${designerGridSnap ? 'active' : ''}" onclick="toggleGridSnap()" title="网格吸附">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+          <span>吸附</span>
+        </button>
+        <span class="toolbar-divider"></span>
+        <button class="toolbar-btn ${designerMinimapVisible ? 'active' : ''}" onclick="toggleMinimap()" title="小地图">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2"/><rect x="12" y="12" width="8" height="8" rx="1"/></svg>
+          <span>地图</span>
+        </button>
         <span class="toolbar-divider"></span>
         <button class="toolbar-btn ${designerBottomPanel === 'problems' ? 'active' : ''}" onclick="toggleDesignerBottom('problems')">
           ${icons.alertTriangle} <span>问题</span>
@@ -193,18 +245,20 @@ function renderDesigner() {
         </button>
       </div>
       <div class="designer-toolbar-right">
-        <button class="btn btn-secondary btn-sm" onclick="enterDebugMode()" ${designerDebugMode ? 'disabled style="opacity:0.5"' : ''}>${icons.play}<span>调试</span></button>
+        <button class="btn btn-secondary btn-sm" onclick="enterDebugMode()" ${designerDebugMode || designerReadonly ? 'disabled style="opacity:0.5"' : ''}>${icons.play}<span>调试</span></button>
+        <button class="btn btn-secondary btn-sm" onclick="designerSave()" ${designerReadonly ? 'disabled style="opacity:0.5"' : ''}>${icons.check}<span>保存</span></button>
         <button class="btn btn-secondary btn-sm" onclick="showDesignerSettings()">${icons.settings}<span>设置</span></button>
         <button class="btn btn-secondary btn-sm" onclick="showDesignerVersions()">${icons.history}<span>版本</span></button>
-        <button class="btn btn-primary btn-sm" onclick="showPublishDialog()" ${wf.status === 'disabled' ? 'disabled style="opacity:0.5"' : ''}>${icons.arrowUp || icons.check}<span>发布</span></button>
+        <button class="btn btn-primary btn-sm" onclick="showPublishDialog()" ${wf.status === 'disabled' || designerReadonly ? 'disabled style="opacity:0.5"' : ''}>${icons.arrowUp || icons.check}<span>发布</span></button>
       </div>
     </div>
 
     <div class="designer-main">
       ${renderNodePanel()}
       <div class="canvas-area" id="canvasArea">
-        <div class="canvas-container" id="canvasContainer" onmousedown="onCanvasMouseDown(event)" onmousemove="onCanvasMouseMove(event)" onmouseup="onCanvasMouseUp(event)" onwheel="onCanvasWheel(event)" ondblclick="onCanvasDblClick(event)">
+        <div class="canvas-container" id="canvasContainer" onmousedown="onCanvasMouseDown(event)" onmousemove="onCanvasMouseMove(event)" onmouseup="onCanvasMouseUp(event)" onwheel="onCanvasWheel(event)" ondblclick="onCanvasDblClick(event)" oncontextmenu="onCanvasContextMenu(event)">
           <div class="canvas-grid" style="transform: translate(${designerPanX % 20}px, ${designerPanY % 20}px)"></div>
+          ${designerIsBoxSelecting && designerBoxSelectRect ? `<div class="box-select-rect" style="left:${designerBoxSelectRect.x}px;top:${designerBoxSelectRect.y}px;width:${designerBoxSelectRect.w}px;height:${designerBoxSelectRect.h}px"></div>` : ''}
           <svg class="canvas-svg" id="canvasSvg">
             <defs>
               <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
@@ -229,12 +283,13 @@ function renderDesigner() {
           <span style="width:1px;height:16px;background:var(--md-outline-variant);margin:0 4px"></span>
           <button class="canvas-control-btn" onclick="designerFitCanvas()" title="适应画布">${icons.workflow}</button>
         </div>
-        ${renderMinimap()}
+        ${designerMinimapVisible ? renderMinimap() : ''}
       </div>
       ${renderRightPanel()}
     </div>
 
     ${renderBottomPanel()}
+    ${renderContextMenu()}
   `;
 
   // Set up keyboard shortcuts
