@@ -87,7 +87,8 @@ const spaceColors = ['bg-blue', 'bg-green', 'bg-purple', 'bg-orange', 'bg-pink',
 let currentView = 'list';
 let currentDsId = null;
 let currentTab = 'items';
-let listState = { search: '', authFilter: 'all', refFilter: 'all', creatorFilter: 'all', page: 1, pageSize: 10 };
+let listState = { search: '', authFilter: 'all', refFilter: 'all', creatorFilter: 'all', dateFrom: '', dateTo: '', page: 1, pageSize: 10 };
+let searchTimer = null;
 let itemSortField = null;
 let itemSortAsc = true;
 let itemPage = 1;
@@ -319,36 +320,34 @@ function navigateTo(view, dsId) { currentView = view; currentDsId = dsId || null
 function renderDsListPage() {
   const filtered = getFilteredDataSources();
   const total = filtered.length;
-  const allTotal = dataSources.length;
   const start = (listState.page - 1) * listState.pageSize;
   const paged = filtered.slice(start, start + listState.pageSize);
   const totalPages = Math.ceil(total / listState.pageSize);
   const creators = [...new Set(dataSources.map(d => d.creator))];
-  const hasFilters = listState.search || listState.authFilter !== 'all' || listState.refFilter !== 'all' || listState.creatorFilter !== 'all';
+  const hasFilters = listState.search || listState.authFilter !== 'all' || listState.refFilter !== 'all' || listState.creatorFilter !== 'all' || listState.dateFrom || listState.dateTo;
   return `
     <div class="page-header"><div class="page-title-section"><h1 class="page-title shiny-text">数据源管理</h1><p class="page-subtitle">管理和维护系统数据字典及配置数据</p></div><button class="btn btn-primary magnet-btn" onclick="showCreateDsModal()">${icons.plus}<span>新建数据源</span></button></div>
     <div class="filter-bar">
-      <div class="filter-search">${icons.search}<input type="text" placeholder="搜索数据源名称..." value="${listState.search}" oninput="onSearchInput(this.value)" /></div>
-      <div class="filter-chips">
+      <div class="filter-search">${icons.search}<input type="text" id="dsSearchInput" placeholder="搜索数据源名称..." value="${listState.search}" oninput="onSearchInput(this.value)" /></div>
+      <div class="filter-group"><span class="filter-label">授权：</span><div class="filter-chips">
         <span class="filter-chip ${listState.authFilter === 'all' ? 'active' : ''}" onclick="onFilterAuth('all')">全部</span>
         <span class="filter-chip ${listState.authFilter === 'public' ? 'active' : ''}" onclick="onFilterAuth('public')">公开</span>
         <span class="filter-chip ${listState.authFilter === 'private' ? 'active' : ''}" onclick="onFilterAuth('private')">指定空间</span>
-      </div>
-      <div class="filter-chips">
+      </div></div>
+      <div class="filter-group"><span class="filter-label">引用：</span><div class="filter-chips">
         <span class="filter-chip ${listState.refFilter === 'all' ? 'active' : ''}" onclick="onFilterRef('all')">全部</span>
         <span class="filter-chip ${listState.refFilter === 'referenced' ? 'active' : ''}" onclick="onFilterRef('referenced')">已引用</span>
         <span class="filter-chip ${listState.refFilter === 'unreferenced' ? 'active' : ''}" onclick="onFilterRef('unreferenced')">未引用</span>
-      </div>
-      <div class="filter-actions">
-        <select class="pagination-size-select" onchange="onFilterCreator(this.value)"><option value="all" ${listState.creatorFilter === 'all' ? 'selected' : ''}>全部创建人</option>${creators.map(c => `<option value="${c}" ${listState.creatorFilter === c ? 'selected' : ''}>${c}</option>`).join('')}</select>
-        <span class="item-count">共 <strong>${total}</strong> 条</span>
-      </div>
+      </div></div>
+      <div class="filter-group"><span class="filter-label">创建人：</span><select class="filter-select-sm" onchange="onFilterCreator(this.value)"><option value="all" ${listState.creatorFilter === 'all' ? 'selected' : ''}>全部</option>${creators.map(c => `<option value="${c}" ${listState.creatorFilter === c ? 'selected' : ''}>${c}</option>`).join('')}</select></div>
+      <div class="filter-group"><span class="filter-label">创建时间：</span><div class="filter-date-range"><input type="date" value="${listState.dateFrom}" onchange="onFilterDateFrom(this.value)" /><span class="date-sep">~</span><input type="date" value="${listState.dateTo}" onchange="onFilterDateTo(this.value)" /></div></div>
+      ${hasFilters ? `<button class="filter-reset-btn" onclick="clearAllFilters()">${icons.close}<span>清除筛选</span></button>` : ''}
     </div>
     ${total === 0 ? (hasFilters ? renderEmptyState('dsSearchEmpty') : renderEmptyState('datasource')) : `
     <div class="table-wrapper"><table class="data-table"><thead><tr><th>名称</th><th style="width:100px">授权方式</th><th style="width:80px">数据项</th><th style="width:90px">被引用</th><th style="width:100px">创建者</th><th style="width:110px">创建时间</th><th style="width:90px">操作</th></tr></thead><tbody>
       ${paged.map(ds => `<tr onclick="navigateTo('detail', ${ds.id})"><td><div class="ds-name-cell"><span class="ds-name">${ds.name}</span>${ds.desc ? `<span class="ds-desc">${ds.desc}</span>` : ''}</div></td><td><span class="badge ${ds.isPublic ? 'badge-public' : 'badge-private'}">${ds.isPublic ? `${icons.globe} 公开` : `${icons.lock} 指定空间`}</span></td><td>${ds.items.length} 条</td><td>${ds.referenced ? `<span class="ref-count">${icons.link} ${ds.referenceCount}</span>` : '<span class="ref-none">未引用</span>'}</td><td>${ds.creator}</td><td>${ds.createdAt}</td><td onclick="event.stopPropagation()"><div class="table-actions"><button class="table-action-btn" title="编辑" onclick="showEditDsModal(${ds.id})">${icons.edit}</button><button class="table-action-btn danger" title="删除" onclick="showDeleteDsModal(${ds.id})">${icons.trash}</button></div></td></tr>`).join('')}
     </tbody></table></div>
-    <div class="pagination"><div class="pagination-info"><span>共 ${total} 条记录</span><span class="pagination-size"><label>每页</label><select onchange="onDsPageSizeChange(this.value)">${[10,20,50].map(n => `<option value="${n}" ${listState.pageSize === n ? 'selected' : ''}>${n}</option>`).join('')}</select><label>条</label></span></div><div class="pagination-controls"><button class="pagination-btn" ${listState.page <= 1 ? 'disabled' : ''} onclick="goToPage(${listState.page - 1})">${icons.chevronLeft}</button>${Array.from({length: totalPages}, (_, i) => i + 1).map(p => `<button class="pagination-btn ${p === listState.page ? 'active' : ''}" onclick="goToPage(${p})">${p}</button>`).join('')}<button class="pagination-btn" ${listState.page >= totalPages ? 'disabled' : ''} onclick="goToPage(${listState.page + 1})">${icons.chevronRight}</button></div></div>`}`;
+    <div class="pagination"><div class="pagination-info"><span>共 ${total} 条记录</span><div class="pagination-divider"></div><span class="pagination-size"><label>每页</label><select onchange="onDsPageSizeChange(this.value)">${[10,20,50].map(n => `<option value="${n}" ${listState.pageSize === n ? 'selected' : ''}>${n}</option>`).join('')}</select><label>条</label></span></div><div class="pagination-controls"><button class="pagination-btn" ${listState.page <= 1 ? 'disabled' : ''} onclick="goToPage(${listState.page - 1})">${icons.chevronLeft}</button>${Array.from({length: totalPages}, (_, i) => i + 1).map(p => `<button class="pagination-btn ${p === listState.page ? 'active' : ''}" onclick="goToPage(${p})">${p}</button>`).join('')}<button class="pagination-btn" ${listState.page >= totalPages ? 'disabled' : ''} onclick="goToPage(${listState.page + 1})">${icons.chevronRight}</button></div></div>`}`;
 }
 function getFilteredDataSources() {
   return dataSources.filter(ds => {
@@ -358,15 +357,30 @@ function getFilteredDataSources() {
     if (listState.refFilter === 'referenced' && !ds.referenced) return false;
     if (listState.refFilter === 'unreferenced' && ds.referenced) return false;
     if (listState.creatorFilter !== 'all' && ds.creator !== listState.creatorFilter) return false;
+    if (listState.dateFrom && ds.createdAt < listState.dateFrom) return false;
+    if (listState.dateTo && ds.createdAt > listState.dateTo) return false;
     return true;
   });
 }
-function onSearchInput(val) { listState.search = val; listState.page = 1; render(); }
+function onSearchInput(val) { listState.search = val; clearTimeout(searchTimer); searchTimer = setTimeout(() => { listState.page = 1; render(); }, 300); }
 function onFilterAuth(val) { listState.authFilter = val; listState.page = 1; render(); }
 function goToPage(p) { listState.page = p; render(); }
 function onFilterRef(val) { listState.refFilter = val; listState.page = 1; render(); }
 function onFilterCreator(val) { listState.creatorFilter = val; listState.page = 1; render(); }
+function onFilterDateFrom(val) { listState.dateFrom = val; listState.page = 1; render(); }
+function onFilterDateTo(val) { listState.dateTo = val; listState.page = 1; render(); }
+function clearAllFilters() { listState.search = ''; listState.authFilter = 'all'; listState.refFilter = 'all'; listState.creatorFilter = 'all'; listState.dateFrom = ''; listState.dateTo = ''; listState.page = 1; render(); }
 function onDsPageSizeChange(val) { listState.pageSize = parseInt(val); listState.page = 1; render(); }
+function validateKeyRealtime(input) {
+  const val = input.value, ke = document.getElementById('keyError');
+  if (val && !/^[a-zA-Z0-9_-]*$/.test(val)) { input.classList.add('error'); if (ke) { ke.textContent = 'Key 仅支持英文、数字、下划线和连字符'; ke.classList.remove('hidden'); } }
+  else { input.classList.remove('error'); if (ke) ke.classList.add('hidden'); }
+}
+function validateDsNameRealtime(input) {
+  const val = input.value, ne = document.getElementById('nameError');
+  if (val && !/^[\u4e00-\u9fa5a-zA-Z0-9_-]*$/.test(val)) { input.classList.add('error'); if (ne) { ne.textContent = '仅支持中文、英文、数字、下划线和连字符'; ne.classList.remove('hidden'); } }
+  else { input.classList.remove('error'); if (ne) ne.classList.add('hidden'); }
+}
 function onItemPageChange(page) { itemPage = page; render(); }
 function onItemPageSizeChange(size) { itemPageSize = parseInt(size); itemPage = 1; render(); }
 function renderPagination(current, total) {
@@ -416,7 +430,7 @@ function renderDataItemsTab(ds) {
   const si = (f) => itemSortField === f ? (itemSortAsc ? icons.arrowUp : icons.arrowDown) : icons.arrowUpDown;
   const addBtnDisabled = ds.items.length >= 500;
   const addBtn = addBtnDisabled
-    ? `<span title="已达数据项上限（500条）" style="cursor:not-allowed"><button class="btn btn-primary btn-sm" disabled style="opacity:0.5;cursor:not-allowed;pointer-events:none">${icons.plus}<span>添加数据项</span></button></span>`
+    ? `<span title="已达数据项上限（500条），无法继续添加" style="cursor:not-allowed"><button class="btn btn-primary btn-sm" disabled style="opacity:0.5;cursor:not-allowed;pointer-events:none">${icons.plus}<span>添加数据项</span></button></span>`
     : `<button class="btn btn-primary btn-sm" onclick="showAddItemModal(${ds.id})">${icons.plus}<span>添加数据项</span></button>`;
   return `<div class="tab-toolbar"><div class="tab-toolbar-left"><span class="item-count">共 <strong>${ds.items.length}</strong> 条</span></div><div class="tab-toolbar-right">${addBtn}</div></div>
   <div class="table-wrapper"><table class="data-table"><thead><tr><th class="sortable" onclick="toggleItemSort('key')">Key <span class="sort-icon">${si('key')}</span></th><th class="sortable" onclick="toggleItemSort('value')">Value <span class="sort-icon">${si('value')}</span></th><th style="width:90px">类型</th><th style="width:130px">更新时间</th><th style="width:90px">操作</th></tr></thead><tbody>
@@ -489,7 +503,7 @@ function closeModal() { const o = document.getElementById('modalContainer'); o.c
 
 // --- DS CRUD ---
 function showCreateDsModal() {
-  showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">新建数据源</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body"><div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">数据源名称 <span class="required">*</span></label><input type="text" class="form-input" id="dsName" placeholder="请输入数据源名称" maxlength="50" oninput="this.classList.remove('error');document.getElementById('nameError').classList.add('hidden')" /><div class="form-error hidden" id="nameError"></div></div><div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">描述</label><textarea class="form-textarea" id="dsDesc" placeholder="请输入描述（选填）" maxlength="200"></textarea></div><div class="form-group"><label class="form-label">授权方式</label><div class="radio-group"><label class="radio-item"><input type="radio" name="dsAuth" value="public" checked /> ${icons.globe} 公开</label><label class="radio-item"><input type="radio" name="dsAuth" value="private" /> ${icons.lock} 指定空间</label></div></div></div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="createDataSource()">创建</button></div></div>`);
+  showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">新建数据源</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body"><div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">数据源名称 <span class="required">*</span></label><input type="text" class="form-input" id="dsName" placeholder="请输入数据源名称" maxlength="50" oninput="validateDsNameRealtime(this)" /><div class="form-error hidden" id="nameError"></div></div><div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">描述</label><textarea class="form-textarea" id="dsDesc" placeholder="请输入描述（选填）" maxlength="200"></textarea></div><div class="form-group"><label class="form-label">授权方式</label><div class="radio-group"><label class="radio-item"><input type="radio" name="dsAuth" value="public" checked /> ${icons.globe} 公开</label><label class="radio-item"><input type="radio" name="dsAuth" value="private" /> ${icons.lock} 指定空间</label></div></div></div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="createDataSource()">创建</button></div></div>`);
   setTimeout(() => document.getElementById('dsName')?.focus(), 300);
 }
 function createDataSource() {
@@ -500,23 +514,23 @@ function createDataSource() {
   if (dataSources.some(d => d.name === name)) { ni.classList.add('error'); ne.textContent = '该名称已存在'; ne.classList.remove('hidden'); return; }
   dataSources.push({ id: nextId++, name, desc, createdAt: new Date().toISOString().slice(0, 10), creator: 'Sukey Wu', isPublic, referenced: false, referenceCount: 0, items: [], authorizedSpaces: [], syncConfig: { url: '', keyField: '', valueField: '' }, syncLogs: [] });
   const newId = nextId - 1;
-  listState.search = ''; listState.authFilter = 'all'; listState.refFilter = 'all';
+  listState.search = ''; listState.authFilter = 'all'; listState.refFilter = 'all'; listState.creatorFilter = 'all'; listState.dateFrom = ''; listState.dateTo = '';
   closeModal(); showToast('success', '创建成功', `数据源「${name}」已创建`);
   currentView = 'detail'; currentDsId = newId; currentTab = 'items'; render();
 }
 function showEditDsModal(id) {
   const ds = dataSources.find(d => d.id === id); if (!ds) return;
   showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">编辑数据源</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
-  <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">数据源名称 <span class="required">*</span></label><input type="text" class="form-input" id="dsName" value="${ds.name}" maxlength="50" oninput="this.classList.remove('error');document.getElementById('nameError').classList.add('hidden')" /><div class="form-error hidden" id="nameError"></div></div>
+  <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">数据源名称 <span class="required">*</span></label><input type="text" class="form-input" id="dsName" value="${ds.name}" maxlength="50" oninput="validateDsNameRealtime(this)" /><div class="form-error hidden" id="nameError"></div></div>
   <div class="form-group"><label class="form-label">描述</label><textarea class="form-textarea" id="dsDesc" maxlength="200">${ds.desc}</textarea></div>
   </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="updateDataSource(${id})">保存</button></div></div>`);
 }
 function updateDataSource(id) {
   const ds = dataSources.find(d => d.id === id), name = document.getElementById('dsName').value.trim();
   const ni = document.getElementById('dsName'), ne = document.getElementById('nameError'); ni.classList.remove('error'); ne.classList.add('hidden');
-  if (!name) { ni.classList.add('error'); ne.textContent = '请输入名称'; ne.classList.remove('hidden'); return; }
+  if (!name) { ni.classList.add('error'); ne.textContent = '请输入数据源名称'; ne.classList.remove('hidden'); return; }
   if (!/^[\u4e00-\u9fa5a-zA-Z0-9_-]+$/.test(name)) { ni.classList.add('error'); ne.textContent = '仅支持中文、英文、数字、下划线和连字符'; ne.classList.remove('hidden'); return; }
-  if (dataSources.some(d => d.id !== id && d.name === name)) { ni.classList.add('error'); ne.textContent = '名称已存在'; ne.classList.remove('hidden'); return; }
+  if (dataSources.some(d => d.id !== id && d.name === name)) { ni.classList.add('error'); ne.textContent = '该名称已存在'; ne.classList.remove('hidden'); return; }
   ds.name = name; ds.desc = document.getElementById('dsDesc').value.trim();
   closeModal(); showToast('success', '保存成功', `数据源已更新`); render();
 }
@@ -571,7 +585,7 @@ const dsItemTypes = ['String', 'Integer', 'Double', 'Boolean', 'DateTime'];
 
 function showAddItemModal(dsId) {
   showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">添加数据项</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
-  <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">Key <span class="required">*</span></label><input type="text" class="form-input" id="itemKey" placeholder="英文、数字、下划线、连字符" maxlength="100" oninput="this.classList.remove('error');document.getElementById('keyError').classList.add('hidden')" /><div class="form-error hidden" id="keyError"></div></div>
+  <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">Key <span class="required">*</span></label><input type="text" class="form-input" id="itemKey" placeholder="英文、数字、下划线、连字符" maxlength="100" oninput="validateKeyRealtime(this)" /><div class="form-error hidden" id="keyError"></div></div>
   <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">类型 <span class="required">*</span></label><select class="form-input" id="itemType" onchange="onAddItemTypeChange(${dsId})">${dsItemTypes.map(t => `<option value="${t}">${t}</option>`).join('')}</select></div>
   <div class="form-group" id="valueGroup"><label class="form-label">Value <span class="required">*</span></label>${getValueInputHtml('String', '', 'itemValue')}</div>
   </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="addItem(${dsId})">添加</button></div></div>`);
@@ -665,7 +679,7 @@ function removeSpace(dsId, space) {
   const hasRunning = ws && ws.runningInstances > 0;
   showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">移除授权</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
   <div class="delete-warning"><span class="delete-warning-icon">${icons.alertTriangle}</span><div class="delete-warning-text">确定要移除「${space}」的授权吗？</div></div>
-  ${hasRunning ? `<div style="margin-top:var(--space-3);padding:var(--space-3);background:rgba(220,38,38,0.06);border:1px solid rgba(220,38,38,0.15);border-radius:var(--radius-md);font-size:var(--font-size-sm);color:var(--md-error);line-height:1.6"><strong>⚠ 该空间当前有 ${ws.runningInstances} 个运行中的实例</strong>，已运行的实例不受影响，但移除授权后新实例将无法启动。</div>` : ''}
+  ${hasRunning ? `<div style="margin-top:var(--space-3);padding:var(--space-3);background:rgba(220,38,38,0.06);border:1px solid rgba(220,38,38,0.15);border-radius:var(--radius-md);font-size:var(--font-size-sm);color:var(--md-error);line-height:1.6"><strong>⚠ 该空间内有正在运行的工作流引用了此数据源</strong>，撤销后不影响运行中的实例，但新的实例将无法启动。是否继续？</div>` : ''}
   <div style="margin-top:var(--space-3);padding:var(--space-3);background:var(--md-surface-container);border-radius:var(--radius-md);font-size:var(--font-size-sm);color:var(--md-on-surface-variant);line-height:1.6">
   <div style="font-weight:500;color:var(--md-error);margin-bottom:4px">移除后的影响：</div>
   <ul style="margin:0;padding-left:var(--space-4)"><li>该空间内引用此数据源的工作流<strong>新实例将无法启动</strong></li><li>已运行的实例不受影响</li><li>重新授权后可恢复访问</li></ul></div>
@@ -1695,10 +1709,12 @@ function applyBlurText(el) {
   });
 }
 
+let lastBlurView = '';
 function triggerBlurTextAnimations() {
+  const viewKey = `${currentModule}-${currentView}-${currentDsId || ''}-${wsCurrentView}-${wsCurrentId || ''}`;
+  if (viewKey === lastBlurView) return;
+  lastBlurView = viewKey;
   document.querySelectorAll('.page-title, .detail-title, .ws-detail-title').forEach(el => {
-    if (el.dataset.blurApplied) return;
-    el.dataset.blurApplied = '1';
     applyBlurText(el);
   });
 }
@@ -1791,5 +1807,10 @@ render = function() {
     triggerBlurTextAnimations();
     triggerCountUpAnimations();
     initSpotlightCards();
+    // Restore search input focus after DOM rebuild
+    if (currentModule === 'datasource' && currentView === 'list') {
+      const si = document.getElementById('dsSearchInput');
+      if (si && listState.search) { si.focus(); si.setSelectionRange(si.value.length, si.value.length); }
+    }
   });
 };
