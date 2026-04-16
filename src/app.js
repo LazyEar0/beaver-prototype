@@ -384,11 +384,11 @@ function renderDsListPage() {
         <div class="filter-group"><span class="filter-label">创建时间</span><div class="filter-date-range"><input type="date" value="${listState.dateFrom}" onchange="onFilterDateFrom(this.value)" /><span class="date-sep">~</span><input type="date" value="${listState.dateTo}" onchange="onFilterDateTo(this.value)" /></div></div>
       </div>
     </div>
-    ${total === 0 ? (hasFilters ? renderEmptyState('dsSearchEmpty') : renderEmptyState('datasource')) : `
+    <div class="ds-table-area">${total === 0 ? (hasFilters ? renderEmptyState('dsSearchEmpty') : renderEmptyState('datasource')) : `
     <div class="table-wrapper"><table class="data-table"><thead><tr><th>名称</th><th style="width:100px">授权方式</th><th style="width:80px">数据项</th><th style="width:90px">被引用</th><th style="width:100px">创建者</th><th style="width:110px">创建时间</th><th style="width:90px">操作</th></tr></thead><tbody>
       ${paged.map(ds => `<tr onclick="navigateTo('detail', ${ds.id})"><td><div class="ds-name-cell"><span class="ds-name">${ds.name}</span>${ds.desc ? `<span class="ds-desc">${ds.desc}</span>` : ''}</div></td><td><span class="badge ${ds.isPublic ? 'badge-public' : 'badge-private'}">${ds.isPublic ? `${icons.globe} 公开` : `${icons.lock} 指定空间`}</span></td><td>${ds.items.length} 条</td><td>${ds.referenced ? `<span class="ref-count">${icons.link} ${ds.referenceCount}</span>` : '<span class="ref-none">未引用</span>'}</td><td>${ds.creator}</td><td>${ds.createdAt}</td><td onclick="event.stopPropagation()"><div class="table-actions"><button class="table-action-btn" title="编辑" onclick="showEditDsModal(${ds.id})">${icons.edit}</button><button class="table-action-btn danger" title="删除" onclick="showDeleteDsModal(${ds.id})">${icons.trash}</button></div></td></tr>`).join('')}
     </tbody></table></div>
-    <div class="pagination"><div class="pagination-info"><span>共 ${total} 条记录</span><div class="pagination-divider"></div><span class="pagination-size"><label>每页</label><select onchange="onDsPageSizeChange(this.value)">${[10,20,50].map(n => `<option value="${n}" ${listState.pageSize === n ? 'selected' : ''}>${n}</option>`).join('')}</select><label>条</label></span></div><div class="pagination-controls"><button class="pagination-btn" ${listState.page <= 1 ? 'disabled' : ''} onclick="goToPage(${listState.page - 1})">${icons.chevronLeft}</button>${Array.from({length: totalPages}, (_, i) => i + 1).map(p => `<button class="pagination-btn ${p === listState.page ? 'active' : ''}" onclick="goToPage(${p})">${p}</button>`).join('')}<button class="pagination-btn" ${listState.page >= totalPages ? 'disabled' : ''} onclick="goToPage(${listState.page + 1})">${icons.chevronRight}</button></div></div>`}`;
+    <div class="pagination"><div class="pagination-info"><span>共 ${total} 条记录</span><div class="pagination-divider"></div><span class="pagination-size"><label>每页</label><select onchange="onDsPageSizeChange(this.value)">${[10,20,50].map(n => `<option value="${n}" ${listState.pageSize === n ? 'selected' : ''}>${n}</option>`).join('')}</select><label>条</label></span></div><div class="pagination-controls"><button class="pagination-btn" ${listState.page <= 1 ? 'disabled' : ''} onclick="goToPage(${listState.page - 1})">${icons.chevronLeft}</button>${Array.from({length: totalPages}, (_, i) => i + 1).map(p => `<button class="pagination-btn ${p === listState.page ? 'active' : ''}" onclick="goToPage(${p})">${p}</button>`).join('')}<button class="pagination-btn" ${listState.page >= totalPages ? 'disabled' : ''} onclick="goToPage(${listState.page + 1})">${icons.chevronRight}</button></div></div>`}</div>`;
 }
 function getFilteredDataSources() {
   return dataSources.filter(ds => {
@@ -411,7 +411,41 @@ function onFilterDateFrom(val) { listState.dateFrom = val; listState.page = 1; r
 function onFilterDateTo(val) { listState.dateTo = val; listState.page = 1; render(); }
 function toggleFilterPanel() { listState.filterPanelOpen = !listState.filterPanelOpen; render(); }
 function toggleCreatorDropdown() { listState.creatorDropdownOpen = !listState.creatorDropdownOpen; listState.creatorSearch = ''; render(); }
-function toggleCreatorSelection(name) { const idx = listState.creatorFilter.indexOf(name); if (idx > -1) listState.creatorFilter.splice(idx, 1); else listState.creatorFilter.push(name); listState.page = 1; render(); }
+function toggleCreatorSelection(name) {
+  const idx = listState.creatorFilter.indexOf(name);
+  if (idx > -1) listState.creatorFilter.splice(idx, 1); else listState.creatorFilter.push(name);
+  listState.page = 1;
+  // --- Targeted DOM updates (no full render, no flash) ---
+  // 1. Toggle dropdown item visual state
+  document.querySelectorAll('.creator-dropdown-item').forEach(el => {
+    if (el.children[1] && el.children[1].textContent === name) el.classList.toggle('selected');
+  });
+  // 2. Update trigger display
+  const trigger = document.querySelector('.creator-dropdown-trigger');
+  if (trigger) {
+    const f = listState.creatorFilter;
+    trigger.innerHTML = f.length === 0
+      ? '<span style="color:var(--md-on-surface-variant)">全部</span>'
+      : f.length <= 2
+        ? `<span class="creator-mini-tags">${f.map(c => `<span class="creator-mini-tag">${c}</span>`).join('')}</span>`
+        : `<span class="creator-mini-tags"><span class="creator-mini-tag">${f[0]}</span><span class="creator-mini-tag-more">+${f.length - 1}</span></span>`;
+  }
+  // 3. Update filter badge
+  const activeCount = (listState.authFilter !== 'all' ? 1 : 0) + (listState.refFilter !== 'all' ? 1 : 0) + (listState.creatorFilter.length > 0 ? 1 : 0) + (listState.dateFrom || listState.dateTo ? 1 : 0);
+  const badge = document.querySelector('.filter-badge');
+  if (activeCount > 0) { if (badge) badge.textContent = activeCount; else { const s = document.createElement('span'); s.className = 'filter-badge'; s.textContent = activeCount; document.querySelector('.filter-toggle-btn')?.appendChild(s); } }
+  else { if (badge) badge.remove(); }
+  // 4. Refresh table area only (reuse renderDsListPage output to avoid code duplication)
+  refreshDsTableArea();
+}
+function refreshDsTableArea() {
+  const old = document.querySelector('.ds-table-area');
+  if (!old) return;
+  const full = renderDsListPage();
+  const tmp = document.createElement('div'); tmp.innerHTML = full;
+  const fresh = tmp.querySelector('.ds-table-area');
+  if (fresh) old.replaceWith(fresh);
+}
 function onCreatorSearch(val) {
   listState.creatorSearch = val;
   const listEl = document.querySelector('.creator-dropdown-list');
@@ -450,7 +484,7 @@ function renderPagination(current, total) {
 
 function renderEmptyState(type) {
   const s = {
-    datasource: { img: './public/images/empty-datasource.png', title: '暂无数据源', desc: '创建您的第一个数据源来管理配置数据', btn: `<button class="btn btn-primary" onclick="showCreateDsModal()">${icons.plus}<span>新建数据源</span></button>` },
+    datasource: { img: './public/images/empty-datasource.png', title: '暂无数据源', desc: '创建您的第一个数据源来管理配置数据', btn: '' },
     dsSearchEmpty: { img: './public/images/empty-datasource.png', title: '未找到匹配的数据源', desc: '请调整搜索或筛选条件', btn: '' },
     dataItems: { img: './public/images/empty-dataitems.png', title: '暂无数据项', desc: '添加数据项来定义数据源内容', btn: `<button class="btn btn-primary" onclick="showAddItemModal(${typeof currentDsId !== 'undefined' ? currentDsId : 0})">${icons.plus}<span>添加数据项</span></button>` },
     syncLog: { img: './public/images/empty-sync-log.png', title: '暂无同步记录', desc: '执行 API 同步后将在此记录历史', btn: '' },
