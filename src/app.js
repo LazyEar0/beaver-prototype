@@ -598,7 +598,7 @@ function closeModal() { const o = document.getElementById('modalContainer'); o.c
 
 // --- DS CRUD ---
 function showCreateDsModal() {
-  showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">新建数据源</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body"><div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">数据源名称 <span class="required">*</span></label><input type="text" class="form-input" id="dsName" placeholder="请输入数据源名称" maxlength="50" oninput="validateDsNameRealtime(this)" /><div class="form-error hidden" id="nameError"></div></div><div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">描述</label><textarea class="form-textarea" id="dsDesc" placeholder="请输入描述（选填）" maxlength="200"></textarea></div><div class="form-group"><label class="form-label">授权方式</label><div class="radio-group"><label class="radio-item"><input type="radio" name="dsAuth" value="public" checked /> ${icons.globe} 公开</label><label class="radio-item"><input type="radio" name="dsAuth" value="private" /> ${icons.lock} 指定空间</label></div></div></div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="createDataSource()">创建</button></div></div>`);
+  showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">新建数据源</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body"><div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">数据源名称 <span class="required">*</span></label><input type="text" class="form-input" id="dsName" placeholder="请输入数据源名称" maxlength="50" oninput="validateDsNameRealtime(this)" /><div class="form-error hidden" id="nameError"></div></div><div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">描述</label><textarea class="form-textarea" id="dsDesc" placeholder="请输入描述（选填）" maxlength="200"></textarea></div><div class="form-group"><label class="form-label">授权方式</label><div class="radio-group"><label class="radio-item"><input type="radio" name="dsAuth" value="public" checked /> ${icons.globe} 公开</label><label class="radio-item"><input type="radio" name="dsAuth" value="private" /> ${icons.lock} 指定空间</label></div></div></div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="createDataSource()">保存</button></div></div>`);
   setTimeout(() => document.getElementById('dsName')?.focus(), 300);
 }
 function createDataSource() {
@@ -683,7 +683,7 @@ function showAddItemModal(dsId) {
   <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">Key <span class="required">*</span></label><input type="text" class="form-input" id="itemKey" placeholder="英文、数字、下划线、连字符" maxlength="100" oninput="validateKeyRealtime(this)" /><div class="form-error hidden" id="keyError"></div></div>
   <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">类型 <span class="required">*</span></label><select class="form-input" id="itemType" onchange="onAddItemTypeChange(${dsId})">${dsItemTypes.map(t => `<option value="${t}">${t}</option>`).join('')}</select></div>
   <div class="form-group" id="valueGroup"><label class="form-label">Value <span class="required">*</span></label>${getValueInputHtml('String', '', 'itemValue')}</div>
-  </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="addItem(${dsId})">添加</button></div></div>`);
+  </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="addItem(${dsId})">保存</button></div></div>`);
 }
 function onAddItemTypeChange(dsId) {
   const type = document.getElementById('itemType').value;
@@ -1037,7 +1037,7 @@ function navigateToWsFolderByIndex(idx) { wsFolderPath = wsFolderPath.slice(0, i
 
 // --- Folder CRUD ---
 function showCreateFolderModal() {
-  showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">新建文件夹</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body"><div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">文件夹名称 <span class="required">*</span></label><input type="text" class="form-input" id="folderName" placeholder="请输入文件夹名称" maxlength="50" oninput="this.classList.remove('error');document.getElementById('folderNameError').classList.add('hidden')" /><div class="form-error hidden" id="folderNameError"></div></div><div class="form-group"><label class="form-label">描述</label><textarea class="form-textarea" id="folderDesc" placeholder="选填" maxlength="500"></textarea></div></div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="createFolder()">创建</button></div></div>`);
+  showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">新建文件夹</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body"><div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">文件夹名称 <span class="required">*</span></label><input type="text" class="form-input" id="folderName" placeholder="请输入文件夹名称" maxlength="50" oninput="this.classList.remove('error');document.getElementById('folderNameError').classList.add('hidden')" /><div class="form-error hidden" id="folderNameError"></div></div><div class="form-group"><label class="form-label">描述</label><textarea class="form-textarea" id="folderDesc" placeholder="选填" maxlength="500"></textarea></div></div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="createFolder()">保存</button></div></div>`);
   setTimeout(() => document.getElementById('folderName')?.focus(), 300);
 }
 function createFolder() {
@@ -1170,7 +1170,7 @@ function showCreateWfModal() {
     <div class="form-group" style="flex:1"><label class="form-label">允许被引用</label><div class="toggle-inline"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="wfAllowRef" /><span style="font-size:var(--font-size-sm)">开启后可作为子流程</span></label></div></div>
   </div>
   <div class="form-row"><div class="form-group" style="flex:1"><label class="form-label">流程负责人 <span class="required">*</span></label><select class="form-input" id="wfOwner">${ws.members.filter(m => m.role !== 'viewer').map(m => `<option value="${m.userId}">${m.name}</option>`).join('')}</select></div></div>
-  </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="createWf()">创建</button></div></div>`);
+  </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="createWf()">保存</button></div></div>`);
   setTimeout(() => document.getElementById('wfName')?.focus(), 300);
 }
 function createWf() {
@@ -1591,7 +1591,7 @@ function showCreateWsModal() {
   <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">空间名称 <span class="required">*</span></label><input type="text" class="form-input" id="wsName" placeholder="请输入空间名称" maxlength="50" oninput="this.classList.remove('error');document.getElementById('wsNameError').classList.add('hidden')" /><div class="form-error hidden" id="wsNameError"></div></div>
   <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">空间描述</label><textarea class="form-textarea" id="wsDesc" placeholder="选填" maxlength="200"></textarea></div>
   <div class="form-group"><label class="form-label">空间编号 <span class="required">*</span></label><input type="text" class="form-input" id="wsCode" placeholder="英文、数字、下划线、连字符" maxlength="30" oninput="this.classList.remove('error');document.getElementById('wsCodeError').classList.add('hidden')" /><div class="form-error hidden" id="wsCodeError"></div></div>
-  </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="createWorkspace()">创建</button></div></div>`);
+  </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="createWorkspace()">保存</button></div></div>`);
   setTimeout(() => document.getElementById('wsName')?.focus(), 300);
 }
 function createWorkspace() {
