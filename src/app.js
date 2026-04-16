@@ -572,10 +572,12 @@ function confirmSwitchAuthType(dsId, toPublic) {
 
 function renderSyncTab(ds) {
   return `<div class="sync-config"><h3 class="sync-config-title">API 同步配置</h3>
+  <div class="sync-form-content">
   <div class="form-group" style="margin-bottom:var(--space-3)"><label class="form-label">API 地址</label><input type="text" class="form-input" id="syncUrl" value="${ds.syncConfig.url}" placeholder="https://api.example.com/data" oninput="this.classList.remove('error');var e=this.parentElement.querySelector('.sync-field-error');if(e)e.remove()" /></div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3);margin-bottom:var(--space-4)"><div class="form-group"><label class="form-label">Key 字段映射</label><input type="text" class="form-input" id="syncKeyField" value="${ds.syncConfig.keyField}" placeholder="字段名" oninput="this.classList.remove('error');var e=this.parentElement.querySelector('.sync-field-error');if(e)e.remove()" /></div><div class="form-group"><label class="form-label">Value 字段映射</label><input type="text" class="form-input" id="syncValueField" value="${ds.syncConfig.valueField}" placeholder="字段名" oninput="this.classList.remove('error');var e=this.parentElement.querySelector('.sync-field-error');if(e)e.remove()" /></div></div>
-  <div style="display:flex;gap:var(--space-2)"><button class="btn btn-secondary btn-sm" onclick="saveSyncConfig(${ds.id})">保存配置</button><button class="btn btn-primary btn-sm" onclick="showSyncStrategyModal(${ds.id})">${icons.sync}<span>立即同步</span></button></div></div>
-  <div style="margin-top:var(--space-6)"><h3 class="sync-config-title">同步记录</h3>
+  <div style="display:flex;gap:var(--space-2)"><button class="btn btn-secondary btn-sm" onclick="saveSyncConfig(${ds.id})">保存配置</button><button class="btn btn-primary btn-sm" onclick="showSyncStrategyModal(${ds.id})">${icons.sync}<span>立即同步</span></button></div>
+  </div></div>
+  <div class="sync-config"><h3 class="sync-config-title">同步记录</h3>
   ${ds.syncLogs.length === 0 ? renderEmptyState('syncLog') : (() => {
     const total = ds.syncLogs.length;
     const totalPages = Math.ceil(total / syncLogPageSize);

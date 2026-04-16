@@ -2443,6 +2443,10 @@ img { display: block; max-width: 100%; }
   margin-bottom: var(--space-6);
 }
 
+.sync-form-content {
+  max-width: 640px;
+}
+
 .sync-config-title {
   font-size: var(--font-size-md);
   font-weight: 500;
