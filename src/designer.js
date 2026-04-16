@@ -1307,7 +1307,27 @@ function addNodeToCanvas(type, x, y) {
 }
 
 function deleteSelectedNode() {
-  if (!designerSelectedNodeId || designerDebugMode) return;
+  if (designerDebugMode || designerReadonly) return;
+
+  // Multi-select delete
+  if (designerSelectedNodeIds.length > 1) {
+    const deletable = designerSelectedNodeIds.filter(id => {
+      const n = designerNodes.find(nd => nd.id === id);
+      return n && n.type !== 'trigger' && n.type !== 'end';
+    });
+    if (deletable.length === 0) { showToast('warning', '无法删除', '不能删除触发器或结束节点'); return; }
+    designerNodes = designerNodes.filter(n => !deletable.includes(n.id));
+    designerConnections = designerConnections.filter(c => !deletable.includes(c.from) && !deletable.includes(c.to));
+    designerSelectedNodeIds = designerSelectedNodeIds.filter(id => !deletable.includes(id));
+    designerSelectedNodeId = null;
+    designerRightPanel = 'overview';
+    renderDesigner();
+    showToast('success', '已删除', `${deletable.length} 个节点`);
+    return;
+  }
+
+  // Single delete
+  if (!designerSelectedNodeId) return;
   const node = designerNodes.find(n => n.id === designerSelectedNodeId);
   if (!node) return;
 
@@ -1319,6 +1339,7 @@ function deleteSelectedNode() {
   designerNodes = designerNodes.filter(n => n.id !== designerSelectedNodeId);
   designerConnections = designerConnections.filter(c => c.from !== designerSelectedNodeId && c.to !== designerSelectedNodeId);
   designerSelectedNodeId = null;
+  designerSelectedNodeIds = [];
   designerRightPanel = 'overview';
   renderDesigner();
   showToast('success', '已删除', node.name);
@@ -1691,7 +1712,8 @@ function designerKeyHandler(e) {
     deleteSelectedNode();
   }
   if (e.key === 'Escape') {
-    if (designerDebugMode) exitDebugMode();
+    if (designerContextMenu) { designerContextMenu = null; renderDesigner(); }
+    else if (designerDebugMode) exitDebugMode();
     else deselectNode();
   }
   if (e.ctrlKey && e.key === 'z') { e.preventDefault(); designerUndo(); }

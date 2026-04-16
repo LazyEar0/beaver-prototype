@@ -516,7 +516,7 @@ function renderEmptyState(type) {
     dsSearchEmpty: { img: './public/images/empty-datasource.png', title: '未找到匹配的数据源', desc: '请调整搜索或筛选条件', btn: '' },
     dataItems: { img: './public/images/empty-dataitems.png', title: '暂无数据项', desc: '添加数据项来定义数据源内容', btn: `<button class="btn btn-primary" onclick="showAddItemModal(${typeof currentDsId !== 'undefined' ? currentDsId : 0})">${icons.plus}<span>添加数据项</span></button>` },
     syncLog: { img: './public/images/empty-sync-log.png', title: '暂无同步记录', desc: '执行 API 同步后将在此记录历史', btn: '' },
-    workspace: { img: './public/images/empty-workspace.png', title: '暂无工作空间', desc: '创建工作空间来组织工作流', btn: `<button class="btn btn-primary" onclick="showCreateWsModal()">${icons.plus}<span>新建空间</span></button>` }
+    workspace: { img: './public/images/empty-workspace.png', title: '暂无工作空间', desc: '创建工作空间来组织工作流', btn: `<button class="btn btn-primary" onclick="showCreateWsModal()">${icons.plus}<span>新建空间</span></button>` },
     wsSearchEmpty: { img: './public/images/empty-workspace.png', title: '未找到匹配空间', desc: '请调整搜索或筛选条件', btn: '' },
     folderContent: { img: './public/images/empty-folder-content.png', title: '暂无内容', desc: '创建工作流或文件夹来组织您的空间', btn: '' },
     folderEmpty: { img: './public/images/empty-folder-content.png', title: '该文件夹为空', desc: '在此文件夹中创建工作流或子文件夹', btn: '' },
