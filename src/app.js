@@ -869,7 +869,7 @@ function renderWsListPage() {
   const paged = filtered.slice(start, start + wsListState.pageSize);
   const totalPages = Math.ceil(total / wsListState.pageSize);
   return `
-    <div class="page-header"><div class="page-title-section"><h1 class="page-title shiny-text">空间管理</h1><p class="page-subtitle">管理工作空间，组织和协作工作流</p></div><button class="btn btn-primary magnet-btn" onclick="showCreateWsModal()">${icons.plus}<span>创建空间</span></button></div>
+    <div class="page-header"><div class="page-title-section"><h1 class="page-title shiny-text">空间管理</h1></div><button class="btn btn-primary magnet-btn" onclick="showCreateWsModal()">${icons.plus}<span>创建空间</span></button></div>
     <div class="filter-bar">
       <div class="filter-search">${icons.search}<input type="text" placeholder="搜索空间名称或编号..." value="${wsListState.search}" oninput="onWsSearchInput(this.value)" /></div>
       <div class="filter-chips">
@@ -885,7 +885,7 @@ function renderWsListPage() {
       const cc = wsCardColors[ws.id % wsCardColors.length];
       const rl = { admin: '管理员', member: '成员', viewer: '只读查看者' };
       const rc = { admin: 'role-badge-admin', member: 'role-badge-member', viewer: 'role-badge-viewer' };
-      return `<div class="workspace-card spotlight-card glare-hover" onclick="wsNavigateTo('detail', ${ws.id})"><div class="workspace-card-header"><div class="workspace-card-icon" style="background:${cc.bg};color:${cc.color}">${ws.name.charAt(0)}</div><div class="workspace-card-title-group"><div class="workspace-card-name">${ws.name}</div><span class="workspace-card-code">${icons.hash} ${ws.code}</span></div><div class="workspace-card-actions" onclick="event.stopPropagation()">${ws.myRole === 'admin' ? `<button class="table-action-btn" title="编辑" onclick="showEditWsModal(${ws.id})">${icons.edit}</button>` : ''}</div></div><div class="workspace-card-desc" title="${ws.desc}">${ws.desc || '暂无描述'}</div><div class="workspace-card-stats"><span class="ws-stat-item">${icons.users} <span class="ws-stat-value" data-count-up="${ws.members.length}">${ws.members.length}</span> 成员</span><span class="ws-stat-item">${icons.workflow} <span class="ws-stat-value" data-count-up="${ws.workflowCount}">${ws.workflowCount}</span> 工作流</span>${ws.runningInstances > 0 ? `<span class="ws-stat-item" style="color:var(--md-success)">${icons.sync} <span class="ws-stat-value" data-count-up="${ws.runningInstances}">${ws.runningInstances}</span> 运行中</span>` : ''}</div><div class="workspace-card-footer"><span class="role-badge ${rc[ws.myRole]}">${icons.shield} ${rl[ws.myRole]}</span><span class="workspace-card-time">${icons.clock} ${ws.lastActiveAt}</span></div></div>`;
+      return `<div class="workspace-card spotlight-card glare-hover" onclick="wsNavigateTo('detail', ${ws.id})"><div class="workspace-card-header"><div class="workspace-card-icon" style="background:${cc.bg};color:${cc.color}">${ws.name.charAt(0)}</div><div class="workspace-card-title-group"><div class="workspace-card-name">${ws.name}</div><span class="workspace-card-code">${icons.hash} ${ws.code}</span></div><div class="workspace-card-actions" onclick="event.stopPropagation()">${ws.myRole === 'admin' ? `<button class="table-action-btn" title="编辑" onclick="showEditWsModal(${ws.id})">${icons.edit}</button>` : ''}</div></div><div class="workspace-card-desc" title="${ws.desc}">${ws.desc || '暂无描述'}</div><div class="workspace-card-stats"><span class="ws-stat-item">${icons.users} <span class="ws-stat-value" data-count-up="${ws.members.length}">${ws.members.length}</span> 成员</span><span class="ws-stat-item">${icons.workflow} <span class="ws-stat-value" data-count-up="${ws.workflowCount}">${ws.workflowCount}</span> 工作流</span>${ws.runningInstances > 0 ? `<span class="ws-stat-item" style="color:var(--md-success)">${icons.sync} <span class="ws-stat-value" data-count-up="${ws.runningInstances}">${ws.runningInstances}</span> 运行中</span>` : ''}</div><div class="workspace-card-footer"><span class="role-badge ${rc[ws.myRole]}">${icons.shield} ${rl[ws.myRole]}</span><span class="workspace-card-time">${icons.clock} 活跃于 ${ws.lastActiveAt}</span></div></div>`;
     }).join('')}</div>
     ${totalPages > 1 || total > 12 ? `<div class="pagination"><div class="pagination-info">第 ${start + 1}-${Math.min(start + wsListState.pageSize, total)} 条，共 ${total} 条</div><div class="pagination-controls">${wsListState.page > 1 ? `<button class="pagination-btn" onclick="wsListState.page--;render()">${icons.chevronLeft}</button>` : `<button class="pagination-btn disabled">${icons.chevronLeft}</button>`}${Array.from({length: totalPages}, (_, i) => `<button class="pagination-btn ${wsListState.page === i + 1 ? 'active' : ''}" onclick="wsListState.page=${i + 1};render()">${i + 1}</button>`).join('')}${wsListState.page < totalPages ? `<button class="pagination-btn" onclick="wsListState.page++;render()">${icons.chevronRight}</button>` : `<button class="pagination-btn disabled">${icons.chevronRight}</button>`}</div><div class="pagination-size"><span>每页</span><select onchange="wsListState.pageSize=parseInt(this.value);wsListState.page=1;render()"><option value="12" ${wsListState.pageSize === 12 ? 'selected' : ''}>12</option><option value="24" ${wsListState.pageSize === 24 ? 'selected' : ''}>24</option><option value="48" ${wsListState.pageSize === 48 ? 'selected' : ''}>48</option></select><span>条</span></div></div>` : ''}`}`;
 }
@@ -905,8 +905,22 @@ function toggleWsSortOrder() { wsListState.sortAsc = !wsListState.sortAsc; rende
 function renderWsDetailPage(ws) {
   const isAdmin = ws.myRole === 'admin';
   return `
-    <div class="detail-back" onclick="wsNavigateTo('list')">${icons.arrowLeft}<span>返回空间列表</span></div>
-    <div class="ws-detail-header"><div class="ws-detail-info"><div class="ws-detail-title-row"><h1 class="ws-detail-title">${ws.name}</h1><span class="role-badge role-badge-${ws.myRole}">${icons.shield} ${{ admin: '管理员', member: '成员', viewer: '只读查看者' }[ws.myRole]}</span></div>${ws.desc ? `<div class="ws-detail-desc">${ws.desc}</div>` : ''}<div class="ws-detail-meta"><span class="ws-detail-meta-item">${icons.hash} ${ws.code}</span><span class="ws-detail-meta-item">${icons.calendar} 创建于 ${ws.createdAt}</span><span class="ws-detail-meta-item">${icons.clock} 最近活跃 ${ws.lastActiveAt}</span></div></div><div class="ws-detail-stats">${[{ icon: icons.workflow, value: ws.workflowCount, label: '工作流' }, { icon: icons.users, value: ws.members.length, label: '成员' }, { icon: icons.sync, value: ws.runningInstances || 0, label: '运行中' }].map(s => `<div class="ws-detail-stat-card"><div class="ws-detail-stat-value" data-count-up="${s.value}">${s.value}</div><div class="ws-detail-stat-label">${s.icon} ${s.label}</div></div>`).join('')}</div></div>
+    <div class="ws-detail-compact-header">
+      <div class="ws-detail-top-row">
+        <span class="ws-detail-back-link" onclick="wsNavigateTo('list')">${icons.arrowLeft} 返回</span>
+        <span class="ws-detail-breadcrumb-sep">/</span>
+        <h1 class="ws-detail-compact-title">${ws.name}</h1>
+        <span class="role-badge role-badge-${ws.myRole}" style="font-size:11px;padding:2px 8px">${icons.shield} ${{ admin: '管理员', member: '成员', viewer: '只读查看者' }[ws.myRole]}</span>
+      </div>
+      <div class="ws-detail-compact-meta">
+        <span class="ws-detail-meta-item">${icons.hash} ${ws.code}</span>
+        ${ws.desc ? `<span class="ws-detail-meta-sep">·</span><span class="ws-detail-meta-item" style="color:var(--md-on-surface-variant)">${ws.desc}</span>` : ''}
+        <span class="ws-detail-meta-sep">·</span>
+        <span class="ws-detail-meta-item">${icons.calendar} ${ws.createdAt}</span>
+        <span class="ws-detail-meta-sep">·</span>
+        <span class="ws-detail-meta-item">${icons.clock} 活跃 ${ws.lastActiveAt}</span>
+      </div>
+    </div>
     <div class="ws-tabs-bar">
       <button class="ws-tab-btn ${wsInternalTab === 'workflows' ? 'active' : ''}" onclick="switchWsTab('workflows')">${icons.workflow}<span>工作流</span></button>
       <button class="ws-tab-btn ${wsInternalTab === 'executions' ? 'active' : ''}" onclick="switchWsTab('executions')">${icons.clock}<span>执行记录</span></button>
@@ -1022,15 +1036,20 @@ function renderWsWorkflowsTab(ws) {
 
   return `
     ${breadcrumb}
-    <div class="filter-bar" style="margin-top:var(--space-3)">
-      <div class="filter-search" style="flex:1;max-width:320px">${icons.search}<input type="text" placeholder="搜索工作流名称或编号..." value="${wsContentSearch}" oninput="onWsContentSearch(this.value)" /></div>
-      <div class="filter-chips">
-        <span class="filter-chip ${wsContentStatusFilter === 'all' ? 'active' : ''}" onclick="onWsStatusFilter('all')">全部</span>
-        <span class="filter-chip ${wsContentStatusFilter === 'draft' ? 'active' : ''}" onclick="onWsStatusFilter('draft')">草稿</span>
-        <span class="filter-chip ${wsContentStatusFilter === 'published' ? 'active' : ''}" onclick="onWsStatusFilter('published')">已发布</span>
-        <span class="filter-chip ${wsContentStatusFilter === 'disabled' ? 'active' : ''}" onclick="onWsStatusFilter('disabled')">已停用</span>
+    <div class="wf-filter-toolbar" style="margin-top:var(--space-3)">
+      <div class="wf-filter-row-1">
+        <div class="filter-search" style="flex:1;max-width:280px">${icons.search}<input type="text" placeholder="搜索名称或编号..." value="${wsContentSearch}" oninput="onWsContentSearch(this.value)" /></div>
+        <div class="filter-chips">
+          <span class="filter-chip ${wsContentStatusFilter === 'all' ? 'active' : ''}" onclick="onWsStatusFilter('all')">全部</span>
+          <span class="filter-chip ${wsContentStatusFilter === 'draft' ? 'active' : ''}" onclick="onWsStatusFilter('draft')">草稿</span>
+          <span class="filter-chip ${wsContentStatusFilter === 'published' ? 'active' : ''}" onclick="onWsStatusFilter('published')">已发布</span>
+          <span class="filter-chip ${wsContentStatusFilter === 'disabled' ? 'active' : ''}" onclick="onWsStatusFilter('disabled')">已停用</span>
+        </div>
+        <div style="flex:1"></div>
+        ${isMemberOrAbove ? `<button class="btn btn-primary btn-sm" onclick="showCreateWfModal()">${icons.plus}<span>新建工作流</span></button>` : ''}
+        ${canCreateFolder ? `<button class="btn btn-secondary btn-sm" onclick="showCreateFolderModal()">${icons.folder}<span>新建文件夹</span></button>` : ''}
       </div>
-      <div class="filter-actions" style="display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap">
+      <div class="wf-filter-row-2">
         <div class="creator-dropdown"><div class="creator-dropdown-trigger ${wsCreatorDropdownOpen ? 'open' : ''}" onclick="event.stopPropagation();toggleWsCreatorDropdown()">${creatorTriggerHtml}</div>${creatorPanelHtml}</div>
         <div class="creator-dropdown"><div class="creator-dropdown-trigger ${wsOwnerDropdownOpen ? 'open' : ''}" onclick="event.stopPropagation();toggleWsOwnerDropdown()">${ownerTriggerHtml}</div>${ownerPanelHtml}</div>
         <select class="form-input" style="width:auto;padding:4px 8px;font-size:var(--font-size-sm)" onchange="onWsTypeFilter(this.value)">
@@ -1038,9 +1057,8 @@ function renderWsWorkflowsTab(ws) {
           <option value="app" ${wsContentTypeFilter === 'app' ? 'selected' : ''}>应用流</option>
           <option value="chat" ${wsContentTypeFilter === 'chat' ? 'selected' : ''}>对话流</option>
         </select>
+        <div style="flex:1"></div>
         <div class="sort-dropdown"><select onchange="onWsContentSort(this.value)"><option value="editedAt" ${wsContentSortField === 'editedAt' ? 'selected' : ''}>最后编辑</option><option value="createdAt" ${wsContentSortField === 'createdAt' ? 'selected' : ''}>创建时间</option><option value="name" ${wsContentSortField === 'name' ? 'selected' : ''}>名称</option></select><button class="sort-toggle-btn" onclick="toggleWsContentSort()">${wsContentSortAsc ? icons.arrowUp : icons.arrowDown}</button></div>
-        ${isMemberOrAbove ? `<button class="btn btn-primary btn-sm" onclick="showCreateWfModal()">${icons.plus}<span>新建工作流</span></button>` : ''}
-        ${canCreateFolder ? `<button class="btn btn-secondary btn-sm" onclick="showCreateFolderModal()">${icons.folder}<span>新建文件夹</span></button>` : ''}
       </div>
     </div>
 

@@ -657,6 +657,30 @@ img { display: block; max-width: 100%; }
   color: var(--md-on-surface-variant);
 }
 
+/* --- Workflow Filter Toolbar (2-row layout) --- */
+.wf-filter-toolbar {
+  background: var(--md-surface-container-lowest);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--md-outline-variant);
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.wf-filter-row-1 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.wf-filter-row-2 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
 /* --- Filter Bar (MD3 Surface Container) --- */
 .filter-bar {
   background: var(--md-surface-container-lowest);
@@ -3110,7 +3134,83 @@ img { display: block; max-width: 100%; }
   color: var(--md-on-surface-variant);
 }
 
-/* --- Workspace Detail Header --- */
+/* --- Workspace Detail Header (Compact) --- */
+.ws-detail-compact-header {
+  margin-bottom: var(--space-4);
+}
+
+.ws-detail-top-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: 4px;
+}
+
+.ws-detail-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--md-on-surface-variant);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: var(--transition-fast);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.ws-detail-back-link:hover {
+  color: var(--md-primary);
+}
+
+.ws-detail-back-link svg {
+  width: 16px;
+  height: 16px;
+}
+
+.ws-detail-breadcrumb-sep {
+  color: var(--md-outline);
+  font-size: var(--font-size-sm);
+  flex-shrink: 0;
+}
+
+.ws-detail-compact-title {
+  font-size: var(--font-size-xl);
+  font-weight: 500;
+  color: var(--md-on-surface);
+  letter-spacing: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ws-detail-compact-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-xs);
+  color: var(--md-outline);
+  padding-left: 2px;
+  flex-wrap: wrap;
+}
+
+.ws-detail-compact-meta .ws-detail-meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+}
+
+.ws-detail-compact-meta .ws-detail-meta-item svg {
+  width: 12px;
+  height: 12px;
+}
+
+.ws-detail-meta-sep {
+  color: var(--md-outline-variant);
+  font-size: var(--font-size-xs);
+}
+
+/* --- Legacy Detail Header (kept for compat) --- */
 .ws-detail-header {
   display: flex;
   align-items: flex-start;
