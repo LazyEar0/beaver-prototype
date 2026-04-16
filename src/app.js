@@ -4,6 +4,9 @@
    ============================================ */
 
 // --- SVG Icons ---
+function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+let isComposing = false;
+let searchFocused = false;
 const icons = {
   plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/><path d="M12 5v14"/></svg>',
   search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>',
@@ -361,7 +364,7 @@ function renderDsListPage() {
     <div class="page-header"><div class="page-title-section"><h1 class="page-title shiny-text">数据源管理</h1><p class="page-subtitle">管理和维护系统数据字典及配置数据</p></div><button class="btn btn-primary magnet-btn" onclick="showCreateDsModal()">${icons.plus}<span>新建数据源</span></button></div>
     <div class="filter-container">
       <div class="filter-toolbar">
-        <div class="filter-search">${icons.search}<input type="text" id="dsSearchInput" placeholder="搜索数据源名称..." value="${listState.search}" oninput="onSearchInput(this.value)" /></div>
+        <div class="filter-search">${icons.search}<input type="text" id="dsSearchInput" placeholder="搜索数据源名称..." value="${escHtml(listState.search)}" oninput="onSearchInput(this.value)" onfocus="searchFocused=true" onblur="searchFocused=false" oncompositionstart="isComposing=true" oncompositionend="isComposing=false;onSearchInput(this.value)" /></div>
         <button class="filter-toggle-btn ${listState.filterPanelOpen ? 'active' : ''}" onclick="toggleFilterPanel()">${icons.filter}<span>筛选</span>${activeFilterCount > 0 ? `<span class="filter-badge">${activeFilterCount}</span>` : ''}</button>
         ${filterTagsHtml}
         ${hasFilters ? `<button class="filter-reset-btn" onclick="clearAllFilters()" style="margin-left:auto">${icons.close}<span>清除</span></button>` : ''}
@@ -400,7 +403,7 @@ function getFilteredDataSources() {
     return true;
   });
 }
-function onSearchInput(val) { listState.search = val; clearTimeout(searchTimer); searchTimer = setTimeout(() => { listState.page = 1; render(); }, 300); }
+function onSearchInput(val) { if (isComposing) return; listState.search = val; clearTimeout(searchTimer); searchTimer = setTimeout(() => { listState.page = 1; render(); }, 300); }
 function onFilterAuth(val) { listState.authFilter = val; listState.page = 1; render(); }
 function goToPage(p) { listState.page = p; render(); }
 function onFilterRef(val) { listState.refFilter = val; listState.page = 1; render(); }
@@ -409,7 +412,15 @@ function onFilterDateTo(val) { listState.dateTo = val; listState.page = 1; rende
 function toggleFilterPanel() { listState.filterPanelOpen = !listState.filterPanelOpen; render(); }
 function toggleCreatorDropdown() { listState.creatorDropdownOpen = !listState.creatorDropdownOpen; listState.creatorSearch = ''; render(); }
 function toggleCreatorSelection(name) { const idx = listState.creatorFilter.indexOf(name); if (idx > -1) listState.creatorFilter.splice(idx, 1); else listState.creatorFilter.push(name); listState.page = 1; render(); }
-function onCreatorSearch(val) { listState.creatorSearch = val; render(); }
+function onCreatorSearch(val) {
+  listState.creatorSearch = val;
+  const listEl = document.querySelector('.creator-dropdown-list');
+  if (!listEl) return;
+  const creators = [...new Set(dataSources.map(d => d.creator))];
+  const filtered = val ? creators.filter(c => c.toLowerCase().includes(val.toLowerCase())) : creators;
+  if (filtered.length === 0) { listEl.innerHTML = '<div class="creator-dropdown-empty">无匹配结果</div>'; }
+  else { listEl.innerHTML = filtered.map(c => { const sel = listState.creatorFilter.includes(c); return `<div class="creator-dropdown-item ${sel ? 'selected' : ''}" onclick="toggleCreatorSelection('${c}')"><span class="creator-avatar-sm">${c.charAt(0)}</span><span>${c}</span><span class="check-icon">${icons.check}</span></div>`; }).join(''); }
+}
 function removeFilterTag(type) {
   if (type === 'auth') listState.authFilter = 'all';
   else if (type === 'ref') listState.refFilter = 'all';
@@ -1845,6 +1856,14 @@ function initMagnetButtons() {
 // --- 10. Post-render hook to activate effects ---
 const _originalRender = render;
 render = function() {
+  // Save focus state & cursor position BEFORE DOM rebuild destroys inputs
+  const _dsSearchEl = document.getElementById('dsSearchInput');
+  const _searchWasFocused = searchFocused || (document.activeElement && document.activeElement === _dsSearchEl);
+  const _searchCursorPos = (_searchWasFocused && _dsSearchEl) ? (_dsSearchEl.selectionStart || 0) : 0;
+  const _creatorInputEl = document.querySelector('.creator-dropdown-search input');
+  const _creatorWasFocused = document.activeElement && document.activeElement === _creatorInputEl;
+  const _creatorCursorPos = (_creatorWasFocused && _creatorInputEl) ? (_creatorInputEl.selectionStart || 0) : 0;
+
   _originalRender();
 
   // Apply fade-in to content area
@@ -1857,12 +1876,13 @@ render = function() {
     initSpotlightCards();
     // Restore search input focus after DOM rebuild
     if (currentModule === 'datasource' && currentView === 'list') {
-      const si = document.getElementById('dsSearchInput');
-      if (si && listState.search) { si.focus(); si.setSelectionRange(si.value.length, si.value.length); }
-      // Focus creator search if dropdown is open
-      if (listState.creatorDropdownOpen) {
+      // Priority: creator dropdown search > main search (avoid focus fighting)
+      if (listState.creatorDropdownOpen && _creatorWasFocused) {
         const cs = document.querySelector('.creator-dropdown-search input');
-        if (cs) { cs.focus(); if (listState.creatorSearch) cs.setSelectionRange(cs.value.length, cs.value.length); }
+        if (cs) { cs.focus(); cs.setSelectionRange(_creatorCursorPos, _creatorCursorPos); }
+      } else if (_searchWasFocused && !listState.creatorDropdownOpen) {
+        const si = document.getElementById('dsSearchInput');
+        if (si) { si.focus(); si.setSelectionRange(_searchCursorPos, _searchCursorPos); }
       }
     }
   });
