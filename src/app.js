@@ -1891,6 +1891,7 @@ function initMagnetButtons() {
 
 // --- 10. Post-render hook to activate effects ---
 const _originalRender = render;
+let _lastFadeViewKey = '';
 render = function() {
   // Save focus state & cursor position BEFORE DOM rebuild destroys inputs
   const _dsSearchEl = document.getElementById('dsSearchInput');
@@ -1900,10 +1901,17 @@ render = function() {
   const _creatorWasFocused = document.activeElement && document.activeElement === _creatorInputEl;
   const _creatorCursorPos = (_creatorWasFocused && _creatorInputEl) ? (_creatorInputEl.selectionStart || 0) : 0;
 
+  // Detect actual view/page change (not just filter operations)
+  const newViewKey = `${currentModule}-${currentView}-${currentDsId || ''}-${wsCurrentView}-${wsCurrentId || ''}-${wsInternalTab || ''}-${currentTab || ''}`;
+  const viewChanged = newViewKey !== _lastFadeViewKey;
+  _lastFadeViewKey = newViewKey;
+
   _originalRender();
 
-  // Apply fade-in to content area
-  applyFadeIn('.content');
+  // Only apply fade-in on actual page/view transitions, not filter operations
+  if (viewChanged) {
+    applyFadeIn('.content');
+  }
 
   // Activate blur text on titles
   requestAnimationFrame(() => {
