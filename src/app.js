@@ -60,7 +60,23 @@ let currentModule = 'datasource';
 let dataSources = [
   { id: 1, name: '酒店星级字典', desc: '定义酒店星级分类标准', createdAt: '2025-03-15', creator: 'Admin', isPublic: true, referenced: true, referenceCount: 3, items: [{ key: 'ONE_STAR', value: '一星级', type: 'String' }, { key: 'TWO_STAR', value: '二星级', type: 'String' }, { key: 'STAR_COUNT', value: '5', type: 'Integer' }, { key: 'IS_ACTIVE', value: 'true', type: 'Boolean' }, { key: 'AVG_PRICE', value: '688.50', type: 'Double' }, { key: 'LAST_SYNC', value: '2025-04-10T14:30', type: 'DateTime' }], authorizedSpaces: [], syncConfig: { url: '', keyField: '', valueField: '' }, syncLogs: [] },
   { id: 2, name: '货币代码', desc: '国际标准货币代码对照表', createdAt: '2025-03-18', creator: 'Sukey Wu', isPublic: true, referenced: true, referenceCount: 8, items: [{ key: 'CNY', value: '人民币', type: 'String' }, { key: 'USD', value: '美元', type: 'String' }, { key: 'EUR', value: '欧元', type: 'String' }], authorizedSpaces: [], syncConfig: { url: 'https://api.example.com/currencies', keyField: 'code', valueField: 'name_cn' }, syncLogs: [{ time: '2025-04-10 14:30', operator: 'Sukey Wu', strategy: '全量覆盖', result: 'success', summary: '新增 0 条、更新 7 条、删除 0 条', reason: '' }] },
-  { id: 3, name: '房型代码', desc: '酒店房型编码与中文名称映射', createdAt: '2025-03-22', creator: 'Admin', isPublic: false, referenced: true, referenceCount: 2, items: [{ key: 'SGL', value: '单人房', type: 'String' }, { key: 'DBL', value: '双人房', type: 'String' }, { key: 'TWN', value: '双床房', type: 'String' }], authorizedSpaces: ['酒店预订流程', '数据清洗工作区'], syncConfig: { url: '', keyField: '', valueField: '' }, syncLogs: [] },
+  { id: 3, name: '房型代码', desc: '酒店房型编码与中文名称映射', createdAt: '2025-03-22', creator: 'Admin', isPublic: false, referenced: true, referenceCount: 2, items: [{ key: 'SGL', value: '单人房', type: 'String' }, { key: 'DBL', value: '双人房', type: 'String' }, { key: 'TWN', value: '双床房', type: 'String' }], authorizedSpaces: ['酒店预订流程', '数据清洗工作区'], syncConfig: { url: 'https://api.hotel.com/room-types', keyField: 'code', valueField: 'name_cn' }, syncLogs: [
+    { time: '2026-04-16 11:20', operator: 'Sukey Wu', strategy: '全量覆盖', result: 'error', summary: '', reason: 'API 返回格式异常' },
+    { time: '2026-04-16 11:20', operator: 'Sukey Wu', strategy: '增量更新', result: 'success', summary: '新增 2 条、更新 8 条', reason: '' },
+    { time: '2026-04-15 09:30', operator: 'Admin', strategy: '全量覆盖', result: 'success', summary: '新增 0 条、更新 12 条', reason: '' },
+    { time: '2026-04-14 16:45', operator: 'Sukey Wu', strategy: '增量更新', result: 'success', summary: '新增 1 条、更新 3 条', reason: '' },
+    { time: '2026-04-13 10:00', operator: 'Admin', strategy: '全量覆盖', result: 'error', summary: '', reason: '网络连接超时' },
+    { time: '2026-04-12 14:20', operator: 'Sukey Wu', strategy: '增量更新', result: 'success', summary: '新增 0 条、更新 5 条', reason: '' },
+    { time: '2026-04-11 08:15', operator: 'Admin', strategy: '全量覆盖', result: 'success', summary: '新增 3 条、更新 7 条', reason: '' },
+    { time: '2026-04-10 17:30', operator: 'Sukey Wu', strategy: '增量更新', result: 'success', summary: '新增 0 条、更新 2 条', reason: '' },
+    { time: '2026-04-09 11:00', operator: 'Admin', strategy: '全量覆盖', result: 'success', summary: '新增 1 条、更新 9 条', reason: '' },
+    { time: '2026-04-08 15:45', operator: 'Sukey Wu', strategy: '增量更新', result: 'error', summary: '', reason: '字段映射错误' },
+    { time: '2026-04-07 09:20', operator: 'Admin', strategy: '全量覆盖', result: 'success', summary: '新增 2 条、更新 6 条', reason: '' },
+    { time: '2026-04-06 13:10', operator: 'Sukey Wu', strategy: '增量更新', result: 'success', summary: '新增 0 条、更新 4 条', reason: '' },
+    { time: '2026-04-05 10:30', operator: 'Admin', strategy: '全量覆盖', result: 'success', summary: '新增 5 条、更新 11 条', reason: '' },
+    { time: '2026-04-04 16:00', operator: 'Sukey Wu', strategy: '增量更新', result: 'success', summary: '新增 1 条、更新 2 条', reason: '' },
+    { time: '2026-04-03 08:45', operator: 'Admin', strategy: '全量覆盖', result: 'error', summary: '', reason: 'API 认证失败' },
+  ] },
   { id: 4, name: '供应商列表', desc: '酒店供应商接入方清单', createdAt: '2025-04-01', creator: 'Sukey Wu', isPublic: false, referenced: false, referenceCount: 0, items: [{ key: 'SUPPLIER_A', value: 'Expedia', type: 'String' }, { key: 'SUPPLIER_B', value: 'Booking.com', type: 'String' }], authorizedSpaces: ['酒店预订流程'], syncConfig: { url: '', keyField: '', valueField: '' }, syncLogs: [] },
   { id: 5, name: '订单状态码', desc: '订单生命周期各阶段状态定义', createdAt: '2025-04-05', creator: 'Admin', isPublic: true, referenced: true, referenceCount: 5, items: [{ key: 'PENDING', value: '待处理', type: 'String' }, { key: 'CONFIRMED', value: '已确认', type: 'String' }, { key: 'CANCELLED', value: '已取消', type: 'String' }], authorizedSpaces: [], syncConfig: { url: '', keyField: '', valueField: '' }, syncLogs: [] },
 ];
@@ -74,6 +90,8 @@ let currentTab = 'items';
 let listState = { search: '', authFilter: 'all', refFilter: 'all', page: 1, pageSize: 10 };
 let itemSortField = null;
 let itemSortAsc = true;
+let syncLogPage = 1;
+let syncLogPageSize = 10;
 let nextId = 11;
 
 // ============================================
@@ -135,9 +153,9 @@ let wsMemberTab = 'admin';
 let wsListState = { search: '', roleFilter: 'all', sortField: 'lastActiveAt', sortAsc: false };
 let wsNextId = 7;
 const wsCardColors = [
-  { bg: '#EADDFF', color: '#6750A4' }, { bg: '#C4F5A5', color: '#386A20' },
-  { bg: '#E8E0F0', color: '#5B6271' }, { bg: '#FFDEA6', color: '#7C5800' },
-  { bg: '#FFD8E4', color: '#7D5260' }, { bg: '#D8E2FF', color: '#005AC1' },
+  { bg: '#EEF2FF', color: '#4F46E5' }, { bg: '#DCFCE7', color: '#16A34A' },
+  { bg: '#F1F5F9', color: '#64748B' }, { bg: '#FEF3C7', color: '#D97706' },
+  { bg: '#EDE9FE', color: '#8B5CF6' }, { bg: '#DBEAFE', color: '#2563EB' },
 ];
 
 // ============================================
@@ -361,7 +379,7 @@ function renderDsDetailPage(ds) {
     <div class="detail-header-actions"><button class="btn btn-secondary" onclick="showEditDsModal(${ds.id})">${icons.edit}<span>编辑</span></button><button class="btn btn-danger" onclick="showDeleteDsModal(${ds.id})">${icons.trash}<span>删除</span></button></div></div>
     <div class="tabs-container"><div class="tabs-header">${tabItems.map(t => `<div class="tab-item ${currentTab === t.key ? 'active' : ''}" onclick="switchTab('${t.key}')">${t.label}${t.count !== '' ? ` <span class="badge badge-type">${t.count}</span>` : ''}</div>`).join('')}</div><div class="tab-content">${currentTab === 'items' ? renderDataItemsTab(ds) : currentTab === 'auth' ? renderAuthTab(ds) : renderSyncTab(ds)}</div></div>`;
 }
-function switchTab(tab) { currentTab = tab; render(); }
+function switchTab(tab) { currentTab = tab; syncLogPage = 1; render(); }
 
 function renderDataItemsTab(ds) {
   if (ds.items.length === 0) return renderEmptyState('dataItems');
@@ -417,8 +435,19 @@ function renderSyncTab(ds) {
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3);margin-bottom:var(--space-4)"><div class="form-group"><label class="form-label">Key 字段映射</label><input type="text" class="form-input" id="syncKeyField" value="${ds.syncConfig.keyField}" placeholder="字段名" oninput="this.classList.remove('error');var e=this.parentElement.querySelector('.sync-field-error');if(e)e.remove()" /></div><div class="form-group"><label class="form-label">Value 字段映射</label><input type="text" class="form-input" id="syncValueField" value="${ds.syncConfig.valueField}" placeholder="字段名" oninput="this.classList.remove('error');var e=this.parentElement.querySelector('.sync-field-error');if(e)e.remove()" /></div></div>
   <div style="display:flex;gap:var(--space-2)"><button class="btn btn-secondary btn-sm" onclick="saveSyncConfig(${ds.id})">保存配置</button><button class="btn btn-primary btn-sm" onclick="showSyncStrategyModal(${ds.id})">${icons.sync}<span>立即同步</span></button></div></div>
   <div style="margin-top:var(--space-6)"><h3 class="sync-config-title">同步记录</h3>
-  ${ds.syncLogs.length === 0 ? renderEmptyState('syncLog') : `<div class="table-wrapper"><table class="data-table"><thead><tr><th>时间</th><th>操作人</th><th>策略</th><th>结果</th><th>详情</th></tr></thead><tbody>${ds.syncLogs.map(log => `<tr><td>${log.time}</td><td>${log.operator}</td><td>${log.strategy}</td><td><span class="sync-result ${log.result}">${log.result === 'success' ? `${icons.checkCircle} 成功` : `${icons.xCircle} 失败`}</span></td><td>${log.result === 'success' ? log.summary : `<span style="color:var(--md-error)">${log.reason}</span>`}</td></tr>`).join('')}</tbody></table></div>`}</div>`;
+  ${ds.syncLogs.length === 0 ? renderEmptyState('syncLog') : (() => {
+    const total = ds.syncLogs.length;
+    const totalPages = Math.ceil(total / syncLogPageSize);
+    if (syncLogPage > totalPages) syncLogPage = totalPages;
+    const start = (syncLogPage - 1) * syncLogPageSize;
+    const paged = ds.syncLogs.slice(start, start + syncLogPageSize);
+    return `<div class="table-wrapper"><table class="data-table"><thead><tr><th>时间</th><th>操作人</th><th>策略</th><th>结果</th><th>详情</th></tr></thead><tbody>${paged.map(log => `<tr><td>${log.time}</td><td>${log.operator}</td><td>${log.strategy}</td><td><span class="sync-result ${log.result}">${log.result === 'success' ? `${icons.checkCircle} 成功` : `${icons.xCircle} 失败`}</span></td><td>${log.result === 'success' ? log.summary : `<span style="color:var(--md-error)">${log.reason}</span>`}</td></tr>`).join('')}</tbody></table></div>
+    ${totalPages > 1 ? `<div class="pagination"><div class="pagination-info"><span>共 ${total} 条记录</span><span class="pagination-size"><label>每页</label><select onchange="onSyncLogPageSizeChange(this.value)">${[10,20,50].map(n => `<option value="${n}" ${syncLogPageSize === n ? 'selected' : ''}>${n}</option>`).join('')}</select><label>条</label></span></div><div class="pagination-controls"><button class="pagination-btn" ${syncLogPage <= 1 ? 'disabled' : ''} onclick="onSyncLogPageChange(1)">${icons.chevronLeft}${icons.chevronLeft}</button><button class="pagination-btn" ${syncLogPage <= 1 ? 'disabled' : ''} onclick="onSyncLogPageChange(${syncLogPage - 1})">${icons.chevronLeft}</button>${Array.from({length: totalPages}, (_, i) => i + 1).map(p => `<button class="pagination-btn ${p === syncLogPage ? 'active' : ''}" onclick="onSyncLogPageChange(${p})">${p}</button>`).join('')}<button class="pagination-btn" ${syncLogPage >= totalPages ? 'disabled' : ''} onclick="onSyncLogPageChange(${syncLogPage + 1})">${icons.chevronRight}</button><button class="pagination-btn" ${syncLogPage >= totalPages ? 'disabled' : ''} onclick="onSyncLogPageChange(${totalPages})">${icons.chevronRight}${icons.chevronRight}</button></div></div>` : ''}`;
+  })()}</div>`;
 }
+
+function onSyncLogPageChange(page) { syncLogPage = page; render(); }
+function onSyncLogPageSizeChange(size) { syncLogPageSize = parseInt(size); syncLogPage = 1; render(); }
 
 // --- Modal System ---
 function showModal(html, options) { const opt = options || {}; const o = document.getElementById('modalContainer'); o.innerHTML = html; o.classList.add('visible'); o.onclick = (e) => { if (e.target === o && opt.allowBackdropClose) closeModal(); }; }
