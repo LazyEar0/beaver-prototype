@@ -1257,6 +1257,130 @@ img { display: block; max-width: 100%; }
   opacity: 0.9;
 }
 
+/* === Workflow Input Parameter Form === */
+.wf-input-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.wf-input-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.wf-input-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--md-on-surface);
+}
+.wf-input-label .required {
+  color: var(--md-error);
+  margin-left: -2px;
+}
+.wf-input-type-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--md-on-surface-variant);
+  background: var(--md-surface-container);
+  border-radius: var(--radius-full);
+  letter-spacing: 0.02em;
+}
+.wf-input-desc {
+  font-size: var(--font-size-xs);
+  color: var(--md-outline);
+  line-height: 1.5;
+}
+.wf-input-required-hint {
+  padding: var(--space-3) 0 var(--space-2);
+  font-size: var(--font-size-xs);
+  color: var(--md-outline);
+  border-top: 1px solid var(--md-outline-variant);
+  margin-top: var(--space-3);
+}
+.wf-input-required-hint .required {
+  color: var(--md-error);
+}
+/* Toggle switch for Boolean */
+.wf-input-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+  user-select: none;
+}
+.wf-input-toggle input[type="checkbox"] {
+  display: none;
+}
+.wf-toggle-track {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  background: var(--md-outline-variant);
+  border-radius: 10px;
+  transition: background 0.2s;
+}
+.wf-toggle-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+  transition: transform 0.2s;
+}
+.wf-input-toggle input:checked ~ .wf-toggle-track {
+  background: var(--md-primary);
+}
+.wf-input-toggle input:checked ~ .wf-toggle-track .wf-toggle-thumb {
+  transform: translateX(16px);
+}
+.wf-toggle-label {
+  font-size: var(--font-size-sm);
+  color: var(--md-on-surface-variant);
+}
+.wf-input-toggle input:checked ~ .wf-toggle-label::after {
+  content: '';
+}
+/* File upload */
+.wf-input-file {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.wf-input-file-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 6px 12px;
+  font-size: var(--font-size-sm);
+  color: var(--md-primary);
+  background: transparent;
+  border: 1px dashed var(--md-primary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: var(--transition-base);
+}
+.wf-input-file-btn:hover {
+  background: rgba(var(--md-primary-rgb, 103, 80, 164), 0.06);
+}
+.wf-input-file-btn svg {
+  width: 14px;
+  height: 14px;
+}
+.wf-input-file-name {
+  font-size: var(--font-size-xs);
+  color: var(--md-outline);
+}
+
 /* --- People Picker Modal (org tree + selected) --- */
 .people-picker {
   display: flex;

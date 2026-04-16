@@ -53,6 +53,7 @@ const icons = {
   filter: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>',
   chevronDown: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>',
   chevronUp: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m18 15-6-6-6 6"/></svg>',
+  upload: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>',
 };
 
 // ============================================
@@ -213,16 +214,31 @@ let wsFolders = {
 // Workflows per workspace
 let wsWorkflows = {
   1: [
-    { id: 1, name: '酒店搜索', code: 'HTL_SEARCH', desc: '根据条件搜索可用酒店列表', type: 'app', allowRef: true, status: 'published', version: 3, creator: 'Sukey Wu', owners: [101, 103], folderId: 2, wsId: 1, createdAt: '2025-01-20', editedAt: '2025-04-13 14:30', lastRun: 'success', runningCount: 0, execCount: 45, debugPassed: true, versions: [
+    { id: 1, name: '酒店搜索', code: 'HTL_SEARCH', desc: '根据条件搜索可用酒店列表', type: 'app', allowRef: true, status: 'published', version: 3, creator: 'Sukey Wu', owners: [101, 103], folderId: 2, wsId: 1, createdAt: '2025-01-20', editedAt: '2025-04-13 14:30', lastRun: 'success', runningCount: 0, execCount: 45, debugPassed: true, inputs: [
+      { name: 'city', label: '目标城市', type: 'String', required: true, desc: '搜索的目标城市名称' },
+      { name: 'checkInDate', label: '入住日期', type: 'DateTime', required: true, desc: '预期入住日期时间' },
+      { name: 'checkOutDate', label: '退房日期', type: 'DateTime', required: true, desc: '预期退房日期时间' },
+      { name: 'guestCount', label: '入住人数', type: 'Integer', required: true, desc: '入住房间的总人数' },
+      { name: 'maxPrice', label: '最高价格', type: 'Double', required: false, desc: '每晚最高价格限制（元），不填则不限' },
+      { name: 'includeFullBooked', label: '包含满房酒店', type: 'Boolean', required: false, desc: '是否在结果中包含当前已满房的酒店' },
+    ], versions: [
       { v: 3, status: 'current', publishedAt: '2025-04-13 14:00', publisher: 'Sukey Wu', note: '优化搜索性能' },
       { v: 2, status: 'history', publishedAt: '2025-03-20 10:00', publisher: 'Admin', note: '增加价格筛选' },
       { v: 1, status: 'history', publishedAt: '2025-02-01 09:00', publisher: 'Sukey Wu', note: '初始版本' },
     ] },
-    { id: 2, name: '酒店预订确认', code: 'HTL_CONFIRM', desc: '处理酒店预订确认和通知', type: 'app', allowRef: false, status: 'published', version: 2, creator: 'Admin', owners: [102], folderId: 1, wsId: 1, createdAt: '2025-01-25', editedAt: '2025-04-12 10:30', lastRun: 'running', runningCount: 2, execCount: 32, debugPassed: true, versions: [
+    { id: 2, name: '酒店预订确认', code: 'HTL_CONFIRM', desc: '处理酒店预订确认和通知', type: 'app', allowRef: false, status: 'published', version: 2, creator: 'Admin', owners: [102], folderId: 1, wsId: 1, createdAt: '2025-01-25', editedAt: '2025-04-12 10:30', lastRun: 'running', runningCount: 2, execCount: 32, debugPassed: true, inputs: [
+      { name: 'orderId', label: '订单编号', type: 'String', required: true, desc: '需要确认的订单唯一编号' },
+      { name: 'notifyGuest', label: '通知客人', type: 'Boolean', required: false, desc: '确认后是否自动发送通知给客人' },
+    ], versions: [
       { v: 2, status: 'current', publishedAt: '2025-04-10 16:00', publisher: 'Admin', note: '增加短信通知' },
       { v: 1, status: 'history', publishedAt: '2025-02-05 14:00', publisher: 'Admin', note: '' },
     ] },
-    { id: 3, name: '订单取消处理', code: 'HTL_CANCEL', desc: '自动化处理客户取消订单请求', type: 'app', allowRef: true, status: 'published', version: 1, creator: 'Sukey Wu', owners: [101], folderId: 3, wsId: 1, createdAt: '2025-02-15', editedAt: '2025-04-08 09:15', lastRun: 'failed', runningCount: 0, execCount: 18, debugPassed: true, versions: [{ v: 1, status: 'current', publishedAt: '2025-03-01 11:00', publisher: 'Sukey Wu', note: '初始发布' }] },
+    { id: 3, name: '订单取消处理', code: 'HTL_CANCEL', desc: '自动化处理客户取消订单请求', type: 'app', allowRef: true, status: 'published', version: 1, creator: 'Sukey Wu', owners: [101], folderId: 3, wsId: 1, createdAt: '2025-02-15', editedAt: '2025-04-08 09:15', lastRun: 'failed', runningCount: 0, execCount: 18, debugPassed: true, inputs: [
+      { name: 'orderId', label: '订单编号', type: 'String', required: true, desc: '需要取消的订单编号' },
+      { name: 'reason', label: '取消原因', type: 'String', required: true, desc: '客户取消订单的原因说明' },
+      { name: 'refundConfig', label: '退款配置', type: 'Object', required: false, desc: '自定义退款参数，JSON格式，如 {"ratio": 0.8, "method": "original"}' },
+      { name: 'attachments', label: '附件材料', type: 'File', required: false, desc: '客户提供的相关证明材料' },
+    ], versions: [{ v: 1, status: 'current', publishedAt: '2025-03-01 11:00', publisher: 'Sukey Wu', note: '初始发布' }] },
     { id: 4, name: '退款流程', code: 'HTL_REFUND', desc: '客户退款申请审批与执行', type: 'app', allowRef: false, status: 'draft', version: 0, creator: '张三', owners: [103], folderId: 3, wsId: 1, createdAt: '2025-03-20', editedAt: '2025-04-07 15:45', lastRun: null, runningCount: 0, execCount: 0, debugPassed: false, versions: [] },
     { id: 5, name: '智能客服对话', code: 'HTL_CHAT', desc: '基于AI的酒店预订智能客服', type: 'chat', allowRef: false, status: 'published', version: 2, creator: 'Sukey Wu', owners: [101, 107], folderId: null, wsId: 1, createdAt: '2025-02-28', editedAt: '2025-04-11 11:20', lastRun: 'success', runningCount: 1, execCount: 120, debugPassed: true, versions: [
       { v: 2, status: 'current', publishedAt: '2025-04-05 09:30', publisher: 'Sukey Wu', note: '优化对话逻辑' },
@@ -290,10 +306,10 @@ let wsExecutions = {
 // ============================================
 //   NAVIGATION & MODULE SWITCHING
 // ============================================
-function switchModule(module) {
-  currentModule = module;
-  if (module === 'datasource') { currentView = 'list'; currentDsId = null; }
-  else if (module === 'workspace') { wsCurrentView = 'list'; wsCurrentId = null; }
+function switchModule(moduleName) {
+  currentModule = moduleName;
+  if (moduleName === 'datasource') { currentView = 'list'; currentDsId = null; }
+  else if (moduleName === 'workspace') { wsCurrentView = 'list'; wsCurrentId = null; }
   updateSidebarActive(); render();
 }
 function updateSidebarActive() {
@@ -1426,15 +1442,72 @@ function enableWf(wfId) {
   const wf = (wsWorkflows[wsCurrentId] || []).find(x => x.id === wfId); if (!wf) return;
   wf.status = 'published'; showToast('success', '启用成功', `工作流「${wf.name}」已重新启用`); render();
 }
+function buildWfInputFormHtml(inputs) {
+  const typeIcons = { String: '𝐓', Integer: '#', Double: '#.#', Boolean: '⊘', DateTime: '📅', Object: '{ }', File: '📎' };
+  return inputs.map((inp, idx) => {
+    const reqMark = inp.required ? '<span class="required">*</span>' : '';
+    const typeTag = `<span class="wf-input-type-tag">${typeIcons[inp.type] || ''} ${inp.type}</span>`;
+    let control = '';
+    if (inp.type === 'Boolean') {
+      control = `<label class="wf-input-toggle"><input type="checkbox" id="wfInput_${idx}" onchange="this.parentElement.querySelector('.wf-toggle-label').textContent = this.checked ? '是' : '否'"><span class="wf-toggle-track"><span class="wf-toggle-thumb"></span></span><span class="wf-toggle-label">否</span></label>`;
+    } else if (inp.type === 'Integer') {
+      control = `<input type="number" step="1" class="form-input" id="wfInput_${idx}" placeholder="请输入整数值">`;
+    } else if (inp.type === 'Double') {
+      control = `<input type="number" step="0.01" class="form-input" id="wfInput_${idx}" placeholder="请输入数值">`;
+    } else if (inp.type === 'DateTime') {
+      control = `<input type="datetime-local" class="form-input" id="wfInput_${idx}">`;
+    } else if (inp.type === 'Object') {
+      control = `<textarea class="form-textarea" id="wfInput_${idx}" rows="3" placeholder="请输入 JSON 格式数据" style="font-family:var(--font-mono,'Consolas',monospace);font-size:var(--font-size-xs)"></textarea>`;
+    } else if (inp.type === 'File') {
+      control = `<div class="wf-input-file"><button class="wf-input-file-btn" onclick="document.getElementById('wfInput_${idx}').click()">${icons.upload || '📎'}<span>选择文件</span></button><span class="wf-input-file-name" id="wfInputFileName_${idx}">未选择文件</span><input type="file" id="wfInput_${idx}" style="display:none" onchange="document.getElementById('wfInputFileName_${idx}').textContent = this.files[0]?.name || '未选择文件'"></div>`;
+    } else {
+      control = `<input type="text" class="form-input" id="wfInput_${idx}" placeholder="请输入${inp.label || inp.name}">`;
+    }
+    return `<div class="wf-input-field">
+      <div class="wf-input-label">${inp.label || inp.name}${reqMark} ${typeTag}</div>
+      ${inp.desc ? `<div class="wf-input-desc">${inp.desc}</div>` : ''}
+      ${control}
+    </div>`;
+  }).join('');
+}
+function validateWfInputs(inputs) {
+  let hasError = false;
+  inputs.forEach((inp, idx) => {
+    const el = document.getElementById(`wfInput_${idx}`);
+    if (!el) return;
+    if (inp.required) {
+      let empty = false;
+      if (inp.type === 'Boolean') { empty = false; }
+      else if (inp.type === 'File') { empty = !el.files || el.files.length === 0; }
+      else { empty = !el.value.trim(); }
+      if (empty) { el.classList.add('error'); hasError = true; }
+      else { el.classList.remove('error'); }
+    }
+  });
+  return !hasError;
+}
 function executeWf(wfId) {
   const wf = (wsWorkflows[wsCurrentId] || []).find(x => x.id === wfId); if (!wf || wf.status !== 'published') return;
-  showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">确认执行</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
-  <p style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant)">确定手动执行工作流「${wf.name}」（v${wf.version}）吗？</p>
-  ${wf.runningCount > 0 ? `<div style="margin-top:var(--space-3);padding:var(--space-3);background:rgba(234,179,8,0.06);border:1px solid rgba(234,179,8,0.15);border-radius:var(--radius-md);font-size:var(--font-size-sm);color:var(--md-on-surface-variant);line-height:1.6">当前已有 <strong>${wf.runningCount}</strong> 个运行中实例。</div>` : ''}
-  </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="confirmExecuteWf(${wfId})">确认执行</button></div></div>`);
+  const inputs = wf.inputs || [];
+  const runningWarn = wf.runningCount > 0 ? `<div style="margin-top:var(--space-3);padding:var(--space-3);background:rgba(234,179,8,0.06);border:1px solid rgba(234,179,8,0.15);border-radius:var(--radius-md);font-size:var(--font-size-sm);color:var(--md-on-surface-variant);line-height:1.6">当前已有 <strong>${wf.runningCount}</strong> 个运行中实例。</div>` : '';
+  if (inputs.length === 0) {
+    showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">确认执行</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
+    <p style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant)">确定手动执行工作流「${wf.name}」（v${wf.version}）吗？</p>
+    ${runningWarn}
+    </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="confirmExecuteWf(${wfId})">确认执行</button></div></div>`);
+  } else {
+    showModal(`<div class="modal" style="max-width:520px"><div class="modal-header"><h2 class="modal-title">执行工作流 · ${wf.name}</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body" style="padding-bottom:0">
+    <div style="display:flex;align-items:center;gap:var(--space-2);margin-bottom:var(--space-4);padding:var(--space-2) var(--space-3);background:var(--md-surface-container-low);border-radius:var(--radius-sm);font-size:var(--font-size-xs);color:var(--md-on-surface-variant)">发布版本 v${wf.version} · 手动触发</div>
+    ${runningWarn ? runningWarn + '<div style="height:var(--space-3)"></div>' : ''}
+    <div class="wf-input-form">${buildWfInputFormHtml(inputs)}</div>
+    <div class="wf-input-required-hint"><span class="required">*</span> 为必填参数</div>
+    </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="confirmExecuteWf(${wfId})">确认执行</button></div></div>`);
+  }
 }
 function confirmExecuteWf(wfId) {
   const wf = (wsWorkflows[wsCurrentId] || []).find(x => x.id === wfId); if (!wf || wf.status !== 'published') return;
+  const inputs = wf.inputs || [];
+  if (inputs.length > 0 && !validateWfInputs(inputs)) { showToast('error', '参数校验失败', '请填写所有必填参数'); return; }
   if (!wsExecutions[wsCurrentId]) wsExecutions[wsCurrentId] = [];
   const now = new Date(); const ts = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
   const execId = 3000 + wsExecutions[wsCurrentId].length;

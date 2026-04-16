@@ -1513,3 +1513,187 @@
   opacity: 0.8;
   transform: translate(-50%, -50%);
 }
+
+/* ========== New Component Styles ========== */
+
+/* Placeholder node color */
+.node-color-placeholder { background: #F5F5F5; color: #9E9E9E; }
+
+/* Placeholder tag inside node */
+.placeholder-tag {
+  display: inline-block;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  background: var(--md-surface-container-high);
+  color: var(--md-outline);
+  border: 1px dashed var(--md-outline-variant);
+  margin-top: 4px;
+}
+
+/* Box Selection Rectangle */
+.box-select-rect {
+  position: absolute;
+  border: 1.5px dashed var(--md-primary);
+  background: rgba(79, 70, 229, 0.06);
+  border-radius: 2px;
+  z-index: 50;
+  pointer-events: none;
+  display: none;
+}
+
+/* Context Menu */
+.designer-context-menu {
+  position: absolute;
+  z-index: 200;
+  background: #FFFFFF;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--md-outline-variant);
+  min-width: 200px;
+  padding: 4px 0;
+  animation: contextMenuIn 0.15s cubic-bezier(0.2, 0, 0, 1);
+}
+
+@keyframes contextMenuIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.context-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  font-size: var(--font-size-sm);
+  color: var(--md-on-surface);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.context-menu-item:hover {
+  background: var(--md-surface-container);
+}
+
+.context-menu-item.danger {
+  color: var(--md-error);
+}
+
+.context-menu-item.danger:hover {
+  background: rgba(220, 38, 38, 0.06);
+}
+
+.context-menu-item svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.context-menu-shortcut {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--md-outline);
+  font-family: var(--font-family-mono);
+}
+
+.context-menu-divider {
+  height: 1px;
+  background: var(--md-outline-variant);
+  margin: 4px 0;
+}
+
+/* Merge Strategy Badge on Node */
+.merge-strategy-badge {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 9px;
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  background: var(--md-tertiary-container, #E8DEF8);
+  color: var(--md-on-tertiary-container, #4A148C);
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid rgba(106, 27, 154, 0.15);
+  white-space: nowrap;
+  z-index: 5;
+  transition: var(--transition-fast);
+}
+
+.merge-strategy-badge:hover {
+  background: var(--md-primary);
+  color: #fff;
+  border-color: var(--md-primary);
+}
+
+/* Bottom Panel Resize Handle */
+.bottom-panel-resize-handle {
+  position: absolute;
+  top: -3px;
+  left: 0;
+  right: 0;
+  height: 6px;
+  cursor: ns-resize;
+  z-index: 10;
+  background: transparent;
+  transition: background 0.2s;
+}
+
+.bottom-panel-resize-handle:hover,
+.bottom-panel-resize-handle:active {
+  background: var(--md-primary);
+  opacity: 0.3;
+}
+
+.bottom-panel.open {
+  position: relative;
+}
+
+/* Toolbar button active state */
+.toolbar-btn.active {
+  background: var(--md-primary-container);
+  color: var(--md-on-primary-container);
+  border-color: var(--md-primary);
+}
+
+.toolbar-btn.active:hover {
+  background: var(--md-primary);
+  color: var(--md-on-primary);
+}
+
+/* Toolbar badge variants */
+.toolbar-badge.success {
+  background: var(--md-success, #16A34A);
+  min-width: auto;
+  padding: 0 2px;
+}
+.toolbar-badge.success svg {
+  width: 10px;
+  height: 10px;
+}
+
+/* Spin animation for save indicator */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.spin {
+  animation: spin 0.8s linear infinite;
+}
+
+/* Version badge in toolbar */
+.version-badge {
+  font-size: 11px;
+  padding: 1px 8px;
+  border-radius: var(--radius-full);
+  background: var(--md-surface-container);
+  color: var(--md-on-surface-variant);
+  font-family: var(--font-family-mono);
+  font-weight: 500;
+}

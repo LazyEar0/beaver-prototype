@@ -942,7 +942,8 @@ function renderBottomPanel() {
   const vars = designerVariables;
   const logs = designerDebugLog;
 
-  return `<div class="bottom-panel open">
+  return `<div class="bottom-panel open" style="height:${designerBottomPanelHeight}px">
+    <div class="bottom-panel-resize-handle" onmousedown="onBottomResizeStart(event)" title="拖拽调整高度"></div>
     <div class="bottom-panel-header">
       <div class="bottom-panel-tabs">
         <div class="bottom-panel-tab ${designerBottomTab === 'problems' ? 'active' : ''}" onclick="switchBottomTab('problems')">
@@ -1030,6 +1031,10 @@ function getProblems() {
     if (node.type === 'http' && !node.config?.url) {
       problems.push({ level: 'error', message: '请求 URL 未配置', location: node.code, nodeId: node.id });
     }
+    // Placeholder node warning
+    if (node.type === 'placeholder') {
+      problems.push({ level: 'warning', message: `占位节点「${node.name}」待完善`, location: node.code, nodeId: node.id });
+    }
   });
 
   return problems;
@@ -1045,18 +1050,51 @@ function onCanvasMouseDown(e) {
   if (e.target.closest('.canvas-controls')) return;
   if (e.target.closest('.canvas-minimap')) return;
 
+  // Close context menu on click
+  if (designerContextMenu) { designerContextMenu = null; renderDesigner(); return; }
+
+  // Shift+drag = box selection
+  if (e.shiftKey) {
+    const canvasRect = document.getElementById('canvasContainer').getBoundingClientRect();
+    designerIsBoxSelecting = true;
+    designerBoxSelectStart = { x: e.clientX - canvasRect.left, y: e.clientY - canvasRect.top };
+    designerBoxSelectRect = { x: designerBoxSelectStart.x, y: designerBoxSelectStart.y, w: 0, h: 0 };
+    return;
+  }
+
   // Start panning
   designerIsPanning = true;
   designerPanStart = { x: e.clientX - designerPanX, y: e.clientY - designerPanY };
   document.getElementById('canvasContainer').style.cursor = 'grabbing';
 
   // Deselect node if clicking on canvas
-  if (!e.target.closest('.canvas-node')) {
-    deselectNode();
-  }
+  deselectNode();
+  designerSelectedNodeIds = [];
 }
 
 function onCanvasMouseMove(e) {
+  // Box selection drag
+  if (designerIsBoxSelecting && designerBoxSelectStart) {
+    const canvasRect = document.getElementById('canvasContainer').getBoundingClientRect();
+    const cx = e.clientX - canvasRect.left;
+    const cy = e.clientY - canvasRect.top;
+    designerBoxSelectRect = {
+      x: Math.min(designerBoxSelectStart.x, cx),
+      y: Math.min(designerBoxSelectStart.y, cy),
+      w: Math.abs(cx - designerBoxSelectStart.x),
+      h: Math.abs(cy - designerBoxSelectStart.y),
+    };
+    const el = document.querySelector('.box-select-rect');
+    if (el) {
+      el.style.left = designerBoxSelectRect.x + 'px';
+      el.style.top = designerBoxSelectRect.y + 'px';
+      el.style.width = designerBoxSelectRect.w + 'px';
+      el.style.height = designerBoxSelectRect.h + 'px';
+      el.style.display = 'block';
+    }
+    return;
+  }
+
   if (designerIsPanning) {
     designerPanX = e.clientX - designerPanStart.x;
     designerPanY = e.clientY - designerPanStart.y;
@@ -1067,14 +1105,50 @@ function onCanvasMouseMove(e) {
     const node = designerNodes.find(n => n.id === designerDraggingExistingNode);
     if (node) {
       const rect = document.getElementById('canvasContainer').getBoundingClientRect();
-      node.x = (e.clientX - rect.left - designerPanX) / designerZoom - designerDragOffset.x;
-      node.y = (e.clientY - rect.top - designerPanY) / designerZoom - designerDragOffset.y;
+      let nx = (e.clientX - rect.left - designerPanX) / designerZoom - designerDragOffset.x;
+      let ny = (e.clientY - rect.top - designerPanY) / designerZoom - designerDragOffset.y;
+      // Grid snap
+      if (designerGridSnap) {
+        nx = Math.round(nx / 20) * 20;
+        ny = Math.round(ny / 20) * 20;
+      }
+      node.x = nx;
+      node.y = ny;
       updateCanvasTransform();
     }
   }
 }
 
 function onCanvasMouseUp(e) {
+  // Finish box selection
+  if (designerIsBoxSelecting && designerBoxSelectRect) {
+    const r = designerBoxSelectRect;
+    if (r.w > 5 && r.h > 5) {
+      // Find nodes inside the rect (screen-space)
+      designerSelectedNodeIds = [];
+      designerNodes.forEach(node => {
+        const sx = node.x * designerZoom + designerPanX;
+        const sy = node.y * designerZoom + designerPanY;
+        const sw = 180 * designerZoom;
+        const sh = 60 * designerZoom;
+        if (sx + sw > r.x && sx < r.x + r.w && sy + sh > r.y && sy < r.y + r.h) {
+          designerSelectedNodeIds.push(node.id);
+        }
+      });
+      if (designerSelectedNodeIds.length > 0) {
+        designerSelectedNodeId = designerSelectedNodeIds[0];
+        if (designerSelectedNodeIds.length === 1) designerRightPanel = 'node';
+        else designerRightPanel = 'overview';
+        showToast('info', '框选完成', `已选择 ${designerSelectedNodeIds.length} 个节点`);
+      }
+    }
+    designerIsBoxSelecting = false;
+    designerBoxSelectStart = null;
+    designerBoxSelectRect = null;
+    renderDesigner();
+    return;
+  }
+
   designerIsPanning = false;
   designerDraggingExistingNode = null;
   document.getElementById('canvasContainer').style.cursor = '';
@@ -1273,6 +1347,10 @@ function createConnection(fromNodeId, fromPort) {
   // Check for self-connection
   if (fromNodeId === targetId) {
     showToast('warning', '提示', '不允许节点连接到自身'); closeModal(); return;
+  }
+  // Cycle detection
+  if (detectCycle(fromNodeId, targetId)) {
+    showToast('error', '检测到环', '该连线会形成循环依赖，不允许创建'); closeModal(); return;
   }
 
   designerConnections.push({
@@ -1618,5 +1696,331 @@ function designerKeyHandler(e) {
   }
   if (e.ctrlKey && e.key === 'z') { e.preventDefault(); designerUndo(); }
   if (e.ctrlKey && e.key === 'y') { e.preventDefault(); designerRedo(); }
-  if (e.ctrlKey && e.key === 's') { e.preventDefault(); showToast('success', '已保存', '草稿已手动保存'); }
+  if (e.ctrlKey && e.key === 's') { e.preventDefault(); designerSave(); }
+  if (e.ctrlKey && e.key === 'c') { e.preventDefault(); designerCopyNodes(); }
+  if (e.ctrlKey && e.key === 'v') { e.preventDefault(); designerPasteNodes(); }
+  if (e.ctrlKey && e.key === 'a') { e.preventDefault(); designerSelectAll(); }
+}
+
+// --- Context Menu ---
+function renderContextMenu() {
+  if (!designerContextMenu) return '';
+  const m = designerContextMenu;
+
+  // Canvas context menu (right-click on empty canvas area)
+  if (m.canvas) {
+    return `<div class="designer-context-menu" style="left:${m.x}px;top:${m.y}px" onclick="event.stopPropagation()">
+      <div class="context-menu-item" onclick="designerPasteNodes();closeContextMenu()">${icons.clipboard || '📋'} 粘贴节点 <span class="context-menu-shortcut">Ctrl+V</span></div>
+      <div class="context-menu-item" onclick="designerSelectAll();closeContextMenu()">☑ 全选 <span class="context-menu-shortcut">Ctrl+A</span></div>
+      <div class="context-menu-divider"></div>
+      <div class="context-menu-item" onclick="addNodeToCanvas('placeholder',${Math.round(m.canvasX)},${Math.round(m.canvasY)});closeContextMenu()">⬜ 添加占位节点</div>
+      <div class="context-menu-item" onclick="autoLayout();closeContextMenu()">${icons.workflow} 优化排列</div>
+      <div class="context-menu-divider"></div>
+      <div class="context-menu-item" onclick="designerResetZoom();closeContextMenu()">🔍 重置缩放</div>
+    </div>`;
+  }
+
+  // Node context menu
+  const node = designerNodes.find(n => n.id === m.nodeId);
+  if (!node) return '';
+  const isPlaceholder = node.type === 'placeholder';
+  return `<div class="designer-context-menu" style="left:${m.x}px;top:${m.y}px" onclick="event.stopPropagation()">
+    <div class="context-menu-item" onclick="designerCopyNodes();closeContextMenu()">${icons.copy || icons.clipboard} 复制节点 <span class="context-menu-shortcut">Ctrl+C</span></div>
+    <div class="context-menu-item" onclick="duplicateNode(${m.nodeId});closeContextMenu()">${icons.copy || icons.clipboard} 复制为副本</div>
+    <div class="context-menu-divider"></div>
+    ${isPlaceholder ? `<div class="context-menu-item" onclick="showConvertNodeMenu(${m.nodeId})">🔄 转换为… <span style="margin-left:auto">▸</span></div><div class="context-menu-divider"></div>` : ''}
+    <div class="context-menu-item" onclick="toggleBreakpoint(${m.nodeId});closeContextMenu()">${node._breakpoint ? icons.xCircle : '🔴'} ${node._breakpoint ? '移除断点' : '设置断点'} </div>
+    ${designerConnections.filter(c => c.to === m.nodeId).length > 1 && node.type !== 'end' ? `<div class="context-menu-item" onclick="showMergeStrategyConfig(${m.nodeId});closeContextMenu()">🔀 汇合策略</div>` : ''}
+    <div class="context-menu-divider"></div>
+    <div class="context-menu-item danger" onclick="deleteNodeById(${m.nodeId});closeContextMenu()">${icons.trash} 删除节点 <span class="context-menu-shortcut">Delete</span></div>
+  </div>`;
+}
+
+function onCanvasContextMenu(e) {
+  e.preventDefault();
+  if (designerReadonly) return;
+  // If clicked on canvas (not node), show canvas context menu
+  const shell = document.getElementById('designerShell');
+  const rect = shell.getBoundingClientRect();
+  const canvasRect = document.getElementById('canvasContainer').getBoundingClientRect();
+  const cx = (e.clientX - canvasRect.left - designerPanX) / designerZoom;
+  const cy = (e.clientY - canvasRect.top - designerPanY) / designerZoom;
+  designerContextMenu = { x: e.clientX - rect.left, y: e.clientY - rect.top, canvas: true, canvasX: cx, canvasY: cy };
+  renderDesigner();
+}
+
+function closeContextMenu() {
+  designerContextMenu = null;
+  renderDesigner();
+}
+
+function toggleBreakpoint(nodeId) {
+  const node = designerNodes.find(n => n.id === nodeId);
+  if (node) {
+    node._breakpoint = !node._breakpoint;
+    showToast('info', node._breakpoint ? '已设置断点' : '已移除断点', node.name);
+  }
+}
+
+function deleteNodeById(nodeId) {
+  const node = designerNodes.find(n => n.id === nodeId);
+  if (!node) return;
+  if (node.type === 'trigger' || node.type === 'end') {
+    showToast('warning', '提示', '不能删除触发器或结束节点');
+    return;
+  }
+  designerNodes = designerNodes.filter(n => n.id !== nodeId);
+  designerConnections = designerConnections.filter(c => c.from !== nodeId && c.to !== nodeId);
+  if (designerSelectedNodeId === nodeId) {
+    designerSelectedNodeId = null;
+    designerRightPanel = 'overview';
+  }
+  designerSelectedNodeIds = designerSelectedNodeIds.filter(id => id !== nodeId);
+  renderDesigner();
+  showToast('success', '节点已删除', node.name);
+}
+
+function duplicateNode(nodeId) {
+  const node = designerNodes.find(n => n.id === nodeId);
+  if (!node) return;
+  const newNode = {
+    ...JSON.parse(JSON.stringify(node)),
+    id: designerNodeIdCounter++,
+    name: node.name + ' (副本)',
+    code: node.code + '_copy',
+    x: node.x + 40,
+    y: node.y + 40,
+  };
+  designerNodes.push(newNode);
+  renderDesigner();
+  showToast('success', '已复制副本', newNode.name);
+}
+
+function showConvertNodeMenu(nodeId) {
+  const convertTypes = nodeTypes.filter(t => t.type !== 'placeholder' && t.type !== 'trigger' && t.type !== 'end');
+  const listHtml = convertTypes.map(t => `<div class="context-menu-item" onclick="convertNodeTo(${nodeId},'${t.type}');closeModal()">${t.icon} ${t.name}</div>`).join('');
+  showModal(`<div class="modal" style="max-width:320px"><div class="modal-header"><h2 class="modal-title">转换节点类型</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body" style="padding:0;max-height:320px;overflow-y:auto">
+    ${listHtml}
+  </div></div>`);
+  closeContextMenu();
+}
+
+function convertNodeTo(nodeId, newType) {
+  const node = designerNodes.find(n => n.id === nodeId);
+  const nt = nodeTypes.find(t => t.type === newType);
+  if (!node || !nt) return;
+  node.type = newType;
+  node.name = nt.name;
+  node.code = nt.code + '_' + nodeId;
+  node.config = {};
+  closeModal();
+  renderDesigner();
+  showToast('success', '节点已转换', `${node.name}`);
+}
+
+// --- Toggle Functions ---
+function toggleGridSnap() {
+  designerGridSnap = !designerGridSnap;
+  showToast('info', designerGridSnap ? '网格吸附已开启' : '网格吸附已关闭', designerGridSnap ? '节点将自动对齐20px网格' : '');
+  renderDesigner();
+}
+
+function toggleMinimap() {
+  designerMinimapVisible = !designerMinimapVisible;
+  renderDesigner();
+}
+
+function designerSave() {
+  if (designerReadonly) return;
+  const indicator = document.getElementById('designerSaveIndicator');
+  if (indicator) {
+    indicator.innerHTML = `<svg class="spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M21 12a9 9 0 11-6.219-8.56"/></svg> <span>保存中…</span>`;
+  }
+  setTimeout(() => {
+    if (indicator) indicator.innerHTML = `${icons.check} <span>已保存</span>`;
+    showToast('success', '已保存', '草稿已手动保存');
+  }, 600);
+}
+
+// --- Node Config Tab Switch ---
+function switchNodeConfigTab(tab) {
+  const basicTab = document.getElementById('rpTabBasic');
+  const advTab = document.getElementById('rpTabAdvanced');
+  const body = document.getElementById('nodeConfigBody');
+  if (!basicTab || !advTab || !body) return;
+
+  const node = designerNodes.find(n => n.id === designerSelectedNodeId);
+  if (!node) return;
+  const nt = nodeTypes.find(t => t.type === node.type) || {};
+
+  if (tab === 'basic') {
+    basicTab.classList.add('active');
+    advTab.classList.remove('active');
+    body.innerHTML = renderNodeConfigFields(node, nt);
+  } else {
+    basicTab.classList.remove('active');
+    advTab.classList.add('active');
+    body.innerHTML = renderAdvancedConfig(node);
+  }
+}
+
+function renderAdvancedConfig(node) {
+  const ms = node.config?._mergeStrategy || 'all';
+  const retry = node.config?._retryCount || 0;
+  const timeout = node.config?._timeout || 30;
+  return `
+    <div class="config-section">
+      <div class="config-section-title">执行策略</div>
+      <div class="config-field">
+        <div class="config-field-label">超时时间 (秒)</div>
+        <input class="config-input" type="number" value="${timeout}" min="1" max="3600" onchange="updateNodeConfig(${node.id}, '_timeout', parseInt(this.value))" />
+      </div>
+      <div class="config-field">
+        <div class="config-field-label">失败重试次数</div>
+        <input class="config-input" type="number" value="${retry}" min="0" max="10" onchange="updateNodeConfig(${node.id}, '_retryCount', parseInt(this.value))" />
+      </div>
+      <div class="config-field">
+        <div class="config-field-label">汇合策略</div>
+        <select class="config-select" onchange="updateNodeConfig(${node.id}, '_mergeStrategy', this.value)">
+          <option value="all" ${ms === 'all' ? 'selected' : ''}>等待全部 (Wait All)</option>
+          <option value="any" ${ms === 'any' ? 'selected' : ''}>任一完成 (Any)</option>
+        </select>
+        <div style="font-size:var(--font-size-xs);color:var(--md-on-surface-variant);margin-top:4px">当有多条输入连线时，决定何时执行此节点</div>
+      </div>
+    </div>
+    <div class="config-section">
+      <div class="config-section-title">错误处理</div>
+      <div class="config-field">
+        <div class="config-field-label">错误时行为</div>
+        <select class="config-select" onchange="updateNodeConfig(${node.id}, '_errorBehavior', this.value)">
+          <option value="stop" ${(node.config?._errorBehavior || 'stop') === 'stop' ? 'selected' : ''}>停止流程</option>
+          <option value="continue" ${node.config?._errorBehavior === 'continue' ? 'selected' : ''}>继续执行</option>
+          <option value="retry" ${node.config?._errorBehavior === 'retry' ? 'selected' : ''}>自动重试</option>
+        </select>
+      </div>
+    </div>
+    <div class="config-section">
+      <div class="config-section-title">备注</div>
+      <div class="config-field">
+        <textarea class="config-textarea" rows="3" placeholder="输入节点备注，用于描述节点的业务含义" onchange="updateNodeConfig(${node.id}, '_note', this.value)">${node.config?._note || ''}</textarea>
+      </div>
+    </div>`;
+}
+
+// --- Merge Strategy Config ---
+function showMergeStrategyConfig(nodeId) {
+  const node = designerNodes.find(n => n.id === nodeId);
+  if (!node) return;
+  const ms = node.config?._mergeStrategy || 'all';
+  showModal(`<div class="modal" style="max-width:400px"><div class="modal-header"><h2 class="modal-title">🔀 汇合策略</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
+    <p style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant);line-height:1.6;margin-bottom:var(--space-4)">节点「${node.name}」有多条输入连线，请选择汇合策略：</p>
+    <div style="display:flex;flex-direction:column;gap:var(--space-3)">
+      <label class="merge-option ${ms === 'all' ? 'active' : ''}" style="display:flex;align-items:flex-start;gap:var(--space-3);padding:var(--space-3);border:1.5px solid ${ms === 'all' ? 'var(--md-primary)' : 'var(--md-outline-variant)'};border-radius:var(--radius-sm);cursor:pointer;transition:all 0.2s">
+        <input type="radio" name="mergeStrategy" value="all" ${ms === 'all' ? 'checked' : ''} onchange="setMergeStrategy(${nodeId},'all')" />
+        <div><div style="font-weight:500;font-size:var(--font-size-sm)">等待全部 (Wait All)</div><div style="font-size:var(--font-size-xs);color:var(--md-on-surface-variant);margin-top:2px">所有上游节点完成后再执行</div></div>
+      </label>
+      <label class="merge-option ${ms === 'any' ? 'active' : ''}" style="display:flex;align-items:flex-start;gap:var(--space-3);padding:var(--space-3);border:1.5px solid ${ms === 'any' ? 'var(--md-primary)' : 'var(--md-outline-variant)'};border-radius:var(--radius-sm);cursor:pointer;transition:all 0.2s">
+        <input type="radio" name="mergeStrategy" value="any" ${ms === 'any' ? 'checked' : ''} onchange="setMergeStrategy(${nodeId},'any')" />
+        <div><div style="font-weight:500;font-size:var(--font-size-sm)">任一完成 (Any)</div><div style="font-size:var(--font-size-xs);color:var(--md-on-surface-variant);margin-top:2px">任一上游节点完成后立即执行</div></div>
+      </label>
+    </div>
+  </div><div class="modal-footer"><button class="btn btn-primary" onclick="closeModal()">确定</button></div></div>`);
+}
+
+function setMergeStrategy(nodeId, strategy) {
+  const node = designerNodes.find(n => n.id === nodeId);
+  if (node) {
+    if (!node.config) node.config = {};
+    node.config._mergeStrategy = strategy;
+    showToast('success', '汇合策略已更新', strategy === 'all' ? '等待全部' : '任一完成');
+  }
+}
+
+// --- Copy / Paste / Select All ---
+function designerCopyNodes() {
+  if (designerReadonly) return;
+  const ids = designerSelectedNodeIds.length > 0 ? designerSelectedNodeIds : (designerSelectedNodeId ? [designerSelectedNodeId] : []);
+  if (ids.length === 0) { showToast('warning', '提示', '请先选择节点'); return; }
+  designerClipboard = ids.map(id => {
+    const node = designerNodes.find(n => n.id === id);
+    return node ? JSON.parse(JSON.stringify(node)) : null;
+  }).filter(Boolean);
+  showToast('success', '已复制', `${designerClipboard.length} 个节点`);
+}
+
+function designerPasteNodes() {
+  if (designerReadonly) return;
+  if (designerClipboard.length === 0) { showToast('warning', '提示', '剪贴板为空'); return; }
+  const newIds = [];
+  designerClipboard.forEach(src => {
+    const newNode = {
+      ...JSON.parse(JSON.stringify(src)),
+      id: designerNodeIdCounter++,
+      name: src.name + ' (粘贴)',
+      code: src.code + '_p' + Date.now().toString(36).slice(-3),
+      x: src.x + 60,
+      y: src.y + 60,
+    };
+    delete newNode._breakpoint;
+    delete newNode._debugStatus;
+    designerNodes.push(newNode);
+    newIds.push(newNode.id);
+  });
+  designerSelectedNodeIds = newIds;
+  designerSelectedNodeId = newIds[newIds.length - 1];
+  renderDesigner();
+  showToast('success', '已粘贴', `${newIds.length} 个节点`);
+}
+
+function designerSelectAll() {
+  if (designerReadonly) return;
+  designerSelectedNodeIds = designerNodes.map(n => n.id);
+  if (designerSelectedNodeIds.length > 0) {
+    designerSelectedNodeId = designerSelectedNodeIds[0];
+    designerRightPanel = 'overview';
+  }
+  renderDesigner();
+  showToast('info', '全选', `已选择 ${designerSelectedNodeIds.length} 个节点`);
+}
+
+// --- Cycle Detection ---
+function detectCycle(fromId, toId) {
+  // BFS from toId to check if we can reach fromId (which would create a cycle)
+  const visited = new Set();
+  const queue = [toId];
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (current === fromId) return true; // Cycle detected
+    if (visited.has(current)) continue;
+    visited.add(current);
+    designerConnections.filter(c => c.from === current).forEach(c => {
+      queue.push(c.to);
+    });
+  }
+  return false;
+}
+
+// --- Bottom Panel Resize ---
+function onBottomResizeStart(e) {
+  e.preventDefault();
+  designerBottomResizing = true;
+  const startY = e.clientY;
+  const startHeight = designerBottomPanelHeight;
+
+  function onMove(ev) {
+    if (!designerBottomResizing) return;
+    const delta = startY - ev.clientY;
+    const shell = document.getElementById('designerShell');
+    const maxH = shell ? shell.offsetHeight * 0.5 : 400;
+    designerBottomPanelHeight = Math.max(150, Math.min(maxH, startHeight + delta));
+    const bp = document.querySelector('.bottom-panel.open');
+    if (bp) bp.style.height = designerBottomPanelHeight + 'px';
+  }
+  function onUp() {
+    designerBottomResizing = false;
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+  }
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', onUp);
 }
