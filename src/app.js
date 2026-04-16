@@ -135,9 +135,9 @@ let wsMemberTab = 'admin';
 let wsListState = { search: '', roleFilter: 'all', sortField: 'lastActiveAt', sortAsc: false };
 let wsNextId = 7;
 const wsCardColors = [
-  { bg: '#EEF2FF', color: '#4F46E5' }, { bg: '#F0FDF4', color: '#16A34A' },
-  { bg: '#F5F3FF', color: '#7C3AED' }, { bg: '#FFF7ED', color: '#EA580C' },
-  { bg: '#FDF2F8', color: '#DB2777' }, { bg: '#ECFEFF', color: '#0891B2' },
+  { bg: '#EADDFF', color: '#6750A4' }, { bg: '#C4F5A5', color: '#386A20' },
+  { bg: '#E8E0F0', color: '#5B6271' }, { bg: '#FFDEA6', color: '#7C5800' },
+  { bg: '#FFD8E4', color: '#7D5260' }, { bg: '#D8E2FF', color: '#005AC1' },
 ];
 
 // ============================================
@@ -837,7 +837,7 @@ function renderWsWorkflowsTab(ws) {
           <div style="flex:1;font-size:var(--font-size-sm);color:var(--md-outline)">${wf.editedAt}</div>
           <div class="content-item-actions" style="width:170px">
             ${isMemberOrAbove ? `<button class="table-action-btn" title="编辑流程" onclick="openDesigner(${ws.id}, ${wf.id})" style="color:var(--md-primary)">${icons.edit}</button>` : ''}
-            ${wf.status === 'draft' && isMemberOrAbove ? `<button class="table-action-btn" title="发布" onclick="showPublishWfModal(${wf.id})" style="color:#16a34a">${icons.arrowUp}</button>` : ''}
+            ${wf.status === 'draft' && isMemberOrAbove ? `<button class="table-action-btn" title="发布" onclick="showPublishWfModal(${wf.id})" style="color:var(--md-success)">${icons.arrowUp}</button>` : ''}
             <button class="table-action-btn ${!canExec ? 'disabled' : ''}" title="执行" onclick="${canExec ? `executeWf(${wf.id})` : ''}" ${!canExec ? 'style="opacity:0.4;cursor:not-allowed"' : ''}>${icons.play}</button>
             ${isMemberOrAbove ? `<button class="table-action-btn" title="复制" onclick="copyWf(${wf.id})">${icons.copy}</button><button class="table-action-btn" title="移动" onclick="showMoveWfModal(${wf.id})">${icons.move}</button>` : ''}
             ${wf.status === 'published' && isMemberOrAbove ? `<button class="table-action-btn" title="停用" onclick="showDisableWfModal(${wf.id})">${icons.disable}</button>` : ''}
@@ -900,7 +900,7 @@ function showDeleteFolderModal(folderId) {
       <div class="delete-warning"><span class="delete-warning-icon">${icons.alertTriangle}</span><div class="delete-warning-text">该文件夹包含 ${subF} 个子文件夹和 ${subW} 个工作流</div></div>
       <div style="display:flex;flex-direction:column;gap:var(--space-3);margin-top:var(--space-4)">
         <div class="auth-space-item" style="cursor:pointer;border:2px solid transparent" onclick="deleteFolderKeepContent(${folderId})"><div class="auth-space-info"><div class="auth-space-icon bg-blue">${icons.move}</div><div><div class="auth-space-name">仅删除文件夹，保留内容</div><div class="auth-space-desc">子内容将移至上级目录</div></div></div></div>
-        ${isAdmin ? `<div class="auth-space-item" style="cursor:pointer;border:2px solid transparent" onclick="showCascadeDeleteFolder(${folderId})"><div class="auth-space-info"><div class="auth-space-icon bg-orange" style="background:#FEF2F2;color:#DC2626">${icons.trash}</div><div><div class="auth-space-name">删除文件夹及所有内容</div><div class="auth-space-desc">级联删除，不可恢复</div></div></div></div>` : ''}
+        ${isAdmin ? `<div class="auth-space-item" style="cursor:pointer;border:2px solid transparent" onclick="showCascadeDeleteFolder(${folderId})"><div class="auth-space-info"><div class="auth-space-icon bg-orange" style="background:var(--md-error-container);color:var(--md-error)">${icons.trash}</div><div><div class="auth-space-name">删除文件夹及所有内容</div><div class="auth-space-desc">级联删除，不可恢复</div></div></div></div>` : ''}
       </div></div></div>`);
   }
 }
@@ -1283,7 +1283,7 @@ function renderExecDetail(ws) {
     <div class="detail-back" onclick="wsExecDetailId = null; render()" style="margin-bottom:var(--space-4)">${icons.arrowLeft}<span>返回执行记录列表</span></div>
     <div class="exec-detail-header">
       <div style="display:flex;align-items:center;gap:var(--space-3)">
-        <h2 style="font-size:var(--font-size-lg);font-weight:600;margin:0">执行详情 #${exec.id}</h2>
+        <h2 style="font-size:var(--font-size-lg);font-weight:500;margin:0">执行详情 #${exec.id}</h2>
         <span class="exec-status ${statusClass[exec.status]}" style="font-size:var(--font-size-sm)">${statusLabel[exec.status]}</span>
         ${exec.stale ? '<span class="stale-mark">异常滞留</span>' : ''}
       </div>
@@ -1304,7 +1304,7 @@ function renderExecDetail(ws) {
       <div class="exec-detail-field"><span class="exec-detail-field-label">执行时长</span><span>${exec.duration}</span></div>
     </div>
     ${exec.nodes && exec.nodes.length > 0 ? `
-    <h3 style="font-size:var(--font-size-md);font-weight:600;margin:var(--space-6) 0 var(--space-3)">节点执行时间线</h3>
+    <h3 style="font-size:var(--font-size-md);font-weight:500;margin:var(--space-6) 0 var(--space-3)">节点执行时间线</h3>
     <div class="node-timeline">${exec.nodes.map(node => `
       <div class="node-item ${node.status === 'failed' ? 'node-item-failed' : ''}">
         <div class="node-dot ${nodeStatusClass[node.status] || ''}"></div>
@@ -1366,7 +1366,7 @@ function renderWsSettingsTab(ws) {
 
   return `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-4)">
-      <div><h3 style="font-size:var(--font-size-md);font-weight:600;margin:0">空间信息</h3></div>
+      <div><h3 style="font-size:var(--font-size-md);font-weight:500;margin:0">空间信息</h3></div>
       <div style="display:flex;gap:var(--space-2)">
         ${isAdmin ? `<button class="btn btn-secondary btn-sm" onclick="showEditWsModal(${ws.id})">${icons.edit}<span>编辑信息</span></button>` : ''}
         ${currentUserIsOnlyAdmin ? `<button class="btn btn-secondary btn-sm" onclick="showTransferAdminModal(${ws.id})">${icons.transfer}<span>转让管理员</span></button>` : ''}
@@ -1380,7 +1380,7 @@ function renderWsSettingsTab(ws) {
       <div class="exec-detail-field"><span class="exec-detail-field-label">描述</span><span>${ws.desc || '-'}</span></div>
     </div>
 
-    <h3 style="font-size:var(--font-size-md);font-weight:600;margin-bottom:var(--space-3)">成员管理</h3>
+    <h3 style="font-size:var(--font-size-md);font-weight:500;margin-bottom:var(--space-3)">成员管理</h3>
     <div class="tabs-container">
       <div class="tabs-header">
         <div class="tab-item ${wsMemberTab === 'admin' ? 'active' : ''}" onclick="switchMemberTab('admin')">${icons.shield}<span style="margin-left:6px">管理员</span><span class="badge badge-type" style="margin-left:6px">${admins.length}</span></div>
@@ -1552,7 +1552,7 @@ function showToast(type, title, message) {
   toast.className = 'toast'; toast.id = id;
   toast.innerHTML = `<span class="toast-icon ${type}">${iconMap[type]}</span><div class="toast-content"><div class="toast-title">${title}</div>${message ? `<div class="toast-message">${message}</div>` : ''}</div><button class="modal-close" onclick="removeToast('${id}')" style="width:24px;height:24px">${icons.close}</button>`;
   container.appendChild(toast);
-  setTimeout(() => removeToast(id), 4000);
+  setTimeout(() => removeToast(id), 3000);
 }
 function removeToast(id) { const toast = document.getElementById(id); if (toast) { toast.classList.add('removing'); setTimeout(() => toast.remove(), 200); } }
 
