@@ -58,7 +58,7 @@ const icons = {
 // ============================================
 //   SHARED STATE
 // ============================================
-let currentModule = 'datasource';
+let currentModule = 'workspace';
 
 // ============================================
 //   DATA SOURCE MODULE - Mock Data & State
@@ -159,7 +159,7 @@ let workspaces = [
 let wsCurrentView = 'list';
 let wsCurrentId = null;
 let wsMemberTab = 'admin';
-let wsListState = { search: '', roleFilter: 'all', sortField: 'lastActiveAt', sortAsc: false };
+let wsListState = { search: '', roleFilter: 'all', sortField: 'lastActiveAt', sortAsc: false, page: 1, pageSize: 12 };
 let wsNextId = 7;
 const wsCardColors = [
   { bg: '#EEF2FF', color: '#4F46E5' }, { bg: '#DCFCE7', color: '#16A34A' },
@@ -177,9 +177,12 @@ let wsContentSearch = '';
 let wsContentStatusFilter = 'all';
 let wsContentSortField = 'editedAt';
 let wsContentSortAsc = false;
+let wsContentCreatorFilter = 'all';
 let wsExecSearch = '';
 let wsExecStatusFilter = 'all';
 let wsExecTriggerFilter = 'all';
+let wsExecWfFilter = 'all';
+let wsExecTimeRange = 'all';
 let wsExecDetailId = null;
 let wsExecShowArchive = false;
 let wfNextId = 100;
@@ -852,12 +855,15 @@ function renderWorkspaceModule(content, breadcrumb) {
 }
 function wsNavigateTo(view, wsId) {
   wsCurrentView = view; wsCurrentId = wsId || null;
-  if (view === 'detail') { wsInternalTab = 'workflows'; wsMemberTab = 'admin'; wsCurrentFolderId = null; wsFolderPath = []; wsContentSearch = ''; wsContentStatusFilter = 'all'; wsExecSearch = ''; wsExecStatusFilter = 'all'; wsExecTriggerFilter = 'all'; wsExecDetailId = null; wsExecShowArchive = false; }
+  if (view === 'detail') { wsInternalTab = 'workflows'; wsMemberTab = 'admin'; wsCurrentFolderId = null; wsFolderPath = []; wsContentSearch = ''; wsContentStatusFilter = 'all'; wsContentCreatorFilter = 'all'; wsContentSortField = 'editedAt'; wsContentSortAsc = false; wsExecSearch = ''; wsExecStatusFilter = 'all'; wsExecTriggerFilter = 'all'; wsExecWfFilter = 'all'; wsExecTimeRange = 'all'; wsExecDetailId = null; wsExecShowArchive = false; batchMode = false; batchSelectedIds.clear(); }
   render();
 }
 
 function renderWsListPage() {
   const filtered = getFilteredWorkspaces(); const total = filtered.length;
+  const start = (wsListState.page - 1) * wsListState.pageSize;
+  const paged = filtered.slice(start, start + wsListState.pageSize);
+  const totalPages = Math.ceil(total / wsListState.pageSize);
   return `
     <div class="page-header"><div class="page-title-section"><h1 class="page-title shiny-text">空间管理</h1><p class="page-subtitle">管理工作空间，组织和协作工作流</p></div><button class="btn btn-primary magnet-btn" onclick="showCreateWsModal()">${icons.plus}<span>创建空间</span></button></div>
     <div class="filter-bar">
@@ -871,20 +877,21 @@ function renderWsListPage() {
       <div class="filter-actions"><div class="sort-dropdown"><select onchange="onWsSortChange(this.value)"><option value="lastActiveAt" ${wsListState.sortField === 'lastActiveAt' ? 'selected' : ''}>最近活跃</option><option value="createdAt" ${wsListState.sortField === 'createdAt' ? 'selected' : ''}>创建时间</option></select><button class="sort-toggle-btn" onclick="toggleWsSortOrder()">${wsListState.sortAsc ? icons.arrowUp : icons.arrowDown}</button></div><span class="item-count">共 <strong>${total}</strong> 个空间</span></div>
     </div>
     ${total === 0 ? (wsListState.search || wsListState.roleFilter !== 'all' ? `<div class="ws-empty-state">${renderEmptyState('wsSearchEmpty')}</div>` : renderEmptyState('workspace')) : `
-    <div class="workspace-grid fade-in-stagger">${filtered.map(ws => {
+    <div class="workspace-grid fade-in-stagger">${paged.map(ws => {
       const cc = wsCardColors[ws.id % wsCardColors.length];
       const rl = { admin: '管理员', member: '成员', viewer: '只读查看者' };
       const rc = { admin: 'role-badge-admin', member: 'role-badge-member', viewer: 'role-badge-viewer' };
       return `<div class="workspace-card spotlight-card glare-hover" onclick="wsNavigateTo('detail', ${ws.id})"><div class="workspace-card-header"><div class="workspace-card-icon" style="background:${cc.bg};color:${cc.color}">${ws.name.charAt(0)}</div><div class="workspace-card-title-group"><div class="workspace-card-name">${ws.name}</div><span class="workspace-card-code">${icons.hash} ${ws.code}</span></div><div class="workspace-card-actions" onclick="event.stopPropagation()">${ws.myRole === 'admin' ? `<button class="table-action-btn" title="编辑" onclick="showEditWsModal(${ws.id})">${icons.edit}</button><button class="table-action-btn danger" title="删除" onclick="showDeleteWsStep1(${ws.id})">${icons.trash}</button>` : ''}</div></div><div class="workspace-card-desc" title="${ws.desc}">${ws.desc || '暂无描述'}</div><div class="workspace-card-stats"><span class="ws-stat-item">${icons.users} <span class="ws-stat-value" data-count-up="${ws.members.length}">${ws.members.length}</span> 成员</span><span class="ws-stat-item">${icons.workflow} <span class="ws-stat-value" data-count-up="${ws.workflowCount}">${ws.workflowCount}</span> 工作流</span>${ws.runningInstances > 0 ? `<span class="ws-stat-item" style="color:var(--md-success)">${icons.sync} <span class="ws-stat-value" data-count-up="${ws.runningInstances}">${ws.runningInstances}</span> 运行中</span>` : ''}</div><div class="workspace-card-footer"><span class="role-badge ${rc[ws.myRole]}">${icons.shield} ${rl[ws.myRole]}</span><span class="workspace-card-time">${icons.clock} ${ws.lastActiveAt}</span></div></div>`;
-    }).join('')}</div>`}`;
+    }).join('')}</div>
+    ${totalPages > 1 || total > 12 ? `<div class="pagination"><div class="pagination-info">第 ${start + 1}-${Math.min(start + wsListState.pageSize, total)} 条，共 ${total} 条</div><div class="pagination-controls">${wsListState.page > 1 ? `<button class="pagination-btn" onclick="wsListState.page--;render()">${icons.chevronLeft}</button>` : `<button class="pagination-btn disabled">${icons.chevronLeft}</button>`}${Array.from({length: totalPages}, (_, i) => `<button class="pagination-btn ${wsListState.page === i + 1 ? 'active' : ''}" onclick="wsListState.page=${i + 1};render()">${i + 1}</button>`).join('')}${wsListState.page < totalPages ? `<button class="pagination-btn" onclick="wsListState.page++;render()">${icons.chevronRight}</button>` : `<button class="pagination-btn disabled">${icons.chevronRight}</button>`}</div><div class="pagination-size"><span>每页</span><select onchange="wsListState.pageSize=parseInt(this.value);wsListState.page=1;render()"><option value="12" ${wsListState.pageSize === 12 ? 'selected' : ''}>12</option><option value="24" ${wsListState.pageSize === 24 ? 'selected' : ''}>24</option><option value="48" ${wsListState.pageSize === 48 ? 'selected' : ''}>48</option></select><span>条</span></div></div>` : ''}`}`;
 }
 function getFilteredWorkspaces() {
   let result = workspaces.filter(ws => { if (wsListState.search) { const s = wsListState.search.toLowerCase(); if (!ws.name.toLowerCase().includes(s) && !ws.code.toLowerCase().includes(s)) return false; } if (wsListState.roleFilter !== 'all' && ws.myRole !== wsListState.roleFilter) return false; return true; });
   result.sort((a, b) => { const f = wsListState.sortField; const va = f === 'lastActiveAt' ? a.lastActiveAt : a.createdAt, vb = f === 'lastActiveAt' ? b.lastActiveAt : b.createdAt; return wsListState.sortAsc ? va.localeCompare(vb) : vb.localeCompare(va); });
   return result;
 }
-function onWsSearchInput(val) { wsListState.search = val; render(); }
-function onWsRoleFilter(val) { wsListState.roleFilter = val; render(); }
+function onWsSearchInput(val) { wsListState.search = val; wsListState.page = 1; render(); }
+function onWsRoleFilter(val) { wsListState.roleFilter = val; wsListState.page = 1; render(); }
 function onWsSortChange(val) { wsListState.sortField = val; render(); }
 function toggleWsSortOrder() { wsListState.sortAsc = !wsListState.sortAsc; render(); }
 
@@ -929,6 +936,8 @@ function renderWsWorkflowsTab(ws) {
   const isAdmin = ws.myRole === 'admin';
   const folders = (wsFolders[ws.id] || []).filter(f => f.parentId === wsCurrentFolderId);
   let workflows = (wsWorkflows[ws.id] || []).filter(wf => wf.folderId === wsCurrentFolderId);
+  const allWsWorkflows = wsWorkflows[ws.id] || [];
+  const creators = [...new Set(allWsWorkflows.map(wf => wf.creator))].sort();
   const depth = getFolderDepth();
   const canCreateFolder = isMemberOrAbove && depth < 5;
   let isSearchMode = false;
@@ -936,12 +945,16 @@ function renderWsWorkflowsTab(ws) {
   // Status filter
   if (wsContentStatusFilter !== 'all') workflows = workflows.filter(wf => wf.status === wsContentStatusFilter);
 
+  // Creator filter
+  if (wsContentCreatorFilter !== 'all') workflows = workflows.filter(wf => wf.creator === wsContentCreatorFilter);
+
   // Search mode - search across entire space
   if (wsContentSearch) {
     isSearchMode = true;
     const q = wsContentSearch.toLowerCase();
-    workflows = (wsWorkflows[ws.id] || []).filter(wf => wf.name.toLowerCase().includes(q) || wf.code.toLowerCase().includes(q));
+    workflows = allWsWorkflows.filter(wf => wf.name.toLowerCase().includes(q) || wf.code.toLowerCase().includes(q));
     if (wsContentStatusFilter !== 'all') workflows = workflows.filter(wf => wf.status === wsContentStatusFilter);
+    if (wsContentCreatorFilter !== 'all') workflows = workflows.filter(wf => wf.creator === wsContentCreatorFilter);
   }
 
   // Sort
@@ -958,7 +971,9 @@ function renderWsWorkflowsTab(ws) {
   // Breadcrumb
   let breadcrumb = '';
   if (wsFolderPath.length > 0) {
-    breadcrumb = `<div class="content-breadcrumb"><span class="content-breadcrumb-item" onclick="navigateToWsFolder(null)">${ws.name}</span>${wsFolderPath.map((p, i) => `<span class="breadcrumb-separator">/</span><span class="content-breadcrumb-item ${i === wsFolderPath.length - 1 ? 'current' : ''}" onclick="navigateToWsFolderByIndex(${i})">${p.name}</span>`).join('')}</div>`;
+    const parentIdx = wsFolderPath.length >= 2 ? wsFolderPath.length - 2 : -1;
+    const goUpOnclick = parentIdx >= 0 ? `navigateToWsFolderByIndex(${parentIdx})` : `navigateToWsFolder(null)`;
+    breadcrumb = `<div class="content-breadcrumb" style="display:flex;align-items:center;gap:var(--space-2)"><button class="btn btn-ghost btn-sm" onclick="${goUpOnclick}" title="返回上一级" style="padding:2px 6px;min-width:auto">${icons.arrowLeft}</button><span class="content-breadcrumb-item" onclick="navigateToWsFolder(null)">${ws.name}</span>${wsFolderPath.map((p, i) => `<span class="breadcrumb-separator">/</span><span class="content-breadcrumb-item ${i === wsFolderPath.length - 1 ? 'current' : ''}" onclick="navigateToWsFolderByIndex(${i})">${p.name}</span>`).join('')}</div>`;
   }
 
   // Status labels
@@ -979,6 +994,10 @@ function renderWsWorkflowsTab(ws) {
         <span class="filter-chip ${wsContentStatusFilter === 'disabled' ? 'active' : ''}" onclick="onWsStatusFilter('disabled')">已停用</span>
       </div>
       <div class="filter-actions">
+        <select class="form-input" style="width:auto;padding:4px 8px;font-size:var(--font-size-sm)" onchange="onWsCreatorFilter(this.value)">
+          <option value="all" ${wsContentCreatorFilter === 'all' ? 'selected' : ''}>全部创建者</option>
+          ${creators.map(c => `<option value="${c}" ${wsContentCreatorFilter === c ? 'selected' : ''}>${c}</option>`).join('')}
+        </select>
         <div class="sort-dropdown"><select onchange="onWsContentSort(this.value)"><option value="editedAt" ${wsContentSortField === 'editedAt' ? 'selected' : ''}>最后编辑</option><option value="createdAt" ${wsContentSortField === 'createdAt' ? 'selected' : ''}>创建时间</option><option value="name" ${wsContentSortField === 'name' ? 'selected' : ''}>名称</option></select><button class="sort-toggle-btn" onclick="toggleWsContentSort()">${wsContentSortAsc ? icons.arrowUp : icons.arrowDown}</button></div>
         ${isMemberOrAbove ? `<button class="btn btn-secondary btn-sm" onclick="toggleBatchMode()" style="${batchMode ? 'background:var(--md-primary);color:white' : ''}">${icons.check}<span>${batchMode ? '退出批量' : '批量操作'}</span></button>` : ''}
         ${isMemberOrAbove ? `<button class="btn btn-primary btn-sm" onclick="showCreateWfModal()">${icons.plus}<span>新建工作流</span></button>` : ''}
@@ -986,7 +1005,7 @@ function renderWsWorkflowsTab(ws) {
       </div>
     </div>
 
-    ${batchMode && batchSelectedIds.size > 0 ? `<div class="batch-action-bar" style="display:flex;align-items:center;gap:var(--space-3);padding:var(--space-2) var(--space-4);background:var(--md-primary-container);border-radius:var(--radius-md);margin-top:var(--space-2);font-size:var(--font-size-sm)"><span style="color:var(--md-on-primary-container);font-weight:500">已选中 ${batchSelectedIds.size} 项</span><div style="margin-left:auto;display:flex;gap:var(--space-2)"><button class="btn btn-secondary btn-sm" onclick="batchMove()">${icons.move}<span>批量移动</span></button><button class="btn btn-secondary btn-sm" onclick="batchDisable()">${icons.disable}<span>批量停用</span></button><button class="btn btn-danger btn-sm" onclick="batchDelete()">${icons.trash}<span>批量删除</span></button></div></div>` : ''}
+    ${batchMode && batchSelectedIds.size > 0 ? `<div class="batch-action-bar" style="display:flex;align-items:center;gap:var(--space-3);padding:var(--space-2) var(--space-4);background:var(--md-primary-container);border-radius:var(--radius-md);margin-top:var(--space-2);font-size:var(--font-size-sm)"><span style="color:var(--md-on-primary-container);font-weight:500">已选中 ${batchSelectedIds.size} 项</span><div style="margin-left:auto;display:flex;gap:var(--space-2)"><button class="btn btn-secondary btn-sm" onclick="batchMove()">${icons.move}<span>批量移动</span></button><button class="btn btn-secondary btn-sm" onclick="batchDisable()">${icons.disable}<span>批量停用</span></button>${isAdmin ? `<button class="btn btn-danger btn-sm" onclick="batchDelete()">${icons.trash}<span>批量删除</span></button>` : ''}</div></div>` : ''}
 
     ${isEmpty ? (isSearchMode ? renderEmptyState('searchNoResult') : (wsCurrentFolderId !== null ? `<div class="empty-state" style="padding:var(--space-10)"><img src="./public/images/empty-folder-content.png" class="empty-state-img" /><div class="empty-state-title">该文件夹为空</div><div class="empty-state-desc">在此文件夹中创建工作流或子文件夹</div><div style="display:flex;gap:var(--space-2);margin-top:var(--space-4)">${isMemberOrAbove ? `<button class="btn btn-primary btn-sm" onclick="showCreateWfModal()">${icons.plus}<span>新建工作流</span></button>` : ''}${canCreateFolder ? `<button class="btn btn-secondary btn-sm" onclick="showCreateFolderModal()">${icons.folder}<span>新建子文件夹</span></button>` : ''}</div></div>` : `<div class="empty-state" style="padding:var(--space-10)"><img src="./public/images/empty-folder-content.png" class="empty-state-img" /><div class="empty-state-title">暂无内容</div><div class="empty-state-desc">创建工作流或文件夹来组织您的空间</div><div style="display:flex;gap:var(--space-2);margin-top:var(--space-4)">${isMemberOrAbove ? `<button class="btn btn-primary btn-sm" onclick="showCreateWfModal()">${icons.plus}<span>新建工作流</span></button><button class="btn btn-secondary btn-sm" onclick="showCreateFolderModal()">${icons.folder}<span>新建文件夹</span></button>` : ''}</div></div>`)) : `
     <div class="content-list-header">${batchMode ? `<span style="display:flex;align-items:center;padding-right:var(--space-2)"><input type="checkbox" ${batchSelectedIds.size === sortedWf.length && sortedWf.length > 0 ? 'checked' : ''} onchange="toggleBatchSelectAll(${ws.id})" style="width:16px;height:16px;accent-color:var(--md-primary);cursor:pointer" /></span>` : ''}<span style="flex:2">名称</span><span style="flex:1">状态</span><span style="flex:1">创建者</span><span style="flex:1">最后编辑</span><span style="width:170px">操作</span></div>
@@ -1029,11 +1048,13 @@ function renderWsWorkflowsTab(ws) {
 
 function onWsContentSearch(val) { wsContentSearch = val; render(); }
 function onWsStatusFilter(val) { wsContentStatusFilter = val; render(); }
+function onWsCreatorFilter(val) { wsContentCreatorFilter = val; render(); }
 function onWsContentSort(val) { wsContentSortField = val; render(); }
 function toggleWsContentSort() { wsContentSortAsc = !wsContentSortAsc; render(); }
+function openDesigner(wsId, wfId) { showToast('info', '流程设计器', '流程设计器将在 Phase 2 中实现（当前为原型占位）'); }
 function navigateIntoFolder(folderId, folderName) { wsFolderPath.push({ id: folderId, name: folderName }); wsCurrentFolderId = folderId; wsContentSearch = ''; render(); }
 function navigateToWsFolder(folderId) { wsCurrentFolderId = folderId; if (folderId === null) wsFolderPath = []; render(); }
-function navigateToWsFolderByIndex(idx) { wsFolderPath = wsFolderPath.slice(0, idx + 1); wsCurrentFolderId = wsFolderPath[idx].id; render(); }
+function navigateToWsFolderByIndex(idx) { if (idx < 0 || idx >= wsFolderPath.length) return; wsFolderPath = wsFolderPath.slice(0, idx + 1); wsCurrentFolderId = wsFolderPath[idx].id; render(); }
 
 // --- Folder CRUD ---
 function showCreateFolderModal() {
@@ -1041,12 +1062,14 @@ function showCreateFolderModal() {
   setTimeout(() => document.getElementById('folderName')?.focus(), 300);
 }
 function createFolder() {
-  const name = document.getElementById('folderName').value.trim(), desc = document.getElementById('folderDesc').value.trim();
+  const rawName = document.getElementById('folderName').value;
+  const name = rawName.trim(), desc = document.getElementById('folderDesc').value.trim();
   const ni = document.getElementById('folderName'), ne = document.getElementById('folderNameError'); ni.classList.remove('error'); ne.classList.add('hidden');
   if (!name) { ni.classList.add('error'); ne.textContent = '请输入文件夹名称'; ne.classList.remove('hidden'); return; }
-  if (!/^[\u4e00-\u9fa5a-zA-Z0-9_-]+$/.test(name)) { ni.classList.add('error'); ne.textContent = '仅支持中文、英文、数字、下划线和连字符'; ne.classList.remove('hidden'); return; }
+  if (rawName !== name) { ni.classList.add('error'); ne.textContent = '文件夹名称不允许以空格开头或结尾'; ne.classList.remove('hidden'); return; }
+  if (!/^[\u4e00-\u9fa5a-zA-Z0-9_-]+$/.test(name)) { ni.classList.add('error'); ne.textContent = '文件夹名称仅支持中文、英文、数字、下划线和连字符'; ne.classList.remove('hidden'); return; }
   const siblings = (wsFolders[wsCurrentId] || []).filter(f => f.parentId === wsCurrentFolderId);
-  if (siblings.some(f => f.name === name)) { ni.classList.add('error'); ne.textContent = '同级目录下已存在同名文件夹'; ne.classList.remove('hidden'); return; }
+  if (siblings.some(f => f.name === name)) { ni.classList.add('error'); ne.textContent = '同级目录下已存在同名文件夹，请使用其他名称'; ne.classList.remove('hidden'); return; }
   if (!wsFolders[wsCurrentId]) wsFolders[wsCurrentId] = [];
   wsFolders[wsCurrentId].push({ id: folderNextId++, name, desc, parentId: wsCurrentFolderId, wsId: wsCurrentId, creator: 'Sukey Wu', createdAt: new Date().toISOString().slice(0, 10), editedAt: new Date().toISOString().slice(0, 16).replace('T', ' ') });
   closeModal(); showToast('success', '创建成功', `文件夹「${name}」已创建`); render();
@@ -1057,12 +1080,14 @@ function showEditFolderModal(folderId) {
 }
 function updateFolder(folderId) {
   const f = (wsFolders[wsCurrentId] || []).find(x => x.id === folderId); if (!f) return;
-  const name = document.getElementById('folderName').value.trim(), desc = document.getElementById('folderDesc').value.trim();
+  const rawName = document.getElementById('folderName').value;
+  const name = rawName.trim(), desc = document.getElementById('folderDesc').value.trim();
   const ni = document.getElementById('folderName'), ne = document.getElementById('folderNameError'); ni.classList.remove('error'); ne.classList.add('hidden');
   if (!name) { ni.classList.add('error'); ne.textContent = '请输入文件夹名称'; ne.classList.remove('hidden'); return; }
-  if (!/^[\u4e00-\u9fa5a-zA-Z0-9_-]+$/.test(name)) { ni.classList.add('error'); ne.textContent = '仅支持中文、英文、数字、下划线和连字符'; ne.classList.remove('hidden'); return; }
+  if (rawName !== name) { ni.classList.add('error'); ne.textContent = '文件夹名称不允许以空格开头或结尾'; ne.classList.remove('hidden'); return; }
+  if (!/^[\u4e00-\u9fa5a-zA-Z0-9_-]+$/.test(name)) { ni.classList.add('error'); ne.textContent = '文件夹名称仅支持中文、英文、数字、下划线和连字符'; ne.classList.remove('hidden'); return; }
   const siblings = (wsFolders[wsCurrentId] || []).filter(x => x.parentId === f.parentId && x.id !== folderId);
-  if (siblings.some(x => x.name === name)) { ni.classList.add('error'); ne.textContent = '同级已存在同名文件夹'; ne.classList.remove('hidden'); return; }
+  if (siblings.some(x => x.name === name)) { ni.classList.add('error'); ne.textContent = '同级目录下已存在同名文件夹，请使用其他名称'; ne.classList.remove('hidden'); return; }
   f.name = name; f.desc = desc; f.editedAt = new Date().toISOString().slice(0, 16).replace('T', ' ');
   closeModal(); showToast('success', '保存成功', '文件夹已更新'); render();
 }
@@ -1154,6 +1179,15 @@ function buildFolderTree(allFolders, parentId, invalidIds, currentParentId, acti
 
 function moveFolder(folderId, targetParentId) {
   const f = (wsFolders[wsCurrentId] || []).find(x => x.id === folderId); if (!f) return;
+  // Check same-name conflict at target
+  const siblings = (wsFolders[wsCurrentId] || []).filter(x => x.parentId === targetParentId && x.id !== folderId);
+  if (siblings.some(x => x.name === f.name)) { closeModal(); showToast('error', '移动失败', '目标位置已存在同名文件夹，请先重命名'); return; }
+  // Check depth limit (target depth + subtree depth <= 5)
+  let targetDepth = 0; let cur = targetParentId;
+  while (cur) { const p = (wsFolders[wsCurrentId] || []).find(x => x.id === cur); if (!p) break; targetDepth++; cur = p.parentId; }
+  function getMaxSubDepth(pid) { const children = (wsFolders[wsCurrentId] || []).filter(x => x.parentId === pid); if (children.length === 0) return 0; return 1 + Math.max(...children.map(c => getMaxSubDepth(c.id))); }
+  const subDepth = 1 + getMaxSubDepth(folderId);
+  if (targetDepth + subDepth > 5) { closeModal(); showToast('error', '移动失败', '移动后文件夹层级将超过5层限制'); return; }
   f.parentId = targetParentId; f.editedAt = new Date().toISOString().slice(0, 16).replace('T', ' ');
   closeModal(); showToast('success', '移动成功', '文件夹已移动'); render();
 }
@@ -1174,23 +1208,26 @@ function showCreateWfModal() {
   setTimeout(() => document.getElementById('wfName')?.focus(), 300);
 }
 function createWf() {
-  const name = document.getElementById('wfName').value.trim(), code = document.getElementById('wfCode').value.trim(), desc = document.getElementById('wfDesc').value.trim();
+  const rawName = document.getElementById('wfName').value, rawCode = document.getElementById('wfCode').value;
+  const name = rawName.trim(), code = rawCode.trim(), desc = document.getElementById('wfDesc').value.trim();
   const type = document.getElementById('wfType').value, allowRef = document.getElementById('wfAllowRef').checked;
   const ownerId = parseInt(document.getElementById('wfOwner').value);
   let hasError = false;
   const ni = document.getElementById('wfName'), ne = document.getElementById('wfNameError'); ni.classList.remove('error'); ne.classList.add('hidden');
   const ci = document.getElementById('wfCode'), ce = document.getElementById('wfCodeError'); ci.classList.remove('error'); ce.classList.add('hidden');
   if (!name) { ni.classList.add('error'); ne.textContent = '请输入工作流名称'; ne.classList.remove('hidden'); hasError = true; }
-  else if (!/^[\u4e00-\u9fa5a-zA-Z0-9_-]+$/.test(name)) { ni.classList.add('error'); ne.textContent = '仅支持中文、英文、数字、下划线和连字符'; ne.classList.remove('hidden'); hasError = true; }
-  else if ((wsWorkflows[wsCurrentId] || []).some(wf => wf.name === name)) { ni.classList.add('error'); ne.textContent = '该空间内已存在同名工作流'; ne.classList.remove('hidden'); hasError = true; }
+  else if (rawName !== name) { ni.classList.add('error'); ne.textContent = '工作流名称不允许以空格开头或结尾'; ne.classList.remove('hidden'); hasError = true; }
+  else if (!/^[\u4e00-\u9fa5a-zA-Z0-9_-]+$/.test(name)) { ni.classList.add('error'); ne.textContent = '工作流名称仅支持中文、英文、数字、下划线和连字符'; ne.classList.remove('hidden'); hasError = true; }
+  else if ((wsWorkflows[wsCurrentId] || []).some(wf => wf.name === name)) { ni.classList.add('error'); ne.textContent = '该空间内已存在同名工作流，请使用其他名称'; ne.classList.remove('hidden'); hasError = true; }
   if (!code) { ci.classList.add('error'); ce.textContent = '请输入工作流编号'; ce.classList.remove('hidden'); hasError = true; }
-  else if (!/^[a-zA-Z0-9_-]+$/.test(code)) { ci.classList.add('error'); ce.textContent = '仅支持英文、数字、下划线和连字符'; ce.classList.remove('hidden'); hasError = true; }
-  else { const allCodes = Object.values(wsWorkflows).flat().map(wf => wf.code); if (allCodes.includes(code)) { ci.classList.add('error'); ce.textContent = '该编号已被使用，请更换'; ce.classList.remove('hidden'); hasError = true; } }
+  else if (rawCode !== code) { ci.classList.add('error'); ce.textContent = '工作流编号不允许包含空格'; ce.classList.remove('hidden'); hasError = true; }
+  else if (!/^[a-zA-Z0-9_-]+$/.test(code)) { ci.classList.add('error'); ce.textContent = '工作流编号仅支持英文、数字、下划线和连字符'; ce.classList.remove('hidden'); hasError = true; }
+  else { const allCodes = Object.values(wsWorkflows).flat().map(wf => wf.code); if (allCodes.includes(code)) { ci.classList.add('error'); ce.textContent = '该编号已被使用，请更换其他编号'; ce.classList.remove('hidden'); hasError = true; } }
   if (hasError) return;
   if (!wsWorkflows[wsCurrentId]) wsWorkflows[wsCurrentId] = [];
   const now = new Date().toISOString();
   wsWorkflows[wsCurrentId].push({ id: wfNextId++, name, code, desc, type, allowRef, status: 'draft', version: 0, creator: 'Sukey Wu', owners: [ownerId], folderId: wsCurrentFolderId, wsId: wsCurrentId, createdAt: now.slice(0, 10), editedAt: now.slice(0, 16).replace('T', ' '), lastRun: null, runningCount: 0, execCount: 0, debugPassed: false, versions: [] });
-  closeModal(); showToast('success', '创建成功', `工作流「${name}」已创建，初始状态为草稿`); render();
+  closeModal(); showToast('success', '创建成功', `工作流「${name}」已创建，正在进入流程设计器...`); render(); setTimeout(() => openDesigner(wsCurrentId, wfNextId - 1), 500);
 }
 function showDeleteWfModal(wfId) {
   const wf = (wsWorkflows[wsCurrentId] || []).find(x => x.id === wfId); if (!wf) return;
@@ -1217,10 +1254,10 @@ function copyWf(wfId) {
   let copyName = `${wf.name} - 副本`;
   let i = 2; while (allNames.includes(copyName)) { copyName = `${wf.name} - 副本 ${i++}`; }
   const allCodes = Object.values(wsWorkflows).flat().map(x => x.code);
-  let copyCode = `${wf.code}_COPY`; i = 2; while (allCodes.includes(copyCode)) { copyCode = `${wf.code}_COPY_${i++}`; }
+  let copyCode = `${wf.code}_copy`; i = 2; while (allCodes.includes(copyCode)) { copyCode = `${wf.code}_copy${i++}`; }
   if (!wsWorkflows[wsCurrentId]) wsWorkflows[wsCurrentId] = [];
   const now = new Date().toISOString();
-  wsWorkflows[wsCurrentId].push({ ...wf, id: wfNextId++, name: copyName, code: copyCode, status: 'draft', version: 0, owners: [], execCount: 0, runningCount: 0, lastRun: null, debugPassed: false, versions: [], createdAt: now.slice(0, 10), editedAt: now.slice(0, 16).replace('T', ' ') });
+  wsWorkflows[wsCurrentId].push({ ...wf, id: wfNextId++, name: copyName, code: copyCode, status: 'draft', version: 0, creator: 'Sukey Wu', owners: [101], execCount: 0, runningCount: 0, lastRun: null, debugPassed: false, versions: [], createdAt: now.slice(0, 10), editedAt: now.slice(0, 16).replace('T', ' ') });
   showToast('success', '复制成功', `已创建副本「${copyName}」`); render();
 }
 function showMoveWfModal(wfId) {
@@ -1238,6 +1275,9 @@ function showMoveWfModal(wfId) {
 }
 function moveWf(wfId, targetFolderId) {
   const wf = (wsWorkflows[wsCurrentId] || []).find(x => x.id === wfId); if (!wf) return;
+  // Check same-name conflict at target
+  const targetWfs = (wsWorkflows[wsCurrentId] || []).filter(x => x.folderId === targetFolderId && x.id !== wfId);
+  if (targetWfs.some(x => x.name === wf.name)) { closeModal(); showToast('error', '移动失败', '目标位置已存在同名工作流，请先重命名'); return; }
   wf.folderId = targetFolderId; wf.editedAt = new Date().toISOString().slice(0, 16).replace('T', ' ');
   closeModal(); showToast('success', '移动成功', '工作流已移动'); render();
 }
@@ -1292,9 +1332,9 @@ function showPublishWfModal(wfId) {
       <div><div style="font-weight:500">${wf.name}</div><div style="font-size:var(--font-size-xs);color:var(--md-outline)">${icons.hash} ${wf.code}</div></div>
       <span class="version-badge" style="margin-left:auto">v${nextV}</span>
     </div>
-    <div class="form-group"><label class="form-label">发布说明</label><textarea class="form-textarea" id="publishNote" placeholder="选填，简要描述本次发布变更内容" maxlength="200" rows="3"></textarea></div>
-    ${!wf.debugPassed ? `<div class="delete-warning" style="margin-top:var(--space-3)"><span class="delete-warning-icon">${icons.alertTriangle}</span><div class="delete-warning-text" style="font-size:var(--font-size-sm)">建议先通过调试验证后再发布，当前流程尚未通过调试。</div></div>` : ''}
-  </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="publishWfFromList(${wfId})">确认发布</button></div></div>`);
+    <div class="form-group"><label class="form-label">发布说明</label><textarea class="form-textarea" id="publishNote" placeholder="选填，简要描述本次发布变更内容" maxlength="200" rows="3"${!wf.debugPassed ? ' disabled' : ''}></textarea></div>
+    ${!wf.debugPassed ? `<div class="delete-warning" style="margin-top:var(--space-3)"><span class="delete-warning-icon">${icons.alertTriangle}</span><div class="delete-warning-text" style="font-size:var(--font-size-sm);color:var(--md-error)"><strong>无法发布：</strong>当前流程尚未通过调试验证，请先完成调试后再发布。</div></div>` : ''}
+  </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" ${!wf.debugPassed ? 'disabled style="opacity:0.5;cursor:not-allowed;pointer-events:none"' : `onclick="publishWfFromList(${wfId})"`}>确认发布</button></div></div>`);
 }
 function publishWfFromList(wfId) {
   const wf = (wsWorkflows[wsCurrentId] || []).find(x => x.id === wfId); if (!wf) return;
@@ -1379,6 +1419,7 @@ function renderWsExecutionsTab(ws) {
   if (wsExecDetailId !== null) return renderExecDetail(ws);
 
   const allExecs = wsExecutions[ws.id] || [];
+  const wfNames = [...new Set(allExecs.map(e => e.wfName))].sort();
   let execs = allExecs.filter(e => wsExecShowArchive ? e.archived : !e.archived);
 
   // Filters
@@ -1388,6 +1429,16 @@ function renderWsExecutionsTab(ws) {
     else execs = execs.filter(e => e.status === wsExecStatusFilter);
   }
   if (wsExecTriggerFilter !== 'all') execs = execs.filter(e => e.trigger === wsExecTriggerFilter);
+  if (wsExecWfFilter !== 'all') execs = execs.filter(e => e.wfName === wsExecWfFilter);
+  if (wsExecTimeRange !== 'all') {
+    const now = new Date();
+    let from;
+    if (wsExecTimeRange === '1h') from = new Date(now - 3600000);
+    else if (wsExecTimeRange === '24h') from = new Date(now - 86400000);
+    else if (wsExecTimeRange === '7d') from = new Date(now - 7 * 86400000);
+    else if (wsExecTimeRange === '30d') from = new Date(now - 30 * 86400000);
+    if (from) execs = execs.filter(e => new Date(e.startTime) >= from);
+  }
 
   // Sort: stale first, then by startTime desc
   execs.sort((a, b) => { if (a.stale && !b.stale) return -1; if (!a.stale && b.stale) return 1; return b.startTime.localeCompare(a.startTime); });
@@ -1410,11 +1461,22 @@ function renderWsExecutionsTab(ws) {
         <span class="filter-chip ${wsExecStatusFilter === 'stale' ? 'active' : ''}" onclick="onExecStatusFilter('stale')">异常滞留</span>
       </div>
       <div class="filter-actions">
+        <select class="form-input" style="width:auto;padding:4px 8px;font-size:var(--font-size-sm)" onchange="onExecWfFilter(this.value)">
+          <option value="all" ${wsExecWfFilter === 'all' ? 'selected' : ''}>全部工作流</option>
+          ${wfNames.map(n => `<option value="${n}" ${wsExecWfFilter === n ? 'selected' : ''}>${n}</option>`).join('')}
+        </select>
         <select class="form-input" style="width:auto;padding:4px 8px;font-size:var(--font-size-sm)" onchange="onExecTriggerFilter(this.value)">
           <option value="all" ${wsExecTriggerFilter === 'all' ? 'selected' : ''}>全部触发方式</option>
           <option value="manual" ${wsExecTriggerFilter === 'manual' ? 'selected' : ''}>手动</option>
           <option value="scheduled" ${wsExecTriggerFilter === 'scheduled' ? 'selected' : ''}>定时</option>
           <option value="event" ${wsExecTriggerFilter === 'event' ? 'selected' : ''}>事件触发</option>
+        </select>
+        <select class="form-input" style="width:auto;padding:4px 8px;font-size:var(--font-size-sm)" onchange="onExecTimeRange(this.value)">
+          <option value="all" ${wsExecTimeRange === 'all' ? 'selected' : ''}>全部时间</option>
+          <option value="1h" ${wsExecTimeRange === '1h' ? 'selected' : ''}>最近1小时</option>
+          <option value="24h" ${wsExecTimeRange === '24h' ? 'selected' : ''}>最近24小时</option>
+          <option value="7d" ${wsExecTimeRange === '7d' ? 'selected' : ''}>最近7天</option>
+          <option value="30d" ${wsExecTimeRange === '30d' ? 'selected' : ''}>最近30天</option>
         </select>
         ${!wsExecShowArchive ? `<button class="btn btn-secondary btn-sm" onclick="toggleExecArchive()">${icons.archive}<span>查看归档</span></button>` : ''}
         <span class="item-count">共 <strong>${execs.length}</strong> 条</span>
@@ -1446,7 +1508,9 @@ function renderWsExecutionsTab(ws) {
 function onExecSearch(val) { wsExecSearch = val; render(); }
 function onExecStatusFilter(val) { wsExecStatusFilter = val; render(); }
 function onExecTriggerFilter(val) { wsExecTriggerFilter = val; render(); }
-function toggleExecArchive() { wsExecShowArchive = !wsExecShowArchive; wsExecSearch = ''; wsExecStatusFilter = 'all'; render(); }
+function onExecWfFilter(val) { wsExecWfFilter = val; render(); }
+function onExecTimeRange(val) { wsExecTimeRange = val; render(); }
+function toggleExecArchive() { wsExecShowArchive = !wsExecShowArchive; wsExecSearch = ''; wsExecStatusFilter = 'all'; wsExecTriggerFilter = 'all'; wsExecWfFilter = 'all'; wsExecTimeRange = 'all'; wsExecDetailId = null; render(); }
 function viewExecDetail(execId) { wsExecDetailId = execId; render(); }
 
 function renderExecDetail(ws) {
@@ -1595,16 +1659,19 @@ function showCreateWsModal() {
   setTimeout(() => document.getElementById('wsName')?.focus(), 300);
 }
 function createWorkspace() {
-  const name = document.getElementById('wsName').value.trim(), desc = document.getElementById('wsDesc').value.trim(), code = document.getElementById('wsCode').value.trim();
+  const rawName = document.getElementById('wsName').value, rawCode = document.getElementById('wsCode').value;
+  const name = rawName.trim(), desc = document.getElementById('wsDesc').value.trim(), code = rawCode.trim();
   let hasError = false;
   const ni = document.getElementById('wsName'), ne = document.getElementById('wsNameError'); ni.classList.remove('error'); ne.classList.add('hidden');
   if (!name) { ni.classList.add('error'); ne.textContent = '请输入空间名称'; ne.classList.remove('hidden'); hasError = true; }
-  else if (!/^[\u4e00-\u9fa5a-zA-Z0-9_-]+$/.test(name)) { ni.classList.add('error'); ne.textContent = '仅支持中文、英文、数字、下划线和连字符'; ne.classList.remove('hidden'); hasError = true; }
-  else if (workspaces.some(w => w.name === name)) { ni.classList.add('error'); ne.textContent = '名称已存在'; ne.classList.remove('hidden'); hasError = true; }
+  else if (rawName !== name) { ni.classList.add('error'); ne.textContent = '空间名称不允许以空格开头或结尾'; ne.classList.remove('hidden'); hasError = true; }
+  else if (!/^[\u4e00-\u9fa5a-zA-Z0-9_-]+$/.test(name)) { ni.classList.add('error'); ne.textContent = '空间名称仅支持中文、英文、数字、下划线和连字符'; ne.classList.remove('hidden'); hasError = true; }
+  else if (workspaces.some(w => w.name === name)) { ni.classList.add('error'); ne.textContent = '该空间名称已存在，请使用其他名称'; ne.classList.remove('hidden'); hasError = true; }
   const ci = document.getElementById('wsCode'), ce = document.getElementById('wsCodeError'); ci.classList.remove('error'); ce.classList.add('hidden');
   if (!code) { ci.classList.add('error'); ce.textContent = '请输入空间编号'; ce.classList.remove('hidden'); hasError = true; }
-  else if (!/^[a-zA-Z0-9_-]+$/.test(code)) { ci.classList.add('error'); ce.textContent = '仅支持英文、数字、下划线和连字符'; ce.classList.remove('hidden'); hasError = true; }
-  else if (workspaces.some(w => w.code === code)) { ci.classList.add('error'); ce.textContent = '编号已存在'; ce.classList.remove('hidden'); hasError = true; }
+  else if (rawCode !== code) { ci.classList.add('error'); ce.textContent = '空间编号不允许包含空格'; ce.classList.remove('hidden'); hasError = true; }
+  else if (!/^[a-zA-Z0-9_-]+$/.test(code)) { ci.classList.add('error'); ce.textContent = '空间编号仅支持英文、数字、下划线和连字符'; ce.classList.remove('hidden'); hasError = true; }
+  else if (workspaces.some(w => w.code === code)) { ci.classList.add('error'); ce.textContent = '该空间编号已存在，请使用其他编号'; ce.classList.remove('hidden'); hasError = true; }
   if (hasError) return;
   const now = new Date(), ts = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
   const newWs = { id: wsNextId++, name, desc, code, workflowCount: 0, myRole: 'admin', createdAt: now.toISOString().slice(0, 10), lastActiveAt: ts, runningInstances: 0, members: [{ userId: 101, name: 'Sukey Wu', avatar: 'S', role: 'admin', joinedAt: now.toISOString().slice(0, 10) }] };
@@ -1622,8 +1689,9 @@ function showEditWsModal(id) {
 function updateWorkspace(id) {
   const ws = workspaces.find(w => w.id === id), name = document.getElementById('wsName').value.trim(), desc = document.getElementById('wsDesc').value.trim();
   const ni = document.getElementById('wsName'), ne = document.getElementById('wsNameError'); ni.classList.remove('error'); ne.classList.add('hidden');
-  if (!name) { ni.classList.add('error'); ne.textContent = '请输入名称'; ne.classList.remove('hidden'); return; }
-  if (workspaces.some(w => w.id !== id && w.name === name)) { ni.classList.add('error'); ne.textContent = '名称已存在'; ne.classList.remove('hidden'); return; }
+  if (!name) { ni.classList.add('error'); ne.textContent = '请输入空间名称'; ne.classList.remove('hidden'); return; }
+  if (!/^[\u4e00-\u9fa5a-zA-Z0-9_-]+$/.test(name)) { ni.classList.add('error'); ne.textContent = '空间名称仅支持中文、英文、数字、下划线和连字符'; ne.classList.remove('hidden'); return; }
+  if (workspaces.some(w => w.id !== id && w.name === name)) { ni.classList.add('error'); ne.textContent = '该空间名称已存在，请使用其他名称'; ne.classList.remove('hidden'); return; }
   ws.name = name; ws.desc = desc; closeModal(); showToast('success', '保存成功', '空间已更新'); render();
 }
 function showDeleteWsStep1(id) {
@@ -1686,7 +1754,7 @@ function showRemoveMemberModal(wsId, userId) {
   const member = ws.members.find(m => m.userId === userId); if (!member) return;
   if (member.role === 'admin' && ws.members.filter(m => m.role === 'admin').length <= 1) { showToast('error', '操作失败', '至少保留一名管理员'); return; }
   showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">移除成员</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
-  <p style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant)">确定移除该成员吗？</p>
+  <p style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant)">确定移除该成员吗？移除后该用户将无法访问此空间。</p>
   <div style="margin-top:var(--space-4);display:flex;align-items:center;gap:var(--space-3);padding:var(--space-3);background:var(--md-surface);border-radius:var(--radius-lg)"><div class="member-avatar avatar-${member.role}">${member.avatar}</div><div><div style="font-size:var(--font-size-sm);font-weight:500">${member.name}</div></div></div>
   </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-danger" onclick="removeMember(${wsId}, ${userId})">确认移除</button></div></div>`);
 }
@@ -1706,7 +1774,7 @@ function showTransferAdminModal(wsId) {
 function filterTransferPicker(val) { document.querySelectorAll('#transferPickerList .people-picker-item').forEach(item => { item.style.display = item.getAttribute('data-name').toLowerCase().includes(val.toLowerCase()) ? 'flex' : 'none'; }); }
 function confirmTransferAdmin(wsId, targetUserId, targetName) {
   closeModal(); setTimeout(() => {
-    showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">转让管理员</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body"><p style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant)">确定将管理员权限转让给 <strong>${targetName}</strong> 吗？</p></div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="executeTransferAdmin(${wsId}, ${targetUserId})">确认转让</button></div></div>`);
+    showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">转让管理员</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body"><p style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant)">确定将管理员权限转让给 <strong>${targetName}</strong> 吗？转让后您的角色将变更为成员。</p></div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="executeTransferAdmin(${wsId}, ${targetUserId})">确认转让</button></div></div>`);
   }, 250);
 }
 function executeTransferAdmin(wsId, targetUserId) {
