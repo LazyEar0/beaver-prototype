@@ -47,6 +47,9 @@ const icons = {
   settings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>',
   disable: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m4.93 4.93 14.14 14.14"/></svg>',
   redo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5A5.5 5.5 0 0 0 4 14.5v0A5.5 5.5 0 0 0 9.5 20H13"/></svg>',
+  filter: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>',
+  chevronDown: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>',
+  chevronUp: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m18 15-6-6-6 6"/></svg>',
 };
 
 // ============================================
@@ -87,7 +90,7 @@ const spaceColors = ['bg-blue', 'bg-green', 'bg-purple', 'bg-orange', 'bg-pink',
 let currentView = 'list';
 let currentDsId = null;
 let currentTab = 'items';
-let listState = { search: '', authFilter: 'all', refFilter: 'all', creatorFilter: 'all', dateFrom: '', dateTo: '', page: 1, pageSize: 10 };
+let listState = { search: '', authFilter: 'all', refFilter: 'all', creatorFilter: [], dateFrom: '', dateTo: '', page: 1, pageSize: 10, filterPanelOpen: true, creatorDropdownOpen: false, creatorSearch: '' };
 let searchTimer = null;
 let itemSortField = null;
 let itemSortAsc = true;
@@ -324,24 +327,59 @@ function renderDsListPage() {
   const paged = filtered.slice(start, start + listState.pageSize);
   const totalPages = Math.ceil(total / listState.pageSize);
   const creators = [...new Set(dataSources.map(d => d.creator))];
-  const hasFilters = listState.search || listState.authFilter !== 'all' || listState.refFilter !== 'all' || listState.creatorFilter !== 'all' || listState.dateFrom || listState.dateTo;
+  const hasFilters = listState.search || listState.authFilter !== 'all' || listState.refFilter !== 'all' || listState.creatorFilter.length > 0 || listState.dateFrom || listState.dateTo;
+  const activeFilterCount = (listState.authFilter !== 'all' ? 1 : 0) + (listState.refFilter !== 'all' ? 1 : 0) + (listState.creatorFilter.length > 0 ? 1 : 0) + (listState.dateFrom || listState.dateTo ? 1 : 0);
+
+  // Build active filter tags (shown inline in toolbar when panel collapsed)
+  let filterTagsHtml = '';
+  if (hasFilters && !listState.filterPanelOpen) {
+    const tags = [];
+    if (listState.authFilter !== 'all') tags.push(`<span class="filter-tag">授权：${listState.authFilter === 'public' ? '公开' : '指定空间'}<button class="filter-tag-close" onclick="event.stopPropagation();removeFilterTag('auth')">×</button></span>`);
+    if (listState.refFilter !== 'all') tags.push(`<span class="filter-tag">引用：${listState.refFilter === 'referenced' ? '已引用' : '未引用'}<button class="filter-tag-close" onclick="event.stopPropagation();removeFilterTag('ref')">×</button></span>`);
+    if (listState.creatorFilter.length > 0) tags.push(`<span class="filter-tag">创建人：${listState.creatorFilter.join(', ')}<button class="filter-tag-close" onclick="event.stopPropagation();removeFilterTag('creator')">×</button></span>`);
+    if (listState.dateFrom || listState.dateTo) tags.push(`<span class="filter-tag">时间：${listState.dateFrom || '...'} ~ ${listState.dateTo || '...'}<button class="filter-tag-close" onclick="event.stopPropagation();removeFilterTag('date')">×</button></span>`);
+    if (tags.length) filterTagsHtml = `<div class="filter-tags">${tags.join('')}</div>`;
+  }
+
+  // Build creator dropdown trigger text
+  const creatorTriggerHtml = listState.creatorFilter.length === 0
+    ? '<span style="color:var(--md-on-surface-variant)">全部</span>'
+    : listState.creatorFilter.length <= 2
+      ? `<span class="creator-mini-tags">${listState.creatorFilter.map(c => `<span class="creator-mini-tag">${c}</span>`).join('')}</span>`
+      : `<span class="creator-mini-tags"><span class="creator-mini-tag">${listState.creatorFilter[0]}</span><span class="creator-mini-tag-more">+${listState.creatorFilter.length - 1}</span></span>`;
+
+  // Build creator dropdown panel
+  const filteredCreators = listState.creatorSearch ? creators.filter(c => c.toLowerCase().includes(listState.creatorSearch.toLowerCase())) : creators;
+  const creatorPanelHtml = listState.creatorDropdownOpen ? `<div class="creator-dropdown-panel" onclick="event.stopPropagation()">
+    <div class="creator-dropdown-search">${icons.search}<input type="text" placeholder="搜索创建人..." value="${listState.creatorSearch}" oninput="onCreatorSearch(this.value)" autofocus /></div>
+    <div class="creator-dropdown-list">${filteredCreators.length === 0 ? '<div class="creator-dropdown-empty">无匹配结果</div>' : filteredCreators.map(c => {
+      const sel = listState.creatorFilter.includes(c);
+      return `<div class="creator-dropdown-item ${sel ? 'selected' : ''}" onclick="toggleCreatorSelection('${c}')"><span class="creator-avatar-sm">${c.charAt(0)}</span><span>${c}</span><span class="check-icon">${icons.check}</span></div>`;
+    }).join('')}</div></div>` : '';
+
   return `
     <div class="page-header"><div class="page-title-section"><h1 class="page-title shiny-text">数据源管理</h1><p class="page-subtitle">管理和维护系统数据字典及配置数据</p></div><button class="btn btn-primary magnet-btn" onclick="showCreateDsModal()">${icons.plus}<span>新建数据源</span></button></div>
-    <div class="filter-bar">
-      <div class="filter-search">${icons.search}<input type="text" id="dsSearchInput" placeholder="搜索数据源名称..." value="${listState.search}" oninput="onSearchInput(this.value)" /></div>
-      <div class="filter-group"><span class="filter-label">授权：</span><div class="filter-chips">
-        <span class="filter-chip ${listState.authFilter === 'all' ? 'active' : ''}" onclick="onFilterAuth('all')">全部</span>
-        <span class="filter-chip ${listState.authFilter === 'public' ? 'active' : ''}" onclick="onFilterAuth('public')">公开</span>
-        <span class="filter-chip ${listState.authFilter === 'private' ? 'active' : ''}" onclick="onFilterAuth('private')">指定空间</span>
-      </div></div>
-      <div class="filter-group"><span class="filter-label">引用：</span><div class="filter-chips">
-        <span class="filter-chip ${listState.refFilter === 'all' ? 'active' : ''}" onclick="onFilterRef('all')">全部</span>
-        <span class="filter-chip ${listState.refFilter === 'referenced' ? 'active' : ''}" onclick="onFilterRef('referenced')">已引用</span>
-        <span class="filter-chip ${listState.refFilter === 'unreferenced' ? 'active' : ''}" onclick="onFilterRef('unreferenced')">未引用</span>
-      </div></div>
-      <div class="filter-group"><span class="filter-label">创建人：</span><select class="filter-select-sm" onchange="onFilterCreator(this.value)"><option value="all" ${listState.creatorFilter === 'all' ? 'selected' : ''}>全部</option>${creators.map(c => `<option value="${c}" ${listState.creatorFilter === c ? 'selected' : ''}>${c}</option>`).join('')}</select></div>
-      <div class="filter-group"><span class="filter-label">创建时间：</span><div class="filter-date-range"><input type="date" value="${listState.dateFrom}" onchange="onFilterDateFrom(this.value)" /><span class="date-sep">~</span><input type="date" value="${listState.dateTo}" onchange="onFilterDateTo(this.value)" /></div></div>
-      ${hasFilters ? `<button class="filter-reset-btn" onclick="clearAllFilters()">${icons.close}<span>清除筛选</span></button>` : ''}
+    <div class="filter-container">
+      <div class="filter-toolbar">
+        <div class="filter-search">${icons.search}<input type="text" id="dsSearchInput" placeholder="搜索数据源名称..." value="${listState.search}" oninput="onSearchInput(this.value)" /></div>
+        <button class="filter-toggle-btn ${listState.filterPanelOpen ? 'active' : ''}" onclick="toggleFilterPanel()">${icons.filter}<span>筛选</span>${activeFilterCount > 0 ? `<span class="filter-badge">${activeFilterCount}</span>` : ''}</button>
+        ${filterTagsHtml}
+        ${hasFilters ? `<button class="filter-reset-btn" onclick="clearAllFilters()" style="margin-left:auto">${icons.close}<span>清除</span></button>` : ''}
+      </div>
+      <div class="filter-panel ${listState.filterPanelOpen ? '' : 'collapsed'}">
+        <div class="filter-group"><span class="filter-label">授权方式</span><div class="filter-chips">
+          <span class="filter-chip ${listState.authFilter === 'all' ? 'active' : ''}" onclick="onFilterAuth('all')">全部</span>
+          <span class="filter-chip ${listState.authFilter === 'public' ? 'active' : ''}" onclick="onFilterAuth('public')">公开</span>
+          <span class="filter-chip ${listState.authFilter === 'private' ? 'active' : ''}" onclick="onFilterAuth('private')">指定空间</span>
+        </div></div>
+        <div class="filter-group"><span class="filter-label">引用状态</span><div class="filter-chips">
+          <span class="filter-chip ${listState.refFilter === 'all' ? 'active' : ''}" onclick="onFilterRef('all')">全部</span>
+          <span class="filter-chip ${listState.refFilter === 'referenced' ? 'active' : ''}" onclick="onFilterRef('referenced')">已引用</span>
+          <span class="filter-chip ${listState.refFilter === 'unreferenced' ? 'active' : ''}" onclick="onFilterRef('unreferenced')">未引用</span>
+        </div></div>
+        <div class="filter-group"><span class="filter-label">创建人</span><div class="creator-dropdown"><div class="creator-dropdown-trigger ${listState.creatorDropdownOpen ? 'open' : ''}" onclick="event.stopPropagation();toggleCreatorDropdown()">${creatorTriggerHtml}</div>${creatorPanelHtml}</div></div>
+        <div class="filter-group"><span class="filter-label">创建时间</span><div class="filter-date-range"><input type="date" value="${listState.dateFrom}" onchange="onFilterDateFrom(this.value)" /><span class="date-sep">~</span><input type="date" value="${listState.dateTo}" onchange="onFilterDateTo(this.value)" /></div></div>
+      </div>
     </div>
     ${total === 0 ? (hasFilters ? renderEmptyState('dsSearchEmpty') : renderEmptyState('datasource')) : `
     <div class="table-wrapper"><table class="data-table"><thead><tr><th>名称</th><th style="width:100px">授权方式</th><th style="width:80px">数据项</th><th style="width:90px">被引用</th><th style="width:100px">创建者</th><th style="width:110px">创建时间</th><th style="width:90px">操作</th></tr></thead><tbody>
@@ -356,7 +394,7 @@ function getFilteredDataSources() {
     if (listState.authFilter === 'private' && ds.isPublic) return false;
     if (listState.refFilter === 'referenced' && !ds.referenced) return false;
     if (listState.refFilter === 'unreferenced' && ds.referenced) return false;
-    if (listState.creatorFilter !== 'all' && ds.creator !== listState.creatorFilter) return false;
+    if (listState.creatorFilter.length > 0 && !listState.creatorFilter.includes(ds.creator)) return false;
     if (listState.dateFrom && ds.createdAt < listState.dateFrom) return false;
     if (listState.dateTo && ds.createdAt > listState.dateTo) return false;
     return true;
@@ -366,10 +404,20 @@ function onSearchInput(val) { listState.search = val; clearTimeout(searchTimer);
 function onFilterAuth(val) { listState.authFilter = val; listState.page = 1; render(); }
 function goToPage(p) { listState.page = p; render(); }
 function onFilterRef(val) { listState.refFilter = val; listState.page = 1; render(); }
-function onFilterCreator(val) { listState.creatorFilter = val; listState.page = 1; render(); }
 function onFilterDateFrom(val) { listState.dateFrom = val; listState.page = 1; render(); }
 function onFilterDateTo(val) { listState.dateTo = val; listState.page = 1; render(); }
-function clearAllFilters() { listState.search = ''; listState.authFilter = 'all'; listState.refFilter = 'all'; listState.creatorFilter = 'all'; listState.dateFrom = ''; listState.dateTo = ''; listState.page = 1; render(); }
+function toggleFilterPanel() { listState.filterPanelOpen = !listState.filterPanelOpen; render(); }
+function toggleCreatorDropdown() { listState.creatorDropdownOpen = !listState.creatorDropdownOpen; listState.creatorSearch = ''; render(); }
+function toggleCreatorSelection(name) { const idx = listState.creatorFilter.indexOf(name); if (idx > -1) listState.creatorFilter.splice(idx, 1); else listState.creatorFilter.push(name); listState.page = 1; render(); }
+function onCreatorSearch(val) { listState.creatorSearch = val; render(); }
+function removeFilterTag(type) {
+  if (type === 'auth') listState.authFilter = 'all';
+  else if (type === 'ref') listState.refFilter = 'all';
+  else if (type === 'creator') listState.creatorFilter = [];
+  else if (type === 'date') { listState.dateFrom = ''; listState.dateTo = ''; }
+  listState.page = 1; render();
+}
+function clearAllFilters() { listState.search = ''; listState.authFilter = 'all'; listState.refFilter = 'all'; listState.creatorFilter = []; listState.dateFrom = ''; listState.dateTo = ''; listState.page = 1; render(); }
 function onDsPageSizeChange(val) { listState.pageSize = parseInt(val); listState.page = 1; render(); }
 function validateKeyRealtime(input) {
   const val = input.value, ke = document.getElementById('keyError');
@@ -514,7 +562,7 @@ function createDataSource() {
   if (dataSources.some(d => d.name === name)) { ni.classList.add('error'); ne.textContent = '该名称已存在'; ne.classList.remove('hidden'); return; }
   dataSources.push({ id: nextId++, name, desc, createdAt: new Date().toISOString().slice(0, 10), creator: 'Sukey Wu', isPublic, referenced: false, referenceCount: 0, items: [], authorizedSpaces: [], syncConfig: { url: '', keyField: '', valueField: '' }, syncLogs: [] });
   const newId = nextId - 1;
-  listState.search = ''; listState.authFilter = 'all'; listState.refFilter = 'all'; listState.creatorFilter = 'all'; listState.dateFrom = ''; listState.dateTo = '';
+  listState.search = ''; listState.authFilter = 'all'; listState.refFilter = 'all'; listState.creatorFilter = []; listState.dateFrom = ''; listState.dateTo = '';
   closeModal(); showToast('success', '创建成功', `数据源「${name}」已创建`);
   currentView = 'detail'; currentDsId = newId; currentTab = 'items'; render();
 }
@@ -659,10 +707,68 @@ function showAddSpaceModal(dsId) {
   const ds = dataSources.find(d => d.id === dsId); if (!ds) return;
   const available = allSpaces.filter(s => !ds.authorizedSpaces.includes(s));
   if (available.length === 0) { showToast('info', '提示', '所有空间均已授权'); return; }
-  showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">添加授权空间</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
-  <div style="margin-bottom:var(--space-3)"><div class="filter-search" style="width:100%">${icons.search}<input type="text" id="spaceSearchInput" placeholder="搜索空间名称..." oninput="filterSpaceList(${dsId})" /></div></div>
-  <div style="max-height:320px;overflow-y:auto"><div class="auth-space-list" id="spaceListContainer">${available.map(space => `<div class="clickable-list-item" data-space-name="${space}" onclick="addSpace(${dsId}, '${space}')"><div class="auth-space-info"><div class="auth-space-icon ${spaceColors[allSpaces.indexOf(space) % spaceColors.length]}">${space.charAt(0)}</div><div><div class="auth-space-name">${space}</div></div></div>${icons.plus}</div>`).join('')}</div></div>
-  </div></div>`);
+  // Group spaces into categories for org-tree style
+  const categories = [
+    { name: '研发部门', icon: '研', color: '#4F46E5', spaces: available.filter((_, i) => i % 3 === 0) },
+    { name: '产品运营', icon: '产', color: '#059669', spaces: available.filter((_, i) => i % 3 === 1) },
+    { name: '其他团队', icon: '他', color: '#D97706', spaces: available.filter((_, i) => i % 3 === 2) },
+  ].filter(c => c.spaces.length > 0);
+  let pendingSpaces = [];
+  const renderPickerContent = () => {
+    const searchVal = document.getElementById('pickerSearchInput')?.value?.toLowerCase() || '';
+    // Left panel
+    let leftHtml = categories.map(cat => {
+      const filtered = searchVal ? cat.spaces.filter(s => s.toLowerCase().includes(searchVal)) : cat.spaces;
+      if (filtered.length === 0) return '';
+      const allSelected = filtered.every(s => pendingSpaces.includes(s));
+      return `<div class="people-picker-dept" onclick="togglePickerCategory('${cat.name}')">
+        <div class="people-picker-dept-checkbox ${allSelected ? 'checked' : ''}">${allSelected ? icons.check : ''}</div>
+        <div class="people-picker-dept-icon" style="background:${cat.color}">${cat.icon}</div>
+        <div class="people-picker-dept-info"><div class="people-picker-dept-name">${cat.name}</div><div class="people-picker-dept-count">${filtered.length} 个空间</div></div>
+        <span class="people-picker-dept-arrow">${icons.chevronRight}</span>
+      </div>
+      ${filtered.map(s => {
+        const sel = pendingSpaces.includes(s);
+        const idx = allSpaces.indexOf(s);
+        return `<div class="people-picker-dept" style="padding-left:var(--space-8)" onclick="togglePickerSpace('${s}')">
+          <div class="people-picker-dept-checkbox ${sel ? 'checked' : ''}">${sel ? icons.check : ''}</div>
+          <div class="people-picker-dept-icon" style="background:var(--md-primary);width:28px;height:28px;font-size:11px">${s.charAt(0)}</div>
+          <div class="people-picker-dept-info"><div class="people-picker-dept-name" style="font-weight:400">${s}</div></div>
+        </div>`;
+      }).join('')}`;
+    }).join('');
+    // Right panel
+    const rightHtml = pendingSpaces.length === 0
+      ? '<div class="creator-dropdown-empty" style="padding:var(--space-8)">点击左侧选择要授权的空间</div>'
+      : pendingSpaces.map(s => `<div class="people-picker-selected-item">
+          <div class="people-picker-dept-icon" style="background:var(--md-primary);width:28px;height:28px;font-size:11px">${s.charAt(0)}</div>
+          <span class="name">${s}</span>
+          <button class="remove-btn" onclick="removePickerSpace('${s}')">×</button>
+        </div>`).join('');
+    document.getElementById('pickerLeft').innerHTML = leftHtml;
+    document.getElementById('pickerRight').innerHTML = rightHtml;
+    document.getElementById('pickerCount').textContent = `已选：${pendingSpaces.length} 个空间`;
+  };
+  // Expose functions to window
+  window.renderPickerContent = renderPickerContent;
+  window.togglePickerSpace = (s) => { const i = pendingSpaces.indexOf(s); if (i > -1) pendingSpaces.splice(i, 1); else pendingSpaces.push(s); renderPickerContent(); };
+  window.removePickerSpace = (s) => { pendingSpaces = pendingSpaces.filter(x => x !== s); renderPickerContent(); };
+  window.togglePickerCategory = (catName) => { const cat = categories.find(c => c.name === catName); if (!cat) return; const allSel = cat.spaces.every(s => pendingSpaces.includes(s)); if (allSel) { pendingSpaces = pendingSpaces.filter(s => !cat.spaces.includes(s)); } else { cat.spaces.forEach(s => { if (!pendingSpaces.includes(s)) pendingSpaces.push(s); }); } renderPickerContent(); };
+  window.confirmPickerSpaces = () => { if (pendingSpaces.length === 0) return; pendingSpaces.forEach(s => ds.authorizedSpaces.push(s)); closeModal(); showToast('success', '授权成功', `已授权 ${pendingSpaces.length} 个空间`); render(); };
+
+  showModal(`<div class="modal" style="max-width:640px"><div class="modal-header"><h2 class="modal-title">添加授权空间</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body" style="padding:0">
+  <div class="people-picker">
+    <div class="people-picker-left">
+      <div class="people-picker-search"><input type="text" id="pickerSearchInput" placeholder="搜索空间名称..." oninput="if(window.renderPickerContent)renderPickerContent()" /></div>
+      <div class="people-picker-tree" id="pickerLeft"></div>
+    </div>
+    <div class="people-picker-right">
+      <div class="people-picker-selected-header"><span id="pickerCount">已选：0 个空间</span><button class="clear-link" onclick="pendingSpaces=[];renderPickerContent();" style="display:none">清空</button></div>
+      <div class="people-picker-selected-list" id="pickerRight"></div>
+    </div>
+  </div>
+  </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="confirmPickerSpaces()">确认授权</button></div></div>`);
+  setTimeout(() => renderPickerContent(), 100);
 }
 function filterSpaceList(dsId) {
   const keyword = document.getElementById('spaceSearchInput').value.trim().toLowerCase();
@@ -1811,6 +1917,20 @@ render = function() {
     if (currentModule === 'datasource' && currentView === 'list') {
       const si = document.getElementById('dsSearchInput');
       if (si && listState.search) { si.focus(); si.setSelectionRange(si.value.length, si.value.length); }
+      // Focus creator search if dropdown is open
+      if (listState.creatorDropdownOpen) {
+        const cs = document.querySelector('.creator-dropdown-search input');
+        if (cs) { cs.focus(); if (listState.creatorSearch) cs.setSelectionRange(cs.value.length, cs.value.length); }
+      }
     }
   });
 };
+
+// --- 11. Close creator dropdown on outside click ---
+document.addEventListener('click', (e) => {
+  if (listState.creatorDropdownOpen && !e.target.closest('.creator-dropdown')) {
+    listState.creatorDropdownOpen = false;
+    listState.creatorSearch = '';
+    render();
+  }
+});
