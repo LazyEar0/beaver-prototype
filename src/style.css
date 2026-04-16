@@ -2320,6 +2320,46 @@ img { display: block; max-width: 100%; }
   background: var(--md-secondary-container);
   color: var(--md-on-secondary-container);
   border-color: transparent;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Star-border on active filter chips */
+.filter-chip.active::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: conic-gradient(
+    from var(--star-angle, 0deg),
+    transparent 0%,
+    var(--md-primary) 10%,
+    transparent 20%,
+    transparent 80%,
+    var(--md-primary) 90%,
+    transparent 100%
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: starBorderRotate 4s linear infinite;
+  opacity: 1;
+}
+
+/* Tab indicator shimmer for active tabs */
+.tab-item.active::after,
+.ws-tab-btn.active::after {
+  background: linear-gradient(90deg, var(--md-primary) 0%, var(--md-primary-container) 50%, var(--md-primary) 100%);
+  background-size: 200% 100%;
+  animation: tabIndicatorShimmer 2.5s ease-in-out infinite;
+}
+
+@keyframes tabIndicatorShimmer {
+  0% { background-position: 0% 0; }
+  50% { background-position: 100% 0; }
+  100% { background-position: 0% 0; }
 }
 
 /* --- Sort Dropdown --- */
@@ -3295,4 +3335,259 @@ img { display: block; max-width: 100%; }
   padding: 2px 6px;
   border-radius: var(--radius-xs);
   color: var(--md-on-surface);
+}
+
+/* ============================================
+   Vue-Bits Inspired Interaction Effects
+   (Pure CSS/vanilla JS implementations)
+   ============================================ */
+
+/* --- 1. Fade Content (page/tab transitions) --- */
+.fade-in {
+  animation: fadeInUp 0.4s cubic-bezier(0.2, 0, 0, 1) both;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    filter: blur(4px);
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateY(0);
+  }
+}
+
+/* Staggered children animation */
+.fade-in-stagger > * {
+  animation: fadeInUp 0.35s cubic-bezier(0.2, 0, 0, 1) both;
+}
+.fade-in-stagger > *:nth-child(1) { animation-delay: 0ms; }
+.fade-in-stagger > *:nth-child(2) { animation-delay: 50ms; }
+.fade-in-stagger > *:nth-child(3) { animation-delay: 100ms; }
+.fade-in-stagger > *:nth-child(4) { animation-delay: 150ms; }
+.fade-in-stagger > *:nth-child(5) { animation-delay: 200ms; }
+.fade-in-stagger > *:nth-child(6) { animation-delay: 250ms; }
+
+/* --- 2. Shiny Text (page titles) --- */
+.shiny-text {
+  background: linear-gradient(
+    120deg,
+    var(--md-on-surface) 40%,
+    var(--md-primary) 50%,
+    var(--md-on-surface) 60%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shinyTextSweep 3s ease-in-out infinite;
+}
+
+@keyframes shinyTextSweep {
+  0%, 100% { background-position: 200% center; }
+  50% { background-position: -200% center; }
+}
+
+/* --- 3. Blur Text (title entrance) --- */
+.blur-text-char {
+  display: inline-block;
+  opacity: 0;
+  filter: blur(8px);
+  transform: translateY(8px);
+  animation: blurTextReveal 0.5s cubic-bezier(0.2, 0, 0, 1) forwards;
+}
+
+@keyframes blurTextReveal {
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateY(0);
+  }
+}
+
+/* --- 4. Spotlight Card (mouse-following highlight) --- */
+.spotlight-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.spotlight-card::before {
+  content: '';
+  position: absolute;
+  top: var(--spotlight-y, -100px);
+  left: var(--spotlight-x, -100px);
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(
+    circle,
+    rgba(103, 80, 164, 0.12) 0%,
+    rgba(103, 80, 164, 0.04) 40%,
+    transparent 70%
+  );
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: 0;
+}
+
+.spotlight-card:hover::before {
+  opacity: 1;
+}
+
+.spotlight-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* --- 5. Click Spark (button click particles) --- */
+.click-spark-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 9999;
+  overflow: hidden;
+}
+
+.click-spark {
+  position: absolute;
+  width: 2px;
+  height: 10px;
+  border-radius: 1px;
+  background: var(--md-primary);
+  transform-origin: center bottom;
+  animation: sparkBurst 0.6s cubic-bezier(0.2, 0, 0, 1) forwards;
+}
+
+@keyframes sparkBurst {
+  0% {
+    opacity: 1;
+    transform: var(--spark-rotation) translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: var(--spark-rotation) translateY(calc(var(--spark-distance, -30px))) scale(0.3);
+  }
+}
+
+/* --- 6. Star Border (rotating gradient border) --- */
+.star-border {
+  position: relative;
+  overflow: hidden;
+}
+
+.star-border::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 2px;
+  background: conic-gradient(
+    from var(--star-angle, 0deg),
+    transparent 0%,
+    var(--md-primary) 10%,
+    transparent 20%,
+    transparent 80%,
+    var(--md-primary) 90%,
+    transparent 100%
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: starBorderRotate 4s linear infinite;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.star-border:hover::before,
+.star-border.active::before {
+  opacity: 1;
+}
+
+@keyframes starBorderRotate {
+  to { --star-angle: 360deg; }
+}
+
+@property --star-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+/* --- 7. Glare Hover (light sweep on hover) --- */
+.glare-hover {
+  position: relative;
+  overflow: hidden;
+}
+
+.glare-hover::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(
+    115deg,
+    transparent 40%,
+    rgba(103, 80, 164, 0.06) 45%,
+    rgba(103, 80, 164, 0.12) 50%,
+    rgba(103, 80, 164, 0.06) 55%,
+    transparent 60%
+  );
+  transform: translateX(-100%);
+  transition: transform 0.6s ease;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.glare-hover:hover::after {
+  transform: translateX(100%);
+}
+
+.glare-hover > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* --- 8. Magnet Button (subtle attraction) --- */
+.magnet-btn {
+  transition: transform 0.2s cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* --- 9. Count Up (animated numbers) --- */
+.count-up {
+  display: inline-block;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- 10. Stepper Animation (enhanced step indicator) --- */
+.delete-step {
+  transition: all 0.3s cubic-bezier(0.2, 0, 0, 1);
+}
+
+.delete-step-num {
+  transition: all 0.3s cubic-bezier(0.2, 0, 0, 1);
+}
+
+.delete-step.active .delete-step-num {
+  animation: stepPulse 0.5s cubic-bezier(0.2, 0, 0, 1);
+}
+
+@keyframes stepPulse {
+  0% { transform: scale(0.8); }
+  50% { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+
+.delete-step-line {
+  transition: background 0.3s ease 0.1s, width 0.3s ease;
 }

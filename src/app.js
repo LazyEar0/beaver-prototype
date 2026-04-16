@@ -303,7 +303,7 @@ function renderDsListPage() {
   const paged = filtered.slice(start, start + listState.pageSize);
   const totalPages = Math.ceil(total / listState.pageSize);
   return `
-    <div class="page-header"><div class="page-title-section"><h1 class="page-title">数据源管理</h1><p class="page-subtitle">管理和维护系统数据字典及配置数据</p></div><button class="btn btn-primary" onclick="showCreateDsModal()">${icons.plus}<span>新建数据源</span></button></div>
+    <div class="page-header"><div class="page-title-section"><h1 class="page-title shiny-text">数据源管理</h1><p class="page-subtitle">管理和维护系统数据字典及配置数据</p></div><button class="btn btn-primary magnet-btn" onclick="showCreateDsModal()">${icons.plus}<span>新建数据源</span></button></div>
     <div class="filter-bar">
       <div class="filter-search">${icons.search}<input type="text" placeholder="搜索数据源名称..." value="${listState.search}" oninput="onSearchInput(this.value)" /></div>
       <div class="filter-chips">
@@ -681,7 +681,7 @@ function wsNavigateTo(view, wsId) {
 function renderWsListPage() {
   const filtered = getFilteredWorkspaces(); const total = filtered.length;
   return `
-    <div class="page-header"><div class="page-title-section"><h1 class="page-title">空间管理</h1><p class="page-subtitle">管理工作空间，组织和协作工作流</p></div><button class="btn btn-primary" onclick="showCreateWsModal()">${icons.plus}<span>创建空间</span></button></div>
+    <div class="page-header"><div class="page-title-section"><h1 class="page-title shiny-text">空间管理</h1><p class="page-subtitle">管理工作空间，组织和协作工作流</p></div><button class="btn btn-primary magnet-btn" onclick="showCreateWsModal()">${icons.plus}<span>创建空间</span></button></div>
     <div class="filter-bar">
       <div class="filter-search">${icons.search}<input type="text" placeholder="搜索空间名称或编号..." value="${wsListState.search}" oninput="onWsSearchInput(this.value)" /></div>
       <div class="filter-chips">
@@ -693,11 +693,11 @@ function renderWsListPage() {
       <div class="filter-actions"><div class="sort-dropdown"><select onchange="onWsSortChange(this.value)"><option value="lastActiveAt" ${wsListState.sortField === 'lastActiveAt' ? 'selected' : ''}>最近活跃</option><option value="createdAt" ${wsListState.sortField === 'createdAt' ? 'selected' : ''}>创建时间</option></select><button class="sort-toggle-btn" onclick="toggleWsSortOrder()">${wsListState.sortAsc ? icons.arrowUp : icons.arrowDown}</button></div><span class="item-count">共 <strong>${total}</strong> 个空间</span></div>
     </div>
     ${total === 0 ? (wsListState.search || wsListState.roleFilter !== 'all' ? `<div class="ws-empty-state">${renderEmptyState('wsSearchEmpty')}</div>` : renderEmptyState('workspace')) : `
-    <div class="workspace-grid">${filtered.map(ws => {
+    <div class="workspace-grid fade-in-stagger">${filtered.map(ws => {
       const cc = wsCardColors[ws.id % wsCardColors.length];
       const rl = { admin: '管理员', member: '成员', viewer: '只读查看者' };
       const rc = { admin: 'role-badge-admin', member: 'role-badge-member', viewer: 'role-badge-viewer' };
-      return `<div class="workspace-card" onclick="wsNavigateTo('detail', ${ws.id})"><div class="workspace-card-header"><div class="workspace-card-icon" style="background:${cc.bg};color:${cc.color}">${ws.name.charAt(0)}</div><div class="workspace-card-title-group"><div class="workspace-card-name">${ws.name}</div><span class="workspace-card-code">${icons.hash} ${ws.code}</span></div><div class="workspace-card-actions" onclick="event.stopPropagation()">${ws.myRole === 'admin' ? `<button class="table-action-btn" title="编辑" onclick="showEditWsModal(${ws.id})">${icons.edit}</button><button class="table-action-btn danger" title="删除" onclick="showDeleteWsStep1(${ws.id})">${icons.trash}</button>` : ''}</div></div><div class="workspace-card-desc" title="${ws.desc}">${ws.desc || '暂无描述'}</div><div class="workspace-card-stats"><span class="ws-stat-item">${icons.users} <span class="ws-stat-value">${ws.members.length}</span> 成员</span><span class="ws-stat-item">${icons.workflow} <span class="ws-stat-value">${ws.workflowCount}</span> 工作流</span>${ws.runningInstances > 0 ? `<span class="ws-stat-item" style="color:var(--md-success)">${icons.sync} <span class="ws-stat-value">${ws.runningInstances}</span> 运行中</span>` : ''}</div><div class="workspace-card-footer"><span class="role-badge ${rc[ws.myRole]}">${icons.shield} ${rl[ws.myRole]}</span><span class="workspace-card-time">${icons.clock} ${ws.lastActiveAt}</span></div></div>`;
+      return `<div class="workspace-card spotlight-card glare-hover" onclick="wsNavigateTo('detail', ${ws.id})"><div class="workspace-card-header"><div class="workspace-card-icon" style="background:${cc.bg};color:${cc.color}">${ws.name.charAt(0)}</div><div class="workspace-card-title-group"><div class="workspace-card-name">${ws.name}</div><span class="workspace-card-code">${icons.hash} ${ws.code}</span></div><div class="workspace-card-actions" onclick="event.stopPropagation()">${ws.myRole === 'admin' ? `<button class="table-action-btn" title="编辑" onclick="showEditWsModal(${ws.id})">${icons.edit}</button><button class="table-action-btn danger" title="删除" onclick="showDeleteWsStep1(${ws.id})">${icons.trash}</button>` : ''}</div></div><div class="workspace-card-desc" title="${ws.desc}">${ws.desc || '暂无描述'}</div><div class="workspace-card-stats"><span class="ws-stat-item">${icons.users} <span class="ws-stat-value" data-count-up="${ws.members.length}">${ws.members.length}</span> 成员</span><span class="ws-stat-item">${icons.workflow} <span class="ws-stat-value" data-count-up="${ws.workflowCount}">${ws.workflowCount}</span> 工作流</span>${ws.runningInstances > 0 ? `<span class="ws-stat-item" style="color:var(--md-success)">${icons.sync} <span class="ws-stat-value" data-count-up="${ws.runningInstances}">${ws.runningInstances}</span> 运行中</span>` : ''}</div><div class="workspace-card-footer"><span class="role-badge ${rc[ws.myRole]}">${icons.shield} ${rl[ws.myRole]}</span><span class="workspace-card-time">${icons.clock} ${ws.lastActiveAt}</span></div></div>`;
     }).join('')}</div>`}`;
 }
 function getFilteredWorkspaces() {
@@ -1557,4 +1557,170 @@ function showToast(type, title, message) {
 function removeToast(id) { const toast = document.getElementById(id); if (toast) { toast.classList.add('removing'); setTimeout(() => toast.remove(), 200); } }
 
 // --- Init ---
-document.addEventListener('DOMContentLoaded', () => { render(); });
+document.addEventListener('DOMContentLoaded', () => { render(); initInteractionEffects(); });
+
+// ============================================
+//   VUE-BITS INSPIRED INTERACTION EFFECTS
+//   (Pure vanilla JS implementations)
+// ============================================
+
+function initInteractionEffects() {
+  initClickSpark();
+  initMagnetButtons();
+}
+
+// --- 1. Count Up Animation ---
+function animateCountUp(el, target, duration) {
+  if (!el || isNaN(target)) return;
+  const start = 0;
+  const startTime = performance.now();
+  duration = duration || 800;
+
+  function easeOutExpo(t) {
+    return t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
+  }
+
+  function update(currentTime) {
+    const elapsed = currentTime - startTime;
+    const progress = Math.min(elapsed / duration, 1);
+    const easedProgress = easeOutExpo(progress);
+    const currentValue = Math.round(start + (target - start) * easedProgress);
+    el.textContent = currentValue;
+    if (progress < 1) requestAnimationFrame(update);
+  }
+  requestAnimationFrame(update);
+}
+
+function triggerCountUpAnimations() {
+  document.querySelectorAll('[data-count-up]').forEach((el, idx) => {
+    const target = parseInt(el.getAttribute('data-count-up'), 10);
+    if (!isNaN(target)) {
+      el.textContent = '0';
+      setTimeout(() => animateCountUp(el, target, 900), idx * 80);
+    }
+  });
+}
+
+// --- 2. Fade Content (applied on render) ---
+function applyFadeIn(selector) {
+  const el = document.querySelector(selector);
+  if (el) {
+    el.classList.remove('fade-in');
+    void el.offsetWidth; // force reflow
+    el.classList.add('fade-in');
+  }
+}
+
+// --- 3. Blur Text (title entrance animation) ---
+function applyBlurText(el) {
+  if (!el) return;
+  const text = el.textContent;
+  el.innerHTML = '';
+  el.style.visibility = 'visible';
+  [...text].forEach((char, i) => {
+    const span = document.createElement('span');
+    span.className = 'blur-text-char';
+    span.textContent = char === ' ' ? '\u00A0' : char;
+    span.style.animationDelay = `${i * 40}ms`;
+    el.appendChild(span);
+  });
+}
+
+function triggerBlurTextAnimations() {
+  document.querySelectorAll('.page-title, .detail-title, .ws-detail-title').forEach(el => {
+    if (el.dataset.blurApplied) return;
+    el.dataset.blurApplied = '1';
+    applyBlurText(el);
+  });
+}
+
+// --- 4. Spotlight Card (mouse-following highlight) ---
+function initSpotlightCards() {
+  document.querySelectorAll('.spotlight-card').forEach(card => {
+    if (card.dataset.spotlightInit) return;
+    card.dataset.spotlightInit = '1';
+    card.addEventListener('mousemove', (e) => {
+      const rect = card.getBoundingClientRect();
+      card.style.setProperty('--spotlight-x', `${e.clientX - rect.left}px`);
+      card.style.setProperty('--spotlight-y', `${e.clientY - rect.top}px`);
+    });
+  });
+}
+
+// --- 5. Click Spark (button click particles) ---
+function initClickSpark() {
+  let sparkContainer = document.querySelector('.click-spark-container');
+  if (!sparkContainer) {
+    sparkContainer = document.createElement('div');
+    sparkContainer.className = 'click-spark-container';
+    document.body.appendChild(sparkContainer);
+  }
+
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.btn-primary, .btn-danger');
+    if (!btn) return;
+
+    const count = 8;
+    const sparks = [];
+    for (let i = 0; i < count; i++) {
+      const spark = document.createElement('div');
+      spark.className = 'click-spark';
+      const angle = (360 / count) * i + (Math.random() * 20 - 10);
+      const distance = 20 + Math.random() * 20;
+      spark.style.left = `${e.clientX}px`;
+      spark.style.top = `${e.clientY}px`;
+      spark.style.setProperty('--spark-rotation', `rotate(${angle}deg)`);
+      spark.style.setProperty('--spark-distance', `-${distance}px`);
+      spark.style.animationDuration = `${0.4 + Math.random() * 0.3}s`;
+      sparkContainer.appendChild(spark);
+      sparks.push(spark);
+    }
+    setTimeout(() => sparks.forEach(s => s.remove()), 800);
+  });
+}
+
+// --- 6. Star Border (rotating gradient border on active tabs) ---
+// Applied via CSS class `.star-border` on active elements
+
+// --- 7. Glare Hover (light sweep on cards) ---
+// Applied via CSS class `.glare-hover` on hoverable cards
+
+// --- 8. Magnet Button (subtle attraction effect) ---
+function initMagnetButtons() {
+  document.addEventListener('mousemove', (e) => {
+    document.querySelectorAll('.magnet-btn').forEach(btn => {
+      const rect = btn.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      const dx = e.clientX - cx;
+      const dy = e.clientY - cy;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const threshold = 120;
+      if (dist < threshold) {
+        const strength = (1 - dist / threshold) * 6;
+        btn.style.transform = `translate(${dx * strength / threshold}px, ${dy * strength / threshold}px)`;
+      } else {
+        btn.style.transform = '';
+      }
+    });
+  });
+}
+
+// --- 9. Shiny Text ---
+// Applied via CSS class `.shiny-text` on titles
+
+// --- 10. Post-render hook to activate effects ---
+const _originalRender = render;
+render = function() {
+  _originalRender();
+
+  // Apply fade-in to content area
+  applyFadeIn('.content');
+
+  // Activate blur text on titles
+  requestAnimationFrame(() => {
+    triggerBlurTextAnimations();
+    triggerCountUpAnimations();
+    initSpotlightCards();
+  });
+};
