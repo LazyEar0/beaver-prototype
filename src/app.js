@@ -859,7 +859,7 @@ function renderWorkspaceModule(content, breadcrumb) {
 }
 function wsNavigateTo(view, wsId) {
   wsCurrentView = view; wsCurrentId = wsId || null;
-  if (view === 'detail') { wsInternalTab = 'workflows'; wsMemberTab = 'admin'; wsCurrentFolderId = null; wsFolderPath = []; wsContentSearch = ''; wsContentStatusFilter = 'all'; wsContentCreatorFilter = []; wsCreatorDropdownOpen = false; wsCreatorSearch = ''; wsContentOwnerFilter = []; wsOwnerDropdownOpen = false; wsOwnerSearch = ''; wsContentTypeFilter = 'all'; wsContentSortField = 'editedAt'; wsContentSortAsc = false; wsExecSearch = ''; wsExecStatusFilter = 'all'; wsExecTriggerFilter = 'all'; wsExecTimeRange = 'all'; wsExecDetailId = null; }
+  if (view === 'detail') { wsInternalTab = 'workflows'; wsMemberTab = 'admin'; wsCurrentFolderId = null; wsFolderPath = []; wsContentSearch = ''; wsContentStatusFilter = 'all'; wsContentCreatorFilter = []; wsCreatorDropdownOpen = false; wsCreatorSearch = ''; wsContentOwnerFilter = []; wsOwnerDropdownOpen = false; wsOwnerSearch = ''; wsContentTypeFilter = 'all'; wsFilterPanelOpen = false; wsContentSortField = 'editedAt'; wsContentSortAsc = false; wsExecSearch = ''; wsExecStatusFilter = 'all'; wsExecTriggerFilter = 'all'; wsExecTimeRange = 'all'; wsExecDetailId = null; }
   render();
 }
 
@@ -930,7 +930,7 @@ function renderWsDetailPage(ws) {
 }
 function switchWsTab(tab) {
   wsInternalTab = tab;
-  if (tab === 'workflows') { wsCurrentFolderId = null; wsFolderPath = []; wsContentSearch = ''; wsContentStatusFilter = 'all'; wsContentCreatorFilter = []; wsCreatorDropdownOpen = false; wsContentOwnerFilter = []; wsOwnerDropdownOpen = false; wsContentTypeFilter = 'all'; }
+  if (tab === 'workflows') { wsCurrentFolderId = null; wsFolderPath = []; wsContentSearch = ''; wsContentStatusFilter = 'all'; wsContentCreatorFilter = []; wsCreatorDropdownOpen = false; wsContentOwnerFilter = []; wsOwnerDropdownOpen = false; wsContentTypeFilter = 'all'; wsFilterPanelOpen = false; }
   if (tab === 'executions') { wsExecDetailId = null; wsExecSearch = ''; wsExecStatusFilter = 'all'; wsExecTriggerFilter = 'all'; }
   render();
 }
@@ -1034,36 +1034,54 @@ function renderWsWorkflowsTab(ws) {
       return `<div class="creator-dropdown-item ${sel ? 'selected' : ''}" onclick="toggleWsOwnerSelection('${c}')"><span class="creator-avatar-sm">${c.charAt(0)}</span><span>${c}</span><span class="check-icon">${icons.check}</span></div>`;
     }).join('')}</div></div>` : '';
 
+  // Build active filter count & tags (reuse DS pattern)
+  const wsHasFilters = wsContentSearch || wsContentStatusFilter !== 'all' || wsContentCreatorFilter.length > 0 || wsContentOwnerFilter.length > 0 || wsContentTypeFilter !== 'all';
+  const wsActiveFilterCount = (wsContentStatusFilter !== 'all' ? 1 : 0) + (wsContentCreatorFilter.length > 0 ? 1 : 0) + (wsContentOwnerFilter.length > 0 ? 1 : 0) + (wsContentTypeFilter !== 'all' ? 1 : 0);
+  let wsFilterTagsHtml = '';
+  if (wsHasFilters && !wsFilterPanelOpen) {
+    const tags = [];
+    if (wsContentStatusFilter !== 'all') tags.push(`<span class="filter-tag">状态：${statusLabel[wsContentStatusFilter]}<button class="filter-tag-close" onclick="event.stopPropagation();removeWsFilterTag('status')">×</button></span>`);
+    if (wsContentCreatorFilter.length > 0) tags.push(`<span class="filter-tag">创建者：${wsContentCreatorFilter.join(', ')}<button class="filter-tag-close" onclick="event.stopPropagation();removeWsFilterTag('creator')">×</button></span>`);
+    if (wsContentOwnerFilter.length > 0) tags.push(`<span class="filter-tag">负责人：${wsContentOwnerFilter.join(', ')}<button class="filter-tag-close" onclick="event.stopPropagation();removeWsFilterTag('owner')">×</button></span>`);
+    if (wsContentTypeFilter !== 'all') tags.push(`<span class="filter-tag">类型：${typeLabel[wsContentTypeFilter]}<button class="filter-tag-close" onclick="event.stopPropagation();removeWsFilterTag('type')">×</button></span>`);
+    if (tags.length) wsFilterTagsHtml = `<div class="filter-tags">${tags.join('')}</div>`;
+  }
+
+  // Sort indicator helper
+  const sortIcon = (field) => wsContentSortField === field ? (wsContentSortAsc ? icons.arrowUp : icons.arrowDown) : '';
+  const sortCls = (field) => wsContentSortField === field ? 'sort-active' : '';
+
   return `
     ${breadcrumb}
-    <div class="wf-filter-toolbar" style="margin-top:var(--space-3)">
-      <div class="wf-filter-row-1">
-        <div class="filter-search" style="flex:1;max-width:280px">${icons.search}<input type="text" placeholder="搜索名称或编号..." value="${wsContentSearch}" oninput="onWsContentSearch(this.value)" /></div>
-        <div class="filter-chips">
-          <span class="filter-chip ${wsContentStatusFilter === 'all' ? 'active' : ''}" onclick="onWsStatusFilter('all')">全部</span>
-          <span class="filter-chip ${wsContentStatusFilter === 'draft' ? 'active' : ''}" onclick="onWsStatusFilter('draft')">草稿</span>
-          <span class="filter-chip ${wsContentStatusFilter === 'published' ? 'active' : ''}" onclick="onWsStatusFilter('published')">已发布</span>
-          <span class="filter-chip ${wsContentStatusFilter === 'disabled' ? 'active' : ''}" onclick="onWsStatusFilter('disabled')">已停用</span>
-        </div>
+    <div class="filter-container" style="margin-top:var(--space-3)">
+      <div class="filter-toolbar">
+        <div class="filter-search">${icons.search}<input type="text" placeholder="搜索名称或编号..." value="${wsContentSearch}" oninput="onWsContentSearch(this.value)" /></div>
+        <button class="filter-toggle-btn ${wsFilterPanelOpen ? 'active' : ''}" onclick="toggleWsFilterPanel()">${icons.filter}<span>筛选</span>${wsActiveFilterCount > 0 ? `<span class="filter-badge">${wsActiveFilterCount}</span>` : ''}</button>
+        ${wsFilterTagsHtml}
+        ${wsHasFilters ? `<button class="filter-reset-btn" onclick="clearAllWsFilters()">${icons.close}<span>清除</span></button>` : ''}
         <div style="flex:1"></div>
         ${isMemberOrAbove ? `<button class="btn btn-primary btn-sm" onclick="showCreateWfModal()">${icons.plus}<span>新建工作流</span></button>` : ''}
         ${canCreateFolder ? `<button class="btn btn-secondary btn-sm" onclick="showCreateFolderModal()">${icons.folder}<span>新建文件夹</span></button>` : ''}
       </div>
-      <div class="wf-filter-row-2">
-        <div class="creator-dropdown"><div class="creator-dropdown-trigger ${wsCreatorDropdownOpen ? 'open' : ''}" onclick="event.stopPropagation();toggleWsCreatorDropdown()">${creatorTriggerHtml}</div>${creatorPanelHtml}</div>
-        <div class="creator-dropdown"><div class="creator-dropdown-trigger ${wsOwnerDropdownOpen ? 'open' : ''}" onclick="event.stopPropagation();toggleWsOwnerDropdown()">${ownerTriggerHtml}</div>${ownerPanelHtml}</div>
-        <select class="form-input" style="width:auto;padding:4px 8px;font-size:var(--font-size-sm)" onchange="onWsTypeFilter(this.value)">
-          <option value="all" ${wsContentTypeFilter === 'all' ? 'selected' : ''}>全部类型</option>
-          <option value="app" ${wsContentTypeFilter === 'app' ? 'selected' : ''}>应用流</option>
-          <option value="chat" ${wsContentTypeFilter === 'chat' ? 'selected' : ''}>对话流</option>
-        </select>
-        <div style="flex:1"></div>
-        <div class="sort-dropdown"><select onchange="onWsContentSort(this.value)"><option value="editedAt" ${wsContentSortField === 'editedAt' ? 'selected' : ''}>最后编辑</option><option value="createdAt" ${wsContentSortField === 'createdAt' ? 'selected' : ''}>创建时间</option><option value="name" ${wsContentSortField === 'name' ? 'selected' : ''}>名称</option></select><button class="sort-toggle-btn" onclick="toggleWsContentSort()">${wsContentSortAsc ? icons.arrowUp : icons.arrowDown}</button></div>
+      <div class="filter-panel ${wsFilterPanelOpen ? '' : 'collapsed'}">
+        <div class="filter-group"><span class="filter-label">状态</span><div class="filter-chips">
+          <span class="filter-chip ${wsContentStatusFilter === 'all' ? 'active' : ''}" onclick="onWsStatusFilter('all')">全部</span>
+          <span class="filter-chip ${wsContentStatusFilter === 'draft' ? 'active' : ''}" onclick="onWsStatusFilter('draft')">草稿</span>
+          <span class="filter-chip ${wsContentStatusFilter === 'published' ? 'active' : ''}" onclick="onWsStatusFilter('published')">已发布</span>
+          <span class="filter-chip ${wsContentStatusFilter === 'disabled' ? 'active' : ''}" onclick="onWsStatusFilter('disabled')">已停用</span>
+        </div></div>
+        <div class="filter-group"><span class="filter-label">创建者</span><div class="creator-dropdown"><div class="creator-dropdown-trigger ${wsCreatorDropdownOpen ? 'open' : ''}" onclick="event.stopPropagation();toggleWsCreatorDropdown()">${creatorTriggerHtml}</div>${creatorPanelHtml}</div></div>
+        <div class="filter-group"><span class="filter-label">负责人</span><div class="creator-dropdown"><div class="creator-dropdown-trigger ${wsOwnerDropdownOpen ? 'open' : ''}" onclick="event.stopPropagation();toggleWsOwnerDropdown()">${ownerTriggerHtml}</div>${ownerPanelHtml}</div></div>
+        <div class="filter-group"><span class="filter-label">类型</span><div class="filter-chips">
+          <span class="filter-chip ${wsContentTypeFilter === 'all' ? 'active' : ''}" onclick="onWsTypeFilter('all')">全部</span>
+          <span class="filter-chip ${wsContentTypeFilter === 'app' ? 'active' : ''}" onclick="onWsTypeFilter('app')">应用流</span>
+          <span class="filter-chip ${wsContentTypeFilter === 'chat' ? 'active' : ''}" onclick="onWsTypeFilter('chat')">对话流</span>
+        </div></div>
       </div>
     </div>
 
     ${isEmpty ? (isSearchMode ? renderEmptyState('searchNoResult') : (wsCurrentFolderId !== null ? `<div class="empty-state" style="padding:var(--space-10)"><img src="./public/images/empty-folder-content.png" class="empty-state-img" /><div class="empty-state-title">该文件夹为空</div><div class="empty-state-desc">在此文件夹中创建工作流或子文件夹</div><div style="display:flex;gap:var(--space-2);margin-top:var(--space-4)">${isMemberOrAbove ? `<button class="btn btn-primary btn-sm" onclick="showCreateWfModal()">${icons.plus}<span>新建工作流</span></button>` : ''}${canCreateFolder ? `<button class="btn btn-secondary btn-sm" onclick="showCreateFolderModal()">${icons.folder}<span>新建子文件夹</span></button>` : ''}</div></div>` : `<div class="empty-state" style="padding:var(--space-10)"><img src="./public/images/empty-folder-content.png" class="empty-state-img" /><div class="empty-state-title">暂无内容</div><div class="empty-state-desc">创建工作流或文件夹来组织您的空间</div><div style="display:flex;gap:var(--space-2);margin-top:var(--space-4)">${isMemberOrAbove ? `<button class="btn btn-primary btn-sm" onclick="showCreateWfModal()">${icons.plus}<span>新建工作流</span></button><button class="btn btn-secondary btn-sm" onclick="showCreateFolderModal()">${icons.folder}<span>新建文件夹</span></button>` : ''}</div></div>`)) : `
-    <div class="content-list-header"><span style="flex:2.5">名称</span><span style="flex:0.7">状态</span><span style="flex:0.6">版本</span><span style="flex:0.6">类型</span><span style="flex:0.8">创建者</span><span style="flex:0.8">负责人</span><span style="flex:0.9">最后编辑</span><span style="width:80px">操作</span></div>
+    <div class="content-list-header"><span class="col-header ${sortCls('name')}" style="flex:2.5" onclick="onWsContentSort('name')">名称 ${sortIcon('name')}</span><span style="flex:0.7">状态</span><span style="flex:0.6">版本</span><span style="flex:0.6">类型</span><span style="flex:0.8">创建者</span><span style="flex:0.8">负责人</span><span class="col-header ${sortCls('editedAt')}" style="flex:0.9" onclick="onWsContentSort('editedAt')">最后编辑 ${sortIcon('editedAt')}</span><span style="width:80px">操作</span></div>
     <div class="content-list">
       ${showFolders ? sortedFolders.map(f => {
         const subF = getSubFolderCount(ws.id, f.id), subW = getSubWfCount(ws.id, f.id);
@@ -1105,9 +1123,11 @@ function renderWsWorkflowsTab(ws) {
 function onWsContentSearch(val) { wsContentSearch = val; render(); }
 function onWsStatusFilter(val) { wsContentStatusFilter = val; render(); }
 function onWsCreatorFilter(val) { wsContentCreatorFilter = val; render(); }
-function onWsContentSort(val) { wsContentSortField = val; render(); }
-function toggleWsContentSort() { wsContentSortAsc = !wsContentSortAsc; render(); }
+function onWsContentSort(field) { if (wsContentSortField === field) { wsContentSortAsc = !wsContentSortAsc; } else { wsContentSortField = field; wsContentSortAsc = true; } render(); }
 function onWsTypeFilter(val) { wsContentTypeFilter = val; render(); }
+function toggleWsFilterPanel() { wsFilterPanelOpen = !wsFilterPanelOpen; render(); }
+function removeWsFilterTag(type) { if (type === 'status') wsContentStatusFilter = 'all'; else if (type === 'creator') { wsContentCreatorFilter = []; } else if (type === 'owner') { wsContentOwnerFilter = []; } else if (type === 'type') wsContentTypeFilter = 'all'; render(); }
+function clearAllWsFilters() { wsContentSearch = ''; wsContentStatusFilter = 'all'; wsContentCreatorFilter = []; wsContentOwnerFilter = []; wsContentTypeFilter = 'all'; wsCreatorDropdownOpen = false; wsOwnerDropdownOpen = false; wsFilterPanelOpen = false; render(); }
 function toggleWsCreatorDropdown() { wsCreatorDropdownOpen = !wsCreatorDropdownOpen; wsCreatorSearch = ''; wsOwnerDropdownOpen = false; render(); }
 function onWsCreatorSearch(val) { wsCreatorSearch = val; render(); }
 function toggleWsCreatorSelection(name) {

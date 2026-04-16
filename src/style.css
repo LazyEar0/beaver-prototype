@@ -658,27 +658,28 @@ img { display: block; max-width: 100%; }
 }
 
 /* --- Workflow Filter Toolbar (2-row layout) --- */
-.wf-filter-toolbar {
-  background: var(--md-surface-container-lowest);
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--md-outline-variant);
-  padding: var(--space-3) var(--space-4);
-  margin-bottom: var(--space-4);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
+/* --- Sortable Column Headers --- */
+.col-header {
+  cursor: pointer;
+  user-select: none;
+  transition: var(--transition-fast);
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
 }
 
-.wf-filter-row-1 {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
+.col-header:hover {
+  color: var(--md-primary);
 }
 
-.wf-filter-row-2 {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
+.col-header.sort-active {
+  color: var(--md-primary);
+  font-weight: 500;
+}
+
+.col-header svg {
+  width: 13px;
+  height: 13px;
 }
 
 /* --- Filter Bar (MD3 Surface Container) --- */
