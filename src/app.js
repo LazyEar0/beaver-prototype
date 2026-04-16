@@ -906,7 +906,7 @@ function renderWsDetailPage(ws) {
   const isAdmin = ws.myRole === 'admin';
   return `
     <div class="detail-back" onclick="wsNavigateTo('list')">${icons.arrowLeft}<span>返回空间列表</span></div>
-    <div class="ws-detail-header"><div class="ws-detail-info"><div class="ws-detail-title-row"><h1 class="ws-detail-title">${ws.name}</h1><span class="role-badge role-badge-${ws.myRole}">${icons.shield} ${{ admin: '管理员', member: '成员', viewer: '只读查看者' }[ws.myRole]}</span></div>${ws.desc ? `<div class="ws-detail-desc">${ws.desc}</div>` : ''}<div class="ws-detail-meta"><span class="ws-detail-meta-item">${icons.hash} ${ws.code}</span><span class="ws-detail-meta-item">${icons.calendar} 创建于 ${ws.createdAt}</span><span class="ws-detail-meta-item">${icons.clock} 最近活跃 ${ws.lastActiveAt}</span></div></div></div>
+    <div class="ws-detail-header"><div class="ws-detail-info"><div class="ws-detail-title-row"><h1 class="ws-detail-title">${ws.name}</h1><span class="role-badge role-badge-${ws.myRole}">${icons.shield} ${{ admin: '管理员', member: '成员', viewer: '只读查看者' }[ws.myRole]}</span></div>${ws.desc ? `<div class="ws-detail-desc">${ws.desc}</div>` : ''}<div class="ws-detail-meta"><span class="ws-detail-meta-item">${icons.hash} ${ws.code}</span><span class="ws-detail-meta-item">${icons.calendar} 创建于 ${ws.createdAt}</span><span class="ws-detail-meta-item">${icons.clock} 最近活跃 ${ws.lastActiveAt}</span></div></div><div class="ws-detail-stats">${[{ icon: icons.workflow, value: ws.workflowCount, label: '工作流' }, { icon: icons.users, value: ws.members.length, label: '成员' }, { icon: icons.sync, value: ws.runningInstances || 0, label: '运行中' }].map(s => `<div class="ws-detail-stat-card"><div class="ws-detail-stat-value" data-count-up="${s.value}">${s.value}</div><div class="ws-detail-stat-label">${s.icon} ${s.label}</div></div>`).join('')}</div></div>
     <div class="ws-tabs-bar">
       <button class="ws-tab-btn ${wsInternalTab === 'workflows' ? 'active' : ''}" onclick="switchWsTab('workflows')">${icons.workflow}<span>工作流</span></button>
       <button class="ws-tab-btn ${wsInternalTab === 'executions' ? 'active' : ''}" onclick="switchWsTab('executions')">${icons.clock}<span>执行记录</span></button>
@@ -1077,6 +1077,7 @@ function renderWsWorkflowsTab(ws) {
               ${canExec ? `<div class="more-menu-item" onclick="executeWf(${wf.id})">${icons.play}<span>执行</span></div>` : ''}
               ${isMemberOrAbove ? `<div class="more-menu-item" onclick="showCopyWfModal(${wf.id})">${icons.copy}<span>复制</span></div>` : ''}
               ${isMemberOrAbove ? `<div class="more-menu-item" onclick="showMoveWfModal(${wf.id})">${icons.move}<span>移动</span></div>` : ''}
+              ${isAdmin ? `<div style="border-top:1px solid var(--md-outline-variant);margin:4px 0"></div><div class="more-menu-item danger" onclick="showDeleteWfModal(${wf.id})">${icons.trash}<span>删除</span></div>` : ''}
             </div></div>
           </div></div>`;
       }).join('')}
