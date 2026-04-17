@@ -163,9 +163,9 @@ let wsMemberTab = 'admin';
 let wsListState = { search: '', roleFilter: 'all', sortField: 'lastActiveAt', sortAsc: false, page: 1, pageSize: 12 };
 let wsNextId = 7;
 const wsCardColors = [
-  { bg: '#EEF2FF', color: '#4F46E5' }, { bg: '#DCFCE7', color: '#16A34A' },
-  { bg: '#F1F5F9', color: '#64748B' }, { bg: '#FEF3C7', color: '#D97706' },
-  { bg: '#EDE9FE', color: '#8B5CF6' }, { bg: '#DBEAFE', color: '#2563EB' },
+  { bg: '#EADDFF', color: '#6750A4' }, { bg: '#C4F5A5', color: '#386A20' },
+  { bg: '#E8E0F0', color: '#5B6271' }, { bg: '#FFDEA6', color: '#7C5800' },
+  { bg: '#FFD8E4', color: '#7D5260' }, { bg: '#D8E2FF', color: '#005AC1' },
 ];
 
 // ============================================
@@ -802,7 +802,7 @@ function removeSpace(dsId, space) {
   const hasRunning = ws && ws.runningInstances > 0;
   showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">移除授权</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
   <div class="delete-warning"><span class="delete-warning-icon">${icons.alertTriangle}</span><div class="delete-warning-text">确定要移除「${space}」的授权吗？</div></div>
-  ${hasRunning ? `<div style="margin-top:var(--space-3);padding:var(--space-3);background:rgba(220,38,38,0.06);border:1px solid rgba(220,38,38,0.15);border-radius:var(--radius-md);font-size:var(--font-size-sm);color:var(--md-error);line-height:1.6"><strong>⚠ 该空间内有正在运行的工作流引用了此数据源</strong>，撤销后不影响运行中的实例，但新的实例将无法启动。是否继续？</div>` : ''}
+  ${hasRunning ? `<div style="margin-top:var(--space-3);padding:var(--space-3);background:rgba(179,38,30,0.06);border:1px solid rgba(179,38,30,0.15);border-radius:var(--radius-md);font-size:var(--font-size-sm);color:var(--md-error);line-height:1.6"><strong>⚠ 该空间内有正在运行的工作流引用了此数据源</strong>，撤销后不影响运行中的实例，但新的实例将无法启动。是否继续？</div>` : ''}
   <div style="margin-top:var(--space-3);padding:var(--space-3);background:var(--md-surface-container);border-radius:var(--radius-md);font-size:var(--font-size-sm);color:var(--md-on-surface-variant);line-height:1.6">
   <div style="font-weight:500;color:var(--md-error);margin-bottom:4px">移除后的影响：</div>
   <ul style="margin:0;padding-left:var(--space-4)"><li>该空间内引用此数据源的工作流<strong>新实例将无法启动</strong></li><li>已运行的实例不受影响</li><li>重新授权后可恢复访问</li></ul></div>
@@ -1778,7 +1778,7 @@ function renderExecDetail(ws) {
           <div style="display:flex;gap:var(--space-4);margin-top:2px;font-size:var(--font-size-xs);color:var(--md-outline)">
             <span>开始: ${node.startTime}</span><span>耗时: ${node.duration}</span>
           </div>
-          ${node.error ? `<div style="margin-top:4px;padding:6px 8px;background:rgba(220,38,38,0.05);border-radius:var(--radius-md);font-size:var(--font-size-xs);color:var(--md-error)">${node.error}</div>` : ''}
+          ${node.error ? `<div style="margin-top:4px;padding:6px 8px;background:rgba(179,38,30,0.05);border-radius:var(--radius-md);font-size:var(--font-size-xs);color:var(--md-error)">${node.error}</div>` : ''}
         </div>
       </div>`).join('')}</div>` : ''}`;
 }
@@ -2029,7 +2029,7 @@ function changeMemberRole(wsId, userId, newRole) {
   const roleLabelsMap = { admin: '管理员', member: '成员', viewer: '只读查看者' };
   showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">确认变更角色</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
   <p style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant)">确定将「${member.name}」的角色从 <strong>${roleLabelsMap[member.role]}</strong> 变更为 <strong>${roleLabelsMap[newRole]}</strong> 吗？</p>
-  ${member.role === 'admin' ? '<div style="margin-top:var(--space-3);padding:var(--space-3);background:rgba(220,38,38,0.06);border:1px solid rgba(220,38,38,0.15);border-radius:var(--radius-md);font-size:var(--font-size-sm);color:var(--md-error);line-height:1.6"><strong>⚠ 降级管理员后，该用户将失去空间管理权限。</strong></div>' : ''}
+  ${member.role === 'admin' ? '<div style="margin-top:var(--space-3);padding:var(--space-3);background:rgba(179,38,30,0.06);border:1px solid rgba(179,38,30,0.15);border-radius:var(--radius-md);font-size:var(--font-size-sm);color:var(--md-error);line-height:1.6"><strong>⚠ 降级管理员后，该用户将失去空间管理权限。</strong></div>' : ''}
   <div style="margin-top:var(--space-4);display:flex;align-items:center;gap:var(--space-3);padding:var(--space-3);background:var(--md-surface);border-radius:var(--radius-lg)"><div class="member-avatar avatar-${member.role}">${member.avatar}</div><div><div style="font-size:var(--font-size-sm);font-weight:500">${member.name}</div></div></div>
   </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal();render()">取消</button><button class="btn btn-primary" onclick="confirmChangeMemberRole(${wsId}, ${userId}, '${newRole}')">确认变更</button></div></div>`);
 }
