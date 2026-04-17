@@ -316,6 +316,26 @@ let wsExecutions = {
       ] },
     { id: 2009, wfId: 1, wfName: '酒店搜索', wfCode: 'HTL_SEARCH', version: 2, trigger: 'manual', status: 'cancelled', startTime: '2025-04-10 15:30:00', endTime: '2025-04-10 15:30:45', duration: '45秒', triggerUser: '李四', archived: false, nodes: [], alerts: [] },
     { id: 2010, wfId: 1, wfName: '酒店搜索', wfCode: 'HTL_SEARCH', version: 2, trigger: 'manual', status: 'completed', startTime: '2025-01-15 10:00:00', endTime: '2025-01-15 10:01:30', duration: '1分30秒', triggerUser: 'Sukey Wu', archived: true, nodes: [], alerts: [] },
+    { id: 2011, wfId: 2, wfName: '酒店预订确认', wfCode: 'HTL_CONFIRM', version: 3, trigger: 'event', status: 'completed', startTime: '2025-04-14 09:00:00', endTime: '2025-04-14 09:08:45', duration: '8分45秒', triggerUser: '系统',  archived: false,
+      inputs: { orderId: { label: '订单编号', type: 'String', value: 'ORD-2025041400201' }, guestName: { label: '入住人', type: 'String', value: 'Zhang Wei' }, hotelId: { label: '酒店ID', type: 'String', value: 'HTL-00582' }, roomType: { label: '房型', type: 'String', value: 'Deluxe King' }, checkIn: { label: '入住日期', type: 'DateTime', value: '2025-04-20 14:00:00' }, checkOut: { label: '退房日期', type: 'DateTime', value: '2025-04-23 12:00:00' }, totalAmount: { label: '总金额', type: 'Double', value: '3280.00' } },
+      outputs: { confirmNo: { label: '确认号', type: 'String', value: 'CNF-20250414-00582-A' }, voucherUrl: { label: '确认函链接', type: 'String', value: 'https://docs.beaver.com/voucher/CNF-20250414-00582-A.pdf' }, notifyStatus: { label: '通知状态', type: 'String', value: '邮件+短信已发送' } },
+      nodes: [
+        { name: '事件触发', type: '事件触发', status: 'success', duration: '0.1秒', startTime: '09:00:00', inputData: { eventType: 'order.payment_completed', eventId: 'evt-a7c2' }, outputData: { orderId: 'ORD-2025041400201', paymentId: 'PAY-9f3a' }, variables: { traceId: 'tr-e1b4-f201', env: 'production' } },
+        { name: '订单数据加载', type: 'HTTP请求', status: 'success', duration: '0.8秒', startTime: '09:00:00', inputData: { url: 'https://api.internal.com/orders/ORD-2025041400201', method: 'GET' }, outputData: { orderId: 'ORD-2025041400201', status: 'paid', guest: 'Zhang Wei', hotel: 'HTL-00582', amount: 3280 }, variables: { traceId: 'tr-e1b4-f201', orderId: 'ORD-2025041400201' } },
+        { name: '用户身份验证', type: '代码节点', status: 'success', duration: '0.3秒', startTime: '09:00:01', inputData: { guestId: 'USR-10482', authLevel: 'standard' }, outputData: { verified: true, memberLevel: 'Gold', loyaltyPoints: 12800 }, variables: { traceId: 'tr-e1b4-f201', guestVerified: true } },
+        { name: '库存锁定检查', type: 'HTTP请求', status: 'success', duration: '1.2秒', startTime: '09:00:01', inputData: { url: 'https://api.hotel-supplier.com/inventory/check', method: 'POST', body: { hotelId: 'HTL-00582', roomType: 'DLX-K', checkIn: '2025-04-20', checkOut: '2025-04-23' } }, outputData: { available: true, lockId: 'LOCK-8f2a', expiresAt: '2025-04-14T09:30:00Z' }, variables: { traceId: 'tr-e1b4-f201', inventoryLocked: true, lockId: 'LOCK-8f2a' } },
+        { name: '价格核验', type: '代码节点', status: 'success', duration: '0.2秒', startTime: '09:00:03', inputData: { originalPrice: 3280, currentPrice: 3280, currency: 'CNY' }, outputData: { priceMatch: true, variance: 0, approved: true }, variables: { traceId: 'tr-e1b4-f201', priceVerified: true } },
+        { name: '优惠券与积分抵扣', type: '代码节点', status: 'success', duration: '0.5秒', startTime: '09:00:03', inputData: { couponCode: null, loyaltyPoints: 0, memberLevel: 'Gold' }, outputData: { discount: 0, memberDiscount: 164, finalAmount: 3116, pointsEarned: 312 }, variables: { traceId: 'tr-e1b4-f201', finalAmount: 3116 } },
+        { name: '风控规则检查', type: '代码节点', status: 'success', duration: '0.6秒', startTime: '09:00:04', inputData: { orderId: 'ORD-2025041400201', amount: 3116, guestId: 'USR-10482', riskRules: ['amount_limit', 'frequency_check', 'blacklist'] }, outputData: { riskScore: 12, passed: true, flags: [] }, variables: { traceId: 'tr-e1b4-f201', riskPassed: true } },
+        { name: '供应商确认预订', type: 'HTTP请求', status: 'success', duration: '3分20秒', startTime: '09:00:04', inputData: { url: 'https://api.hotel-supplier.com/booking/confirm', method: 'POST', body: { lockId: 'LOCK-8f2a', guest: 'Zhang Wei', checkIn: '2025-04-20', checkOut: '2025-04-23', roomType: 'DLX-K' } }, outputData: { confirmationNo: 'CNF-20250414-00582-A', supplierRef: 'BK-HN-90281', status: 'confirmed' }, variables: { traceId: 'tr-e1b4-f201', supplierConfirmed: true, confirmNo: 'CNF-20250414-00582-A' } },
+        { name: '订单状态更新', type: 'HTTP请求', status: 'success', duration: '0.4秒', startTime: '09:03:24', inputData: { url: 'https://api.internal.com/orders/ORD-2025041400201/status', method: 'PUT', body: { status: 'confirmed', confirmNo: 'CNF-20250414-00582-A' } }, outputData: { updated: true, newStatus: 'confirmed' }, variables: { traceId: 'tr-e1b4-f201', orderConfirmed: true } },
+        { name: '确认函PDF生成', type: '代码节点', status: 'success', duration: '2分', startTime: '09:03:25', inputData: { template: 'voucher_standard_v3', orderId: 'ORD-2025041400201', lang: 'zh-CN' }, outputData: { pdfUrl: 'https://docs.beaver.com/voucher/CNF-20250414-00582-A.pdf', fileSize: '128KB', pages: 2 }, variables: { traceId: 'tr-e1b4-f201', voucherGenerated: true } },
+        { name: '邮件通知客人', type: '消息通知', status: 'success', duration: '1.5秒', startTime: '09:05:25', inputData: { to: 'zhangwei@example.com', template: 'booking_confirmation', attachments: ['voucher.pdf'] }, outputData: { messageId: 'MSG-e7a1', channel: 'email', delivered: true }, variables: { traceId: 'tr-e1b4-f201', emailSent: true } },
+        { name: '短信通知客人', type: '消息通知', status: 'success', duration: '0.8秒', startTime: '09:05:27', inputData: { to: '+86-138****7890', template: 'booking_sms_confirm', content: '您的预订已确认，确认号：CNF-20250414-00582-A' }, outputData: { messageId: 'SMS-b3f2', channel: 'sms', delivered: true }, variables: { traceId: 'tr-e1b4-f201', smsSent: true } },
+        { name: '积分发放', type: 'HTTP请求', status: 'success', duration: '0.6秒', startTime: '09:05:28', inputData: { url: 'https://api.internal.com/loyalty/credit', method: 'POST', body: { guestId: 'USR-10482', points: 312, reason: 'booking_reward' } }, outputData: { newBalance: 13112, transactionId: 'LYL-c4d8' }, variables: { traceId: 'tr-e1b4-f201', pointsCredited: true } },
+        { name: '数据归档与日志', type: '代码节点', status: 'success', duration: '0.3秒', startTime: '09:05:28', inputData: { orderId: 'ORD-2025041400201', archiveTarget: 'data-warehouse' }, outputData: { archived: true, logEntries: 14, traceCompleted: true }, variables: { traceId: 'tr-e1b4-f201', flowCompleted: true } },
+        { name: '流程结束', type: '结束节点', status: 'success', duration: '0.1秒', startTime: '09:08:45', inputData: { confirmNo: 'CNF-20250414-00582-A' }, outputData: { success: true, totalDuration: '8分45秒' }, variables: { traceId: 'tr-e1b4-f201' } },
+      ], alerts: [] },
   ],
   2: [{ id: 2100, wfId: 20, wfName: '航班信息拉取', wfCode: 'FLT_PULL', version: 4, trigger: 'scheduled', status: 'completed', startTime: '2025-04-12 06:00:00', endTime: '2025-04-12 06:10:00', duration: '10分', triggerUser: '系统', archived: false, nodes: [], alerts: [] }],
   3: [], 4: [], 5: [], 6: [],
@@ -347,6 +367,9 @@ function toggleNav(el) {
 function render() {
   const content = document.getElementById('mainContent');
   const breadcrumb = document.getElementById('breadcrumb');
+  // Toggle exec-detail-mode: removes content padding for full-viewport detail layout
+  const isExecDetail = currentModule === 'workspace' && wsCurrentView === 'detail' && wsInternalTab === 'executions' && wsExecDetailId !== null;
+  content.classList.toggle('exec-detail-mode', isExecDetail);
   if (currentModule === 'datasource') renderDatasourceModule(content, breadcrumb);
   else if (currentModule === 'workspace') renderWorkspaceModule(content, breadcrumb);
 }
@@ -2150,11 +2173,26 @@ function renderExecDetail(ws) {
   // --- Build: Node Timeline ---
   let timelineHtml = '';
   if (exec.nodes && exec.nodes.length > 0) {
+    // Node status summary for complex workflows
+    const nSuccess = exec.nodes.filter(n => n.status === 'success').length;
+    const nFailed = exec.nodes.filter(n => n.status === 'failed').length;
+    const nRunning = exec.nodes.filter(n => n.status === 'running').length;
+    const nSkipped = exec.nodes.filter(n => n.status === 'skipped').length;
+    const nPaused = exec.nodes.filter(n => n.status === 'paused').length;
+    const showSummary = exec.nodes.length >= 6;
+    const summaryHtml = showSummary ? `<div class="ed-node-summary">
+      ${nSuccess ? `<span class="ed-node-summary-item success">${icons.checkCircle} ${nSuccess} 成功</span>` : ''}
+      ${nFailed ? `<span class="ed-node-summary-item failed">${icons.xCircle} ${nFailed} 失败</span>` : ''}
+      ${nRunning ? `<span class="ed-node-summary-item running">${icons.sync} ${nRunning} 运行中</span>` : ''}
+      ${nPaused ? `<span class="ed-node-summary-item running">${icons.pause} ${nPaused} 已暂停</span>` : ''}
+      ${nSkipped ? `<span class="ed-node-summary-item skipped">${nSkipped} 跳过</span>` : ''}
+    </div>` : '';
     timelineHtml = `
       <div class="ed-section">
         <div class="ed-section-title">${icons.workflow} 节点执行时间线 <span class="section-count">${exec.nodes.length} 个节点</span></div>
+        ${summaryHtml}
         <div class="node-timeline-v2">${exec.nodes.map((node, idx) => `
-          <div class="node-item-v2 ${node.status === 'failed' ? 'node-item-failed' : ''} ${wsExecSelectedNodeIdx === idx ? 'active' : ''}" onclick="selectExecNode(${idx})">
+          <div class="node-item-v2 ${node.status === 'failed' ? 'node-item-failed' : ''} ${wsExecSelectedNodeIdx === idx ? 'active' : ''}" data-node-idx="${idx}" onclick="selectExecNode(${idx})">
             <div class="node-dot ${nodeStatusClass[node.status] || ''}"></div>
             <div class="node-main">
               <div class="node-header-row">
@@ -2244,22 +2282,33 @@ function renderExecDetail(ws) {
 
   // --- Assemble Full Page ---
   return `
-    ${topBarHtml}
-    ${overviewHtml}
-    <div class="ed-body ${hasPanel ? 'panel-open' : ''}">
-      <div class="ed-left">
-        ${timelineHtml}
-        ${inputsHtml}
-        ${outputsHtml}
-        ${alertsHtml}
+    <div class="ed-page">
+      <div class="ed-header">
+        ${topBarHtml}
+        ${overviewHtml}
       </div>
-      ${exec.nodes && exec.nodes.length > 0 ? panelHtml : ''}
+      <div class="ed-body ${hasPanel ? 'panel-open' : ''}">
+        <div class="ed-left">
+          ${timelineHtml}
+          ${inputsHtml}
+          ${outputsHtml}
+          ${alertsHtml}
+        </div>
+        ${exec.nodes && exec.nodes.length > 0 ? panelHtml : ''}
+      </div>
     </div>`;
 }
 
 function selectExecNode(idx) {
   wsExecSelectedNodeIdx = (wsExecSelectedNodeIdx === idx) ? null : idx;
   render();
+  // Scroll selected node into view (for long timelines)
+  if (wsExecSelectedNodeIdx !== null) {
+    requestAnimationFrame(() => {
+      const activeNode = document.querySelector(`.node-item-v2[data-node-idx="${wsExecSelectedNodeIdx}"]`);
+      if (activeNode) activeNode.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+  }
 }
 
 function closeExecNodePanel() {
