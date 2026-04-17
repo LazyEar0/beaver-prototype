@@ -1,19 +1,21 @@
 <template>
   <v-app>
-    <v-navigation-drawer permanent :width="220" color="#1E1B4B" theme="dark">
+    <!-- Light Sidebar (MD3 Navigation Drawer) -->
+    <v-navigation-drawer permanent :width="240" class="beaver-sidebar" :border="0">
       <div class="sidebar-brand">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+        <div class="sidebar-logo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+        </div>
         <span>Beaver</span>
       </div>
       <v-list density="compact" nav class="px-2">
-        <v-list-subheader class="text-white" style="opacity:0.5;font-size:11px;letter-spacing:1px">管理</v-list-subheader>
+        <v-list-subheader class="sidebar-section-title">管理</v-list-subheader>
         <v-list-item
           prepend-icon="mdi-folder-outline"
           title="空间管理"
           :active="currentModule === 'workspace'"
           @click="$router.push('/workspace')"
           rounded="lg"
-          color="white"
         />
         <v-list-item
           prepend-icon="mdi-database-outline"
@@ -21,29 +23,31 @@
           :active="currentModule === 'datasource'"
           @click="$router.push('/datasource')"
           rounded="lg"
-          color="white"
         />
       </v-list>
       <template #append>
-        <div class="pa-3 text-center" style="font-size:11px;opacity:0.3;color:#fff">&copy; 2025 DidaTravel 道旅科技</div>
+        <div class="pa-3 text-center sidebar-footer-text">&copy; 2025 DidaTravel 道旅科技</div>
       </template>
     </v-navigation-drawer>
 
-    <v-main style="background:#F8FAFC;min-height:100vh">
-      <v-app-bar flat color="white" density="compact" :elevation="0" style="border-bottom:1px solid #F1F5F9">
+    <v-main style="min-height:100vh" :style="{ background: 'var(--md-content-bg)' }">
+      <!-- Header (MD3 Top App Bar) -->
+      <v-app-bar flat density="compact" :elevation="0" :style="{ background: 'var(--color-bg-header)', borderBottom: '1px solid var(--md-surface-container-high)', boxShadow: '0 1px 2px rgba(0,0,0,0.04)' }">
         <v-breadcrumbs :items="breadcrumbs" class="px-6">
-          <template #divider><v-icon size="14">mdi-chevron-right</v-icon></template>
+          <template #divider><v-icon size="14" color="grey">mdi-chevron-right</v-icon></template>
         </v-breadcrumbs>
         <v-spacer />
-        <v-btn variant="text" size="small" prepend-icon="mdi-magnify" color="grey-darken-1" @click="store.showToast('info','全局搜索','该功能将在后续版本中实现')">搜索</v-btn>
-        <v-btn variant="text" size="small" prepend-icon="mdi-help-circle-outline" color="grey-darken-1" @click="store.showToast('info','帮助中心','该功能将在后续版本中实现')">帮助</v-btn>
-        <v-btn variant="text" size="small" prepend-icon="mdi-bell-outline" color="grey-darken-1" class="mr-1" @click="store.showToast('info','通知中心','该功能将在后续版本中实现')">
-          通知
-          <v-badge dot color="error" floating />
-        </v-btn>
+        <v-btn variant="text" size="small" prepend-icon="mdi-magnify" :style="headerBtnStyle" @click="store.showToast('info','全局搜索','该功能将在后续版本中实现')">搜索</v-btn>
+        <v-btn variant="text" size="small" prepend-icon="mdi-help-circle-outline" :style="headerBtnStyle" @click="store.showToast('info','帮助中心','该功能将在后续版本中实现')">帮助</v-btn>
+        <div style="position:relative;display:inline-flex">
+          <v-btn variant="text" size="small" prepend-icon="mdi-bell-outline" :style="headerBtnStyle" class="mr-1" @click="store.showToast('info','通知中心','该功能将在后续版本中实现')">通知</v-btn>
+          <span style="position:absolute;top:4px;right:12px;width:6px;height:6px;background:var(--md-error);border-radius:50%"></span>
+        </div>
         <v-divider vertical class="mx-2" length="20" />
-        <v-avatar size="30" color="primary" class="mr-2"><span class="text-white text-caption font-weight-bold">W</span></v-avatar>
-        <span class="text-body-2 mr-4" style="color:#374151">Sukey Wu</span>
+        <div class="d-flex align-center ga-3" style="padding-left:var(--space-3);margin-left:var(--space-2)">
+          <v-avatar size="32" :style="{ background: 'var(--md-primary)' }"><span style="color:var(--md-on-primary);font-size:var(--font-size-sm);font-weight:500">W</span></v-avatar>
+          <span style="font-size:var(--font-size-base);font-weight:500;color:var(--md-on-surface)" class="mr-4">Sukey Wu</span>
+        </div>
       </v-app-bar>
 
       <div class="pa-6">
@@ -69,7 +73,7 @@
           density="compact"
           variant="tonal"
           rounded="lg"
-          style="min-width:300px;max-width:400px;box-shadow:0 4px 20px rgba(0,0,0,0.08)"
+          style="min-width:300px;max-width:400px;box-shadow:var(--shadow-lg)"
         />
       </v-slide-x-reverse-transition>
     </div>
@@ -83,6 +87,12 @@ import { useAppStore } from '@/stores/app'
 
 const store = useAppStore()
 const route = useRoute()
+
+const headerBtnStyle = {
+  color: 'var(--md-on-surface-variant)',
+  borderRadius: 'var(--radius-full)',
+  fontSize: 'var(--font-size-sm)',
+}
 
 const currentModule = computed(() => {
   if (route.path.startsWith('/datasource')) return 'datasource'
@@ -109,7 +119,9 @@ const breadcrumbs = computed(() => {
 </script>
 
 <style>
-.fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease, transform 0.2s ease; }
+.fade-enter-active, .fade-leave-active {
+  transition: opacity var(--transition-base), transform var(--transition-base);
+}
 .fade-enter-from { opacity: 0; transform: translateY(8px); }
 .fade-leave-to { opacity: 0; }
 </style>
