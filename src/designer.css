@@ -53,7 +53,7 @@
 }
 
 .designer-back-btn:hover {
-  background: rgba(29, 27, 32, 0.08);
+  background: rgba(0, 0, 0, 0.06);
   color: var(--md-on-surface);
 }
 
@@ -77,7 +77,7 @@
 }
 
 .designer-wf-name:hover {
-  background: rgba(29, 27, 32, 0.04);
+  background: rgba(0, 0, 0, 0.03);
 }
 
 .designer-wf-status {
@@ -123,7 +123,7 @@
 }
 
 .toolbar-btn:hover {
-  background: rgba(29, 27, 32, 0.08);
+  background: rgba(0, 0, 0, 0.06);
   color: var(--md-on-surface);
 }
 
@@ -222,7 +222,7 @@
 }
 
 .node-panel-toggle:hover {
-  background: rgba(29, 27, 32, 0.08);
+  background: rgba(0, 0, 0, 0.06);
 }
 
 .node-panel-toggle svg {
@@ -651,7 +651,7 @@
 }
 
 .canvas-control-btn:hover {
-  background: rgba(29, 27, 32, 0.08);
+  background: rgba(0, 0, 0, 0.06);
   color: var(--md-on-surface);
 }
 
@@ -756,7 +756,7 @@
 }
 
 .right-panel-close:hover {
-  background: rgba(29, 27, 32, 0.08);
+  background: rgba(0, 0, 0, 0.06);
 }
 
 .right-panel-close svg {
@@ -1071,7 +1071,7 @@
 }
 
 .problem-item:hover {
-  background: rgba(29, 27, 32, 0.04);
+  background: rgba(0, 0, 0, 0.03);
 }
 
 .problem-icon {
@@ -1113,7 +1113,7 @@
 }
 
 .var-item:hover {
-  background: rgba(29, 27, 32, 0.04);
+  background: rgba(0, 0, 0, 0.03);
 }
 
 .var-type-badge {
