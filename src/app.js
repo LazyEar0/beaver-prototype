@@ -1531,11 +1531,14 @@ function buildPersonPickerList(pickerId, search) {
 function personPickerToggle(pickerId) {
   const drop = document.getElementById(`ppDrop_${pickerId}`);
   if (!drop) return;
+  const trigger = document.querySelector(`#pp_${pickerId} .pp-trigger`);
   const isOpen = !drop.classList.contains('hidden');
   // Close all other pickers
   document.querySelectorAll('.pp-dropdown').forEach(d => d.classList.add('hidden'));
+  document.querySelectorAll('.pp-trigger.is-open').forEach(t => t.classList.remove('is-open'));
   if (!isOpen) {
     drop.classList.remove('hidden');
+    if (trigger) trigger.classList.add('is-open');
     const inp = drop.querySelector('.pp-search-input');
     if (inp) { inp.value = ''; setTimeout(() => inp.focus(), 50); }
     const st = _personPickerState[pickerId];
