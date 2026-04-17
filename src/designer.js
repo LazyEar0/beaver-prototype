@@ -58,7 +58,7 @@ const nodeTypes = [
   { type: 'code', name: '代码', icon: '💻', color: 'node-color-data', category: '数据处理', desc: '编写自定义脚本（JS / Python），实现复杂数据处理逻辑', code: 'code' },
   { type: 'http', name: 'HTTP 请求', icon: '🌐', color: 'node-color-integration', category: '集成', desc: 'HTTP 请求调用，支持 GET/POST/PUT/DELETE，可配置请求头和请求体', code: 'http' },
   { type: 'mq', name: 'MQ 消息', icon: '📨', color: 'node-color-integration', category: '集成', desc: '消息队列操作，支持发送和消费消息，需配置 Topic', code: 'mq' },
-  { type: 'workflow', name: '子工作流', icon: '🔗', color: 'node-color-flow', category: '集成', desc: '调用已发布且允许被引用的子工作流，支持参数映射', code: 'wf' },
+  { type: 'workflow', name: '工作流', icon: '🔗', color: 'node-color-flow', category: '集成', desc: '调用被授权且支持引用的工作流，支持输入参数映射', code: 'wf' },
   { type: 'placeholder', name: '占位节点', icon: '⬜', color: 'node-color-placeholder', category: '其他', desc: '标记待完善的流程分支，可后续转换为具体节点类型', code: 'placeholder' },
 ];
 
@@ -609,7 +609,7 @@ function renderNodeConfigFields(node, nt) {
     code: { scene: '标准节点无法满足的复杂数据处理逻辑', rules: '代码中可通过 input 获取输入数据，通过 return 返回处理结果' },
     http: { scene: '调用外部 REST API 接口，例如「查询订单状态」「推送通知」', rules: '请求 URL 为必填项；建议配置超时和重试策略' },
     mq: { scene: '与消息队列系统交互，例如「发布订单创建事件」「消费支付回调消息」', rules: 'Topic 为必填项；消费模式需关注消息幂等处理' },
-    workflow: { scene: '复用已有流程能力，例如「调用通用的审批子流程」', rules: '只能调用已发布且开启了「允许被引用」的工作流' },
+    workflow: { scene: '复用已有流程能力，例如「调用通用的审批流程」「复用数据校验流程」', rules: '只能调用已发布、开启了「允许被引用」、且授权了当前空间的工作流' },
     placeholder: { scene: '规划流程时的临时占位，标记待实现的部分', rules: '发布前需转换为具体节点类型或删除' },
   };
   const help = nodeHelpMap[node.type] || {};
@@ -925,17 +925,34 @@ function renderMqConfig(node) {
 }
 
 function renderSubWfConfig(node) {
+  // Only show workflows that are published, allow reference, AND have authorized the current workspace
+  const currentWsId = designerWsId;
+  const availableWfs = Object.values(wsWorkflows).flat().filter(wf =>
+    wf.allowRef && wf.status === 'published' && wf.id !== designerWfId &&
+    (!wf.authorizedSpaces || wf.authorizedSpaces.length === 0 || wf.authorizedSpaces.includes(currentWsId))
+  );
   return `<div class="config-section">
-    <div class="config-section-title">子工作流配置</div>
+    <div class="config-section-title">工作流调用配置</div>
     <div class="config-field">
       <div class="config-field-label">选择工作流 <span class="required">*</span></div>
-      <select class="config-select"><option value="">请选择...</option>
-        ${Object.values(wsWorkflows).flat().filter(wf => wf.allowRef && wf.status === 'published' && wf.id !== designerWfId).map(wf => `<option value="${wf.id}">${wf.name} (${wf.code})</option>`).join('')}
+      <select class="config-select" onchange="updateNodeConfig(${node.id}, 'targetWfId', this.value)"><option value="">请选择...</option>
+        ${availableWfs.map(wf => {
+          const wsName = workspaces.find(ws => ws.id === wf.wsId)?.name || '';
+          return `<option value="${wf.id}" ${node.config?.targetWfId == wf.id ? 'selected' : ''}>${wf.name} (${wf.code})${wsName ? ' - ' + wsName : ''}</option>`;
+        }).join('')}
       </select>
+      <div class="config-field-help">仅显示已发布、允许引用、且授权当前空间的工作流</div>
     </div>
+    ${availableWfs.length === 0 ? `<div style="padding:var(--space-3);background:var(--md-surface-container);border-radius:var(--radius-sm);font-size:var(--font-size-xs);color:var(--md-outline);text-align:center">暂无可调用的工作流。请确认目标工作流已发布、开启"允许被引用"、并授权了当前空间。</div>` : ''}
     <div class="config-field">
       <div class="config-field-label">输入参数映射</div>
-      <textarea class="expr-editor" style="min-height:50px" placeholder='{"param1": "variable1"}'></textarea>
+      <textarea class="expr-editor" style="min-height:50px" placeholder='{"param1": "\${variable1}", "param2": "\${variable2}"}' onchange="updateNodeConfig(${node.id}, 'inputMapping', this.value)">${node.config?.inputMapping || ''}</textarea>
+      <div class="config-field-help">将当前流程变量映射为目标工作流的输入参数</div>
+    </div>
+    <div class="config-field">
+      <div class="config-field-label">输出变量名</div>
+      <input class="config-input" value="${node.config?.outputVar || 'wfResult'}" style="font-family:var(--font-family-mono)" onchange="updateNodeConfig(${node.id}, 'outputVar', this.value)" />
+      <div class="config-field-help">目标工作流的执行结果将赋值到此变量</div>
     </div>
   </div>`;
 }
@@ -970,8 +987,40 @@ function renderDesignerSettingsPanel() {
         <div class="config-field"><div class="config-field-label">所属空间</div><div class="config-readonly-value">${getFolderPath(wf.wsId, wf.folderId) || '根目录'}</div></div>
         <div class="config-field">
           <div class="config-field-label">允许被引用</div>
-          <div style="display:flex;align-items:center;gap:10px"><label class="toggle-sm"><input type="checkbox" ${wf.allowRef ? 'checked' : ''} /><span class="toggle-sm-slider"></span></label><span style="font-size:var(--font-size-xs);color:var(--md-on-surface-variant)">开启后可被其他工作流作为子流程调用</span></div>
+          <div style="display:flex;align-items:center;gap:10px"><label class="toggle-sm"><input type="checkbox" ${wf.allowRef ? 'checked' : ''} onchange="designerWf.allowRef=this.checked;renderDesigner()" /><span class="toggle-sm-slider"></span></label><span style="font-size:var(--font-size-xs);color:var(--md-on-surface-variant)">开启后可被其他空间的工作流调用</span></div>
         </div>
+        ${wf.allowRef ? `
+        <div class="config-field auth-spaces-field">
+          <div class="config-field-label">授权空间 <span class="required">*</span></div>
+          <div class="config-field-help" style="margin-bottom:6px">选择允许调用本工作流的空间，未授权的空间无法在"工作流"节点中看到本流程</div>
+          <div class="auth-space-options">
+            <label class="auth-space-option ${!wf.authorizedSpaces || wf.authorizedSpaces.length === 0 ? 'active' : ''}" onclick="designerWf.authorizedSpaces=[];renderDesigner()">
+              <input type="radio" name="authMode" ${!wf.authorizedSpaces || wf.authorizedSpaces.length === 0 ? 'checked' : ''} style="display:none" />
+              <span class="auth-space-radio"></span>
+              <span>全部空间</span>
+            </label>
+            <label class="auth-space-option ${wf.authorizedSpaces && wf.authorizedSpaces.length > 0 ? 'active' : ''}" onclick="if(!designerWf.authorizedSpaces||designerWf.authorizedSpaces.length===0){designerWf.authorizedSpaces=[designerWsId];}renderDesigner()">
+              <input type="radio" name="authMode" ${wf.authorizedSpaces && wf.authorizedSpaces.length > 0 ? 'checked' : ''} style="display:none" />
+              <span class="auth-space-radio"></span>
+              <span>指定空间</span>
+            </label>
+          </div>
+          ${wf.authorizedSpaces && wf.authorizedSpaces.length > 0 ? `
+            <div class="auth-space-list">
+              ${workspaces.filter(ws => ws.id !== wf.wsId).map(ws => {
+                const checked = wf.authorizedSpaces.includes(ws.id);
+                return `<label class="auth-space-item ${checked ? 'checked' : ''}">
+                  <input type="checkbox" ${checked ? 'checked' : ''} onchange="toggleAuthorizedSpace(${ws.id}, this.checked)" style="display:none" />
+                  <span class="auth-space-check">${checked ? icons.check : ''}</span>
+                  <span class="auth-space-name">${ws.name}</span>
+                  <span class="auth-space-code">${ws.code}</span>
+                </label>`;
+              }).join('')}
+            </div>
+            <div style="font-size:10px;color:var(--md-outline);margin-top:4px">当前空间「${workspaces.find(ws => ws.id === wf.wsId)?.name || ''}」默认可用，无需勾选</div>
+          ` : ''}
+        </div>
+        ` : ''}
       </div>
 
       <div class="settings-section settings-collapsible">
@@ -1054,6 +1103,19 @@ function toggleSettingsSection(titleEl) {
     body.style.display = isHidden ? 'block' : 'none';
     if (icon) icon.style.transform = isHidden ? '' : 'rotate(-90deg)';
   }
+}
+
+function toggleAuthorizedSpace(wsId, checked) {
+  if (!designerWf) return;
+  if (!designerWf.authorizedSpaces) designerWf.authorizedSpaces = [];
+  if (checked) {
+    if (!designerWf.authorizedSpaces.includes(wsId)) designerWf.authorizedSpaces.push(wsId);
+  } else {
+    designerWf.authorizedSpaces = designerWf.authorizedSpaces.filter(id => id !== wsId);
+    // Ensure at least one space if in specific mode
+    if (designerWf.authorizedSpaces.length === 0) designerWf.authorizedSpaces.push(designerWsId);
+  }
+  renderDesigner();
 }
 
 // --- Version Panel ---

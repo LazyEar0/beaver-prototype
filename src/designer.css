@@ -2000,3 +2000,134 @@
   width: 16px;
   height: 16px;
 }
+
+/* --- Authorized Spaces Selector --- */
+.auth-spaces-field {
+  margin-top: var(--space-1);
+  padding: var(--space-3);
+  background: var(--md-surface-container);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--md-outline-variant);
+}
+
+.auth-space-options {
+  display: flex;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.auth-space-option {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1.5px solid var(--md-outline-variant);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: var(--font-size-xs);
+  color: var(--md-on-surface-variant);
+  transition: var(--transition-fast);
+}
+
+.auth-space-option:hover {
+  border-color: var(--md-primary);
+}
+
+.auth-space-option.active {
+  border-color: var(--md-primary);
+  background: rgba(103, 80, 164, 0.06);
+  color: var(--md-primary);
+  font-weight: 500;
+}
+
+.auth-space-radio {
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-full);
+  border: 2px solid var(--md-outline-variant);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.auth-space-option.active .auth-space-radio {
+  border-color: var(--md-primary);
+}
+
+.auth-space-option.active .auth-space-radio::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border-radius: var(--radius-full);
+  background: var(--md-primary);
+}
+
+.auth-space-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 180px;
+  overflow-y: auto;
+  margin-top: var(--space-2);
+}
+
+.auth-space-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: var(--transition-fast);
+  font-size: var(--font-size-xs);
+  color: var(--md-on-surface);
+  border: 1px solid transparent;
+}
+
+.auth-space-item:hover {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.auth-space-item.checked {
+  background: rgba(103, 80, 164, 0.06);
+  border-color: var(--md-primary);
+}
+
+.auth-space-check {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  border: 1.5px solid var(--md-outline-variant);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: var(--transition-fast);
+}
+
+.auth-space-item.checked .auth-space-check {
+  background: var(--md-primary);
+  border-color: var(--md-primary);
+  color: #fff;
+}
+
+.auth-space-check svg {
+  width: 10px;
+  height: 10px;
+}
+
+.auth-space-name {
+  font-weight: 500;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.auth-space-code {
+  font-family: var(--font-family-mono);
+  font-size: 10px;
+  color: var(--md-outline);
+  flex-shrink: 0;
+}

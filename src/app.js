@@ -1701,7 +1701,7 @@ function showCreateWfModal() {
     <div class="form-group" style="flex:1"><label class="form-label">流程负责人 <span class="required">*</span></label>${buildPersonPickerHtml('wfOwner', [101], true)}</div>
   </div>
   <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">描述</label><textarea class="form-textarea" id="wfDesc" placeholder="选填，500字以内" maxlength="500" rows="2"></textarea></div>
-  <div class="form-group"><label class="form-label">允许被引用</label><div style="display:flex;align-items:center;gap:10px"><label class="toggle-sm"><input type="checkbox" id="wfAllowRef" /><span class="toggle-sm-slider"></span></label><span style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant)">开启后该流程可作为子流程被其他工作流引用</span></div></div>
+  <div class="form-group"><label class="form-label">允许被引用</label><div style="display:flex;align-items:center;gap:10px"><label class="toggle-sm"><input type="checkbox" id="wfAllowRef" /><span class="toggle-sm-slider"></span></label><span style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant)">开启后该流程可被其他空间的工作流调用（授权空间可在设计器设置中配置）</span></div></div>
   </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="createWf()">保存</button></div></div>`);
   setTimeout(() => document.getElementById('wfName')?.focus(), 300);
 }
@@ -2077,7 +2077,7 @@ function renderWsExecutionsTab(ws) {
 
   const statusLabel = { running: '运行中', paused: '已暂停', completed: '已完成', failed: '失败', cancelled: '已取消' };
   const statusClass = { running: 'exec-running', paused: 'exec-paused', completed: 'exec-completed', failed: 'exec-failed', cancelled: 'exec-cancelled' };
-  const triggerLabel = { manual: '手动', scheduled: '定时', event: '事件触发', subflow: '子流程调用' };
+  const triggerLabel = { manual: '手动', scheduled: '定时', event: '事件触发', subflow: '工作流调用' };
 
   // Pagination controls HTML
   let execPaginationHtml = '';
@@ -2154,7 +2154,7 @@ function renderExecDetail(ws) {
 
   const statusLabel = { running: '运行中', paused: '已暂停', completed: '已完成', failed: '失败', cancelled: '已取消' };
   const statusClass = { running: 'exec-running', paused: 'exec-paused', completed: 'exec-completed', failed: 'exec-failed', cancelled: 'exec-cancelled' };
-  const triggerLabel = { manual: '手动', scheduled: '定时', event: '事件触发', subflow: '子流程调用' };
+  const triggerLabel = { manual: '手动', scheduled: '定时', event: '事件触发', subflow: '工作流调用' };
   const nodeStatusClass = { success: 'success', failed: 'failed', running: 'running', skipped: 'skipped', paused: 'running', cancelled: 'failed' };
   const nodeStatusLabel = { success: '成功', failed: '失败', running: '运行中', skipped: '跳过', paused: '已暂停', cancelled: '已取消' };
   const hasPanel = wsExecSelectedNodeIdx !== null && exec.nodes && exec.nodes[wsExecSelectedNodeIdx];
