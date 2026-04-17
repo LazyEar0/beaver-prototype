@@ -963,7 +963,9 @@ function renderWorkspaceModule(content, breadcrumb) {
   } else if (wsCurrentView === 'detail') {
     const ws = workspaces.find(w => w.id === wsCurrentId);
     if (!ws) { wsCurrentView = 'list'; render(); return; }
-    breadcrumb.innerHTML = `<span class="breadcrumb-item" onclick="wsNavigateTo('list')">空间管理</span><span class="breadcrumb-separator">/</span><span class="breadcrumb-item current">${ws.name}</span>`;
+    breadcrumb.innerHTML = wsInternalTab === 'executions' && wsExecDetailId !== null
+      ? `<span class="breadcrumb-item" onclick="wsNavigateTo('list')">空间管理</span><span class="breadcrumb-separator">/</span><span class="breadcrumb-item" onclick="wsExecDetailId=null;wsExecSelectedNodeIdx=null;render()">${ws.name}</span><span class="breadcrumb-separator">/</span><span class="breadcrumb-item current">执行详情 #${wsExecDetailId}</span>`
+      : `<span class="breadcrumb-item" onclick="wsNavigateTo('list')">空间管理</span><span class="breadcrumb-separator">/</span><span class="breadcrumb-item current">${ws.name}</span>`;
     content.innerHTML = renderWsDetailPage(ws);
   }
 }
@@ -1013,6 +1015,10 @@ function toggleWsSortOrder() { wsListState.sortAsc = !wsListState.sortAsc; rende
 //   WORKSPACE DETAIL (3-Tab Layout)
 // ============================================
 function renderWsDetailPage(ws) {
+  // Full-page exec detail mode: skip space header & tabs
+  if (wsInternalTab === 'executions' && wsExecDetailId !== null) {
+    return renderExecDetail(ws);
+  }
   const isAdmin = ws.myRole === 'admin';
   return `
     <div class="ws-detail-compact-header">
@@ -2082,6 +2088,7 @@ function viewExecDetail(execId) { wsExecDetailId = execId; wsExecSelectedNodeIdx
 function renderExecDetail(ws) {
   const exec = (wsExecutions[ws.id] || []).find(e => e.id === wsExecDetailId);
   if (!exec) { wsExecDetailId = null; render(); return ''; }
+
   const statusLabel = { running: '运行中', paused: '已暂停', completed: '已完成', failed: '失败', cancelled: '已取消' };
   const statusClass = { running: 'exec-running', paused: 'exec-paused', completed: 'exec-completed', failed: 'exec-failed', cancelled: 'exec-cancelled' };
   const triggerLabel = { manual: '手动', scheduled: '定时', event: '事件触发', subflow: '子流程调用' };
@@ -2090,92 +2097,121 @@ function renderExecDetail(ws) {
   const hasPanel = wsExecSelectedNodeIdx !== null && exec.nodes && exec.nodes[wsExecSelectedNodeIdx];
   const selectedNode = hasPanel ? exec.nodes[wsExecSelectedNodeIdx] : null;
 
-  // Helper: render key-value cards for params
-  function renderKvCards(params) {
-    if (!params || Object.keys(params).length === 0) return '';
-    return `<div class="kv-cards">${Object.entries(params).map(([key, p]) => {
-      const isJson = p.type === 'Object' || (typeof p.value === 'string' && (p.value.trim().startsWith('{') || p.value.trim().startsWith('[')));
-      return `<div class="kv-card">
-        <div class="kv-card-header"><span class="kv-card-name">${p.label || key}</span><span class="kv-card-type">${p.type}</span></div>
-        <div class="kv-card-value ${isJson ? 'json-value' : ''}">${escHtml(String(p.value))}</div>
-      </div>`;
-    }).join('')}</div>`;
-  }
-
-  // Helper: render JSON block for panel
+  // --- Helpers ---
   function renderJsonBlock(data) {
     if (data === null || data === undefined) return '<div class="panel-empty">无数据</div>';
     const str = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
     return `<div class="panel-json-block">${escHtml(str)}</div>`;
   }
-
-  // Helper: render alert level badge
   function renderAlertLevel(level) {
     const cls = level === '严重' ? 'alert-level-critical' : level === '警告' ? 'alert-level-warning' : 'alert-level-info';
     return `<span class="alert-level ${cls}">${level}</span>`;
   }
-
-  // Build input params section
-  let inputsHtml = '';
-  if (exec.inputs && Object.keys(exec.inputs).length > 0) {
-    inputsHtml = `
-      <div class="exec-section-header">${icons.upload} 输入参数 <span class="section-count">${Object.keys(exec.inputs).length} 项</span></div>
-      ${renderKvCards(exec.inputs)}`;
+  function renderKvCards(params) {
+    if (!params || Object.keys(params).length === 0) return '';
+    return `<div class="kv-cards">${Object.entries(params).map(([key, p]) => {
+      const isJson = p.type === 'Object' || (typeof p.value === 'string' && (p.value.trim().startsWith('{') || p.value.trim().startsWith('[')));
+      return `<div class="kv-card"><div class="kv-card-header"><span class="kv-card-name">${p.label || key}</span><span class="kv-card-type">${p.type}</span></div><div class="kv-card-value ${isJson ? 'json-value' : ''}">${escHtml(String(p.value))}</div></div>`;
+    }).join('')}</div>`;
   }
 
-  // Build output results section (only for completed)
-  let outputsHtml = '';
-  if (exec.status === 'completed' && exec.outputs && Object.keys(exec.outputs).length > 0) {
-    outputsHtml = `
-      <div class="exec-section-header">${icons.checkCircle} 输出结果 <span class="section-count">${Object.keys(exec.outputs).length} 项</span></div>
-      ${renderKvCards(exec.outputs)}`;
-  }
+  // --- Build: Compact Top Bar ---
+  const topBarHtml = `
+    <div class="ed-topbar">
+      <div class="ed-topbar-left">
+        <button class="ed-back-btn" onclick="wsExecDetailId=null;wsExecSelectedNodeIdx=null;render()">${icons.arrowLeft}</button>
+        <div class="ed-topbar-identity">
+          <span class="ed-topbar-title">执行详情</span>
+          <code class="ed-topbar-id">#${exec.id}</code>
+          <span class="exec-status ${statusClass[exec.status]}">${statusLabel[exec.status]}</span>
+          ${exec.stale ? '<span class="stale-mark">异常滞留</span>' : ''}
+        </div>
+        <span class="ed-topbar-divider"></span>
+        <a class="ed-topbar-wf" onclick="navigateToWfDetail(${exec.wfId})">${exec.wfName}</a>
+        <span class="version-badge">v${exec.version}</span>
+      </div>
+      <div class="ed-topbar-actions">
+        ${exec.status === 'running' && ws.myRole !== 'viewer' ? `<button class="btn btn-secondary btn-sm" onclick="showPauseExecModal(${exec.id})">${icons.pause}<span>暂停</span></button>` : ''}
+        ${exec.status === 'paused' && ws.myRole !== 'viewer' ? `<button class="btn btn-primary btn-sm" onclick="showResumeExecModal(${exec.id})">${icons.play}<span>恢复</span></button>` : ''}
+        ${(exec.status === 'running' || exec.status === 'paused') && ws.myRole !== 'viewer' ? `<button class="btn btn-danger btn-sm" onclick="showCancelExecModal(${exec.id})">${icons.stop}<span>取消</span></button>` : ''}
+        ${['completed','failed','cancelled'].includes(exec.status) && ws.myRole !== 'viewer' ? `<button class="btn btn-primary btn-sm" onclick="showReExecuteModal(${exec.id})">${icons.redo}<span>重新执行</span></button>` : ''}
+      </div>
+    </div>`;
 
-  // Build node timeline
+  // --- Build: Compact Overview Strip ---
+  const overviewHtml = `
+    <div class="ed-overview-strip">
+      <div class="ed-overview-chip"><span class="ed-overview-chip-label">触发</span>${triggerLabel[exec.trigger]} · ${exec.triggerUser}</div>
+      <div class="ed-overview-chip"><span class="ed-overview-chip-label">开始</span><span class="ed-mono">${exec.startTime}</span></div>
+      <div class="ed-overview-chip"><span class="ed-overview-chip-label">结束</span><span class="ed-mono">${exec.endTime}</span></div>
+      <div class="ed-overview-chip"><span class="ed-overview-chip-label">耗时</span><strong>${exec.duration}</strong></div>
+    </div>`;
+
+  // --- Build: Node Timeline ---
   let timelineHtml = '';
   if (exec.nodes && exec.nodes.length > 0) {
     timelineHtml = `
-      <div class="exec-section-header">${icons.workflow} 节点执行时间线 <span class="section-count">${exec.nodes.length} 个节点</span></div>
-      <div class="node-timeline-v2">${exec.nodes.map((node, idx) => `
-        <div class="node-item-v2 ${node.status === 'failed' ? 'node-item-failed' : ''} ${wsExecSelectedNodeIdx === idx ? 'active' : ''}" onclick="selectExecNode(${idx})">
-          <div class="node-dot ${nodeStatusClass[node.status] || ''}"></div>
-          <div class="node-main">
-            <div class="node-header-row">
-              <span class="node-name-text">${node.name}</span>
-              <span class="badge badge-type" style="font-size:10px">${node.type}</span>
-              <span class="exec-status ${statusClass[node.status] || ''}" style="font-size:11px">${nodeStatusLabel[node.status] || node.status}</span>
+      <div class="ed-section">
+        <div class="ed-section-title">${icons.workflow} 节点执行时间线 <span class="section-count">${exec.nodes.length} 个节点</span></div>
+        <div class="node-timeline-v2">${exec.nodes.map((node, idx) => `
+          <div class="node-item-v2 ${node.status === 'failed' ? 'node-item-failed' : ''} ${wsExecSelectedNodeIdx === idx ? 'active' : ''}" onclick="selectExecNode(${idx})">
+            <div class="node-dot ${nodeStatusClass[node.status] || ''}"></div>
+            <div class="node-main">
+              <div class="node-header-row">
+                <span class="node-name-text">${node.name}</span>
+                <span class="badge badge-type" style="font-size:10px">${node.type}</span>
+                <span class="exec-status ${statusClass[node.status] || ''}" style="font-size:11px">${nodeStatusLabel[node.status] || node.status}</span>
+              </div>
+              <div class="node-meta-row"><span>开始: ${node.startTime}</span><span>耗时: ${node.duration}</span></div>
+              ${node.error ? `<div class="node-error-brief">${node.error}</div>` : ''}
             </div>
-            <div class="node-meta-row">
-              <span>开始: ${node.startTime}</span><span>耗时: ${node.duration}</span>
-            </div>
-            ${node.error ? `<div class="node-error-brief">${node.error}</div>` : ''}
-          </div>
-          <div class="node-select-arrow">${icons.chevronRight}</div>
-        </div>`).join('')}</div>`;
+            <div class="node-select-arrow">${icons.chevronRight}</div>
+          </div>`).join('')}</div>
+      </div>`;
   }
 
-  // Build alerts section
-  let alertsHtml = '';
-  const alerts = exec.alerts || [];
-  alertsHtml = `
-    <div class="exec-section-header">${icons.alertTriangle} 告警记录 <span class="section-count">${alerts.length} 条</span></div>
-    ${alerts.length === 0
-      ? '<div class="alert-empty">该实例暂无告警记录</div>'
-      : `<div class="table-wrapper"><table class="alert-records-table"><thead><tr><th>触发时间</th><th>告警类型</th><th>告警级别</th><th>推送状态</th><th>操作</th></tr></thead><tbody>
-        ${alerts.map((a, ai) => `<tr>
-          <td style="font-family:'Roboto Mono',monospace">${a.time}</td>
-          <td>${a.type}</td>
-          <td>${renderAlertLevel(a.level)}</td>
-          <td><span class="alert-push-status ${a.pushStatus === 'success' ? 'alert-push-success' : 'alert-push-failed'}">${a.pushStatus === 'success' ? icons.checkCircle + ' 成功' : icons.xCircle + ' 失败'}</span></td>
-          <td>${a.pushStatus === 'failed' ? `<button class="alert-repush-btn" onclick="event.stopPropagation();repushAlert(${exec.id},${ai})">${icons.redo} 重新推送</button>` : ''}</td>
-        </tr>`).join('')}
-      </tbody></table></div>`}`;
+  // --- Build: Input Params (collapsible) ---
+  let inputsHtml = '';
+  if (exec.inputs && Object.keys(exec.inputs).length > 0) {
+    inputsHtml = `
+      <details class="ed-collapsible" open>
+        <summary class="ed-collapsible-header">${icons.upload} 输入参数 <span class="section-count">${Object.keys(exec.inputs).length} 项</span></summary>
+        <div class="ed-collapsible-body">${renderKvCards(exec.inputs)}</div>
+      </details>`;
+  }
 
-  // Build right panel
+  // --- Build: Output Results (collapsible, only for completed) ---
+  let outputsHtml = '';
+  if (exec.status === 'completed' && exec.outputs && Object.keys(exec.outputs).length > 0) {
+    outputsHtml = `
+      <details class="ed-collapsible">
+        <summary class="ed-collapsible-header">${icons.checkCircle} 输出结果 <span class="section-count">${Object.keys(exec.outputs).length} 项</span></summary>
+        <div class="ed-collapsible-body">${renderKvCards(exec.outputs)}</div>
+      </details>`;
+  }
+
+  // --- Build: Alert Records (collapsible) ---
+  const alerts = exec.alerts || [];
+  const alertsHtml = `
+    <details class="ed-collapsible" ${alerts.length > 0 ? 'open' : ''}>
+      <summary class="ed-collapsible-header">${icons.alertTriangle} 告警记录 <span class="section-count">${alerts.length} 条</span></summary>
+      <div class="ed-collapsible-body">
+      ${alerts.length === 0
+        ? '<div class="alert-empty">该实例暂无告警记录</div>'
+        : `<table class="alert-records-table"><thead><tr><th>触发时间</th><th>告警类型</th><th>级别</th><th>推送状态</th><th>操作</th></tr></thead><tbody>
+          ${alerts.map((a, ai) => `<tr>
+            <td class="ed-mono">${a.time}</td><td>${a.type}</td><td>${renderAlertLevel(a.level)}</td>
+            <td><span class="alert-push-status ${a.pushStatus === 'success' ? 'alert-push-success' : 'alert-push-failed'}">${a.pushStatus === 'success' ? icons.checkCircle + ' 成功' : icons.xCircle + ' 失败'}</span></td>
+            <td>${a.pushStatus === 'failed' ? `<button class="alert-repush-btn" onclick="event.stopPropagation();repushAlert(${exec.id},${ai})">${icons.redo} 重新推送</button>` : ''}</td>
+          </tr>`).join('')}</tbody></table>`}
+      </div>
+    </details>`;
+
+  // --- Build: Right Panel ---
   let panelHtml = '';
   if (hasPanel && selectedNode) {
     panelHtml = `
-      <div class="exec-node-panel">
+      <aside class="ed-panel">
         <div class="exec-panel-header">
           <div class="exec-panel-title">${icons.info} 节点详情</div>
           <button class="exec-panel-close" onclick="closeExecNodePanel()">${icons.close}</button>
@@ -2186,98 +2222,38 @@ function renderExecDetail(ws) {
             <div class="panel-node-status-info">
               <div style="font-weight:500;font-size:var(--font-size-sm)">${selectedNode.name}</div>
               <div class="node-type">${selectedNode.type}</div>
-              <div class="node-timing">开始: ${selectedNode.startTime} &middot; 耗时: ${selectedNode.duration}</div>
+              <div class="node-timing">开始: ${selectedNode.startTime} · 耗时: ${selectedNode.duration}</div>
             </div>
             <span class="exec-status ${statusClass[selectedNode.status] || ''}" style="font-size:11px">${nodeStatusLabel[selectedNode.status] || selectedNode.status}</span>
           </div>
-
-          <div class="panel-section">
-            <div class="panel-section-title">${icons.upload} 输入数据</div>
-            ${renderJsonBlock(selectedNode.inputData)}
-          </div>
-
-          <div class="panel-section">
-            <div class="panel-section-title">${icons.checkCircle} 输出数据</div>
-            ${renderJsonBlock(selectedNode.outputData)}
-          </div>
-
-          <div class="panel-section">
-            <div class="panel-section-title">${icons.database} 变量快照</div>
-            ${renderJsonBlock(selectedNode.variables)}
-          </div>
-
-          ${selectedNode.status === 'failed' && (selectedNode.error || selectedNode.errorDetail) ? `
-          <div class="panel-section">
-            <div class="panel-section-title" style="color:var(--md-error)">${icons.xCircle} 错误信息</div>
-            <div class="panel-error-block">${escHtml(selectedNode.errorDetail || selectedNode.error || '')}</div>
-          </div>` : ''}
+          <div class="panel-section"><div class="panel-section-title">${icons.upload} 输入数据</div>${renderJsonBlock(selectedNode.inputData)}</div>
+          <div class="panel-section"><div class="panel-section-title">${icons.checkCircle} 输出数据</div>${renderJsonBlock(selectedNode.outputData)}</div>
+          <div class="panel-section"><div class="panel-section-title">${icons.database} 变量快照</div>${renderJsonBlock(selectedNode.variables)}</div>
+          ${selectedNode.status === 'failed' && (selectedNode.error || selectedNode.errorDetail) ? `<div class="panel-section"><div class="panel-section-title" style="color:var(--md-error)">${icons.xCircle} 错误信息</div><div class="panel-error-block">${escHtml(selectedNode.errorDetail || selectedNode.error || '')}</div></div>` : ''}
         </div>
-      </div>`;
+      </aside>`;
+  } else {
+    panelHtml = `
+      <aside class="ed-panel ed-panel-placeholder">
+        <div class="ed-panel-empty">
+          <div class="ed-panel-empty-icon">${icons.info}</div>
+          <div class="ed-panel-empty-text">点击左侧节点<br/>查看执行详情</div>
+        </div>
+      </aside>`;
   }
 
+  // --- Assemble Full Page ---
   return `
-    <div class="detail-back" onclick="wsExecDetailId = null; wsExecSelectedNodeIdx = null; render()" style="margin-bottom:var(--space-4)">${icons.arrowLeft}<span>返回执行记录列表</span></div>
-    <div class="exec-detail-header">
-      <div style="display:flex;align-items:center;gap:var(--space-3)">
-        <h2 style="font-size:var(--font-size-lg);font-weight:500;margin:0">执行详情 <code style="font-size:var(--font-size-md);color:var(--md-outline)">#${exec.id}</code></h2>
-        <span class="exec-status ${statusClass[exec.status]}" style="font-size:var(--font-size-sm)">${statusLabel[exec.status]}</span>
-        ${exec.stale ? '<span class="stale-mark">异常滞留</span>' : ''}
-      </div>
-      <div style="display:flex;gap:var(--space-2)">
-        ${exec.status === 'running' && ws.myRole !== 'viewer' ? `<button class="btn btn-secondary btn-sm" onclick="showPauseExecModal(${exec.id})">${icons.pause}<span>暂停</span></button>` : ''}
-        ${exec.status === 'paused' && ws.myRole !== 'viewer' ? `<button class="btn btn-primary btn-sm" onclick="showResumeExecModal(${exec.id})">${icons.play}<span>恢复</span></button>` : ''}
-        ${(exec.status === 'running' || exec.status === 'paused') && ws.myRole !== 'viewer' ? `<button class="btn btn-danger btn-sm" onclick="showCancelExecModal(${exec.id})">${icons.stop}<span>取消</span></button>` : ''}
-        ${['completed','failed','cancelled'].includes(exec.status) && ws.myRole !== 'viewer' ? `<button class="btn btn-primary btn-sm" onclick="showReExecuteModal(${exec.id})">${icons.redo}<span>重新执行</span></button>` : ''}
-      </div>
-    </div>
-
-    <div class="exec-detail-split ${hasPanel ? 'panel-open' : ''}">
-      <div class="exec-detail-main">
-        <!-- Overview Card -->
-        <div class="exec-overview-card">
-          <div class="exec-overview-grid">
-            <div class="exec-overview-item">
-              <span class="exec-overview-label">工作流</span>
-              <span class="exec-overview-value"><a onclick="navigateToWfDetail(${exec.wfId})">${exec.wfName}</a></span>
-            </div>
-            <div class="exec-overview-item">
-              <span class="exec-overview-label">版本</span>
-              <span class="exec-overview-value"><span class="version-badge">v${exec.version}</span></span>
-            </div>
-            <div class="exec-overview-item">
-              <span class="exec-overview-label">触发方式</span>
-              <span class="exec-overview-value">${triggerLabel[exec.trigger]}</span>
-            </div>
-            <div class="exec-overview-item">
-              <span class="exec-overview-label">触发人</span>
-              <span class="exec-overview-value">${exec.triggerUser}</span>
-            </div>
-            <div class="exec-overview-item">
-              <span class="exec-overview-label">开始时间</span>
-              <span class="exec-overview-value" style="font-family:'Roboto Mono',monospace;font-size:var(--font-size-xs)">${exec.startTime}</span>
-            </div>
-            <div class="exec-overview-item">
-              <span class="exec-overview-label">结束时间</span>
-              <span class="exec-overview-value" style="font-family:'Roboto Mono',monospace;font-size:var(--font-size-xs)">${exec.endTime}</span>
-            </div>
-            <div class="exec-overview-item">
-              <span class="exec-overview-label">执行时长</span>
-              <span class="exec-overview-value">${exec.duration}</span>
-            </div>
-            <div class="exec-overview-item">
-              <span class="exec-overview-label">实例 ID</span>
-              <span class="exec-overview-value" style="font-family:'Roboto Mono',monospace">${exec.id}</span>
-            </div>
-          </div>
-        </div>
-
+    ${topBarHtml}
+    ${overviewHtml}
+    <div class="ed-body ${hasPanel ? 'panel-open' : ''}">
+      <div class="ed-left">
+        ${timelineHtml}
         ${inputsHtml}
         ${outputsHtml}
-        ${timelineHtml}
         ${alertsHtml}
       </div>
-
-      ${panelHtml}
+      ${exec.nodes && exec.nodes.length > 0 ? panelHtml : ''}
     </div>`;
 }
 
@@ -2292,13 +2268,8 @@ function closeExecNodePanel() {
 }
 
 function navigateToWfDetail(wfId) {
-  // Navigate to workflow detail view within the current workspace
-  const ws = workspaces.find(w => w.id === wsCurrentId);
-  if (!ws) return;
   const wf = (wsWorkflows[wsCurrentId] || []).find(w => w.id === wfId);
-  if (wf) {
-    showToast('info', '跳转', '即将跳转至工作流「' + wf.name + '」详情');
-  }
+  if (wf) showToast('info', '跳转', '即将跳转至工作流「' + wf.name + '」详情');
 }
 
 function repushAlert(execId, alertIdx) {
