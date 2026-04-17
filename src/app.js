@@ -413,9 +413,9 @@ function renderDsListPage() {
       </div>
     </div>
     <div class="ds-table-area">${total === 0 ? (hasFilters ? renderEmptyState('dsSearchEmpty') : renderEmptyState('datasource')) : `
-    <div class="table-wrapper"><table class="data-table"><thead><tr><th>名称</th><th style="width:100px">授权方式</th><th style="width:80px">数据项</th><th style="width:90px">被引用</th><th style="width:100px">创建者</th><th style="width:110px">创建时间</th><th style="width:90px">操作</th></tr></thead><tbody>
+    <div class="table-card"><div class="table-wrapper"><table class="data-table"><thead><tr><th>名称</th><th style="width:100px">授权方式</th><th style="width:80px">数据项</th><th style="width:90px">被引用</th><th style="width:100px">创建者</th><th style="width:110px">创建时间</th><th style="width:90px">操作</th></tr></thead><tbody>
       ${paged.map(ds => `<tr onclick="navigateTo('detail', ${ds.id})"><td><div class="ds-name-cell"><span class="ds-name">${ds.name}</span>${ds.desc ? `<span class="ds-desc">${ds.desc}</span>` : ''}</div></td><td><span class="badge ${ds.isPublic ? 'badge-public' : 'badge-private'}">${ds.isPublic ? `${icons.globe} 公开` : `${icons.lock} 指定空间`}</span></td><td>${ds.items.length} 条</td><td>${ds.referenced ? `<span class="ref-count">${icons.link} ${ds.referenceCount}</span>` : '<span class="ref-none">未引用</span>'}</td><td>${ds.creator}</td><td>${ds.createdAt}</td><td onclick="event.stopPropagation()"><div class="table-actions"><button class="table-action-btn" title="编辑" onclick="showEditDsModal(${ds.id})">${icons.edit}</button><button class="table-action-btn danger" title="删除" onclick="showDeleteDsModal(${ds.id})">${icons.trash}</button></div></td></tr>`).join('')}
-    </tbody></table></div>
+    </tbody></table></div></div>
     <div class="pagination"><div class="pagination-info"><span>共 ${total} 条记录</span><div class="pagination-divider"></div><span class="pagination-size"><label>每页</label><select onchange="onDsPageSizeChange(this.value)">${[10,20,50].map(n => `<option value="${n}" ${listState.pageSize === n ? 'selected' : ''}>${n}</option>`).join('')}</select><label>条</label></span></div><div class="pagination-controls"><button class="pagination-btn" ${listState.page <= 1 ? 'disabled' : ''} onclick="goToPage(${listState.page - 1})">${icons.chevronLeft}</button>${Array.from({length: totalPages}, (_, i) => i + 1).map(p => `<button class="pagination-btn ${p === listState.page ? 'active' : ''}" onclick="goToPage(${p})">${p}</button>`).join('')}<button class="pagination-btn" ${listState.page >= totalPages ? 'disabled' : ''} onclick="goToPage(${listState.page + 1})">${icons.chevronRight}</button></div></div>`}</div>`;
 }
 function getFilteredDataSources() {
@@ -432,6 +432,14 @@ function getFilteredDataSources() {
   });
 }
 function onSearchInput(val) { if (isComposing) return; listState.search = val; clearTimeout(searchTimer); searchTimer = setTimeout(() => { listState.page = 1; render(); }, 300); }
+function clearSearchInput(type) {
+  if (type === 'ds') { listState.search = ''; listState.page = 1; }
+  else if (type === 'item') { itemSearchKeyword = ''; itemPage = 1; }
+  else if (type === 'wsList') { wsListState.search = ''; wsListState.page = 1; }
+  else if (type === 'wsContent') { wsContentSearch = ''; }
+  else if (type === 'wsExec') { wsExecSearch = ''; wsExecPage = 1; }
+  render();
+}
 function onFilterAuth(val) { listState.authFilter = val; listState.page = 1; render(); }
 function goToPage(p) { listState.page = p; render(); }
 function onFilterRef(val) { listState.refFilter = val; listState.page = 1; render(); }
@@ -570,7 +578,7 @@ function renderDataItemsTab(ds) {
   const addBtn = addBtnDisabled
     ? `<span title="已达数据项上限（500条），无法继续添加" style="cursor:not-allowed"><button class="btn btn-primary btn-sm" disabled style="opacity:0.5;cursor:not-allowed;pointer-events:none">${icons.plus}<span>添加数据项</span></button></span>`
     : `<button class="btn btn-primary btn-sm" onclick="showAddItemModal(${ds.id})">${icons.plus}<span>添加数据项</span></button>`;
-  const searchHtml = `<div class="filter-search" style="width:240px;height:34px">${icons.search}<input type="text" placeholder="搜索 Key / Value ..." value="${escHtml(itemSearchKeyword)}" oninput="onItemSearch(this.value)" /></div>`;
+  const searchHtml = `<div class="filter-search" style="width:240px;height:34px">${icons.search}<input type="text" placeholder="搜索 Key / Value ..." value="${escHtml(itemSearchKeyword)}" oninput="onItemSearch(this.value)" />${itemSearchKeyword ? `<button class="search-clear-btn" onclick="event.stopPropagation();clearSearchInput('item')" title="清空">×</button>` : ''}</div>`;
   return `<div class="tab-toolbar"><div class="tab-toolbar-left">${searchHtml}</div><div class="tab-toolbar-right">${addBtn}</div></div>
   ${total === 0 && itemSearchKeyword ? `<div style="padding:var(--space-12) var(--space-8);text-align:center;color:var(--md-on-surface-variant)"><div style="font-size:var(--font-size-lg);margin-bottom:var(--space-2)">未找到匹配的数据项</div><div style="font-size:var(--font-size-sm)">尝试调整搜索关键词</div></div>` : `<div class="table-wrapper"><table class="data-table"><thead><tr><th style="width:180px" class="sortable" onclick="toggleItemSort('key')">Key <span class="sort-icon">${si('key')}</span></th><th class="sortable" onclick="toggleItemSort('value')">Value <span class="sort-icon">${si('value')}</span></th><th style="width:90px">类型</th><th style="width:130px">更新时间</th><th style="width:90px">操作</th></tr></thead><tbody>
   ${paged.map(item => `<tr><td style="width:180px"><code class="item-key">${item.key}</code></td><td><div style="max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(item.value)}">${item.value}</div></td><td><span class="badge badge-type">${item.type}</span></td><td style="font-size:var(--font-size-xs);color:var(--md-outline)">${item.updatedAt || '-'}</td><td><div class="table-actions"><button class="table-action-btn" title="编辑" onclick="showEditItemModal(${ds.id}, '${item.key}')">${icons.edit}</button><button class="table-action-btn danger" title="删除" onclick="deleteItem(${ds.id}, '${item.key}')">${icons.trash}</button></div></td></tr>`).join('')}
@@ -956,7 +964,7 @@ function renderWsListPage() {
   return `
     <div class="page-header"><div class="page-title-section"><h1 class="page-title shiny-text">空间管理</h1></div><button class="btn btn-primary magnet-btn" onclick="showCreateWsModal()">${icons.plus}<span>新建空间</span></button></div>
     <div class="filter-bar">
-      <div class="filter-search">${icons.search}<input type="text" placeholder="搜索空间名称或编号..." value="${wsListState.search}" oninput="onWsSearchInput(this.value)" /></div>
+      <div class="filter-search">${icons.search}<input type="text" id="wsListSearchInput" placeholder="搜索空间名称或编号..." value="${wsListState.search}" oninput="onWsSearchInput(this.value)" />${wsListState.search ? `<button class="search-clear-btn" onclick="event.stopPropagation();clearSearchInput('wsList')" title="清空">×</button>` : ''}</div>
       <div class="filter-chips">
         <span class="filter-chip ${wsListState.roleFilter === 'all' ? 'active' : ''}" onclick="onWsRoleFilter('all')">全部</span>
         <span class="filter-chip ${wsListState.roleFilter === 'admin' ? 'active' : ''}" onclick="onWsRoleFilter('admin')">我管理的</span>
@@ -1169,34 +1177,35 @@ function renderWsWorkflowsTab(ws) {
     </div>
 
     ${isEmpty ? (isSearchMode ? renderEmptyState('searchNoResult') : (wsCurrentFolderId !== null ? `<div class="empty-state" style="padding:var(--space-10)"><img src="./public/images/empty-folder-content.png" class="empty-state-img" /><div class="empty-state-title">该文件夹为空</div><div class="empty-state-desc">在此文件夹中创建工作流或子文件夹</div><div style="display:flex;gap:var(--space-2);margin-top:var(--space-4)">${isMemberOrAbove ? `<button class="btn btn-primary btn-sm" onclick="showCreateWfModal()">${icons.plus}<span>新建工作流</span></button>` : ''}${canCreateFolder ? `<button class="btn btn-secondary btn-sm" onclick="showCreateFolderModal()">${icons.folder}<span>新建子文件夹</span></button>` : ''}</div></div>` : `<div class="empty-state" style="padding:var(--space-10)"><img src="./public/images/empty-folder-content.png" class="empty-state-img" /><div class="empty-state-title">暂无内容</div><div class="empty-state-desc">创建工作流或文件夹来组织您的空间</div><div style="display:flex;gap:var(--space-2);margin-top:var(--space-4)">${isMemberOrAbove ? `<button class="btn btn-primary btn-sm" onclick="showCreateWfModal()">${icons.plus}<span>新建工作流</span></button><button class="btn btn-secondary btn-sm" onclick="showCreateFolderModal()">${icons.folder}<span>新建文件夹</span></button>` : ''}</div></div>`)) : `
-    <div class="content-list-header"><span class="col-header ${sortCls('name')}" style="flex:2.5" onclick="onWsContentSort('name')">名称 ${sortIcon('name')}</span><span style="flex:0.7">状态</span><span style="flex:0.6">发布版本</span><span style="flex:0.6">类型</span><span style="flex:0.8">创建者</span><span style="flex:0.8">负责人</span><span class="col-header ${sortCls('editedAt')}" style="flex:0.9" onclick="onWsContentSort('editedAt')">最后编辑 ${sortIcon('editedAt')}</span><span style="width:110px">操作</span></div>
-    <div class="content-list">
+    <div class="table-card"><div class="table-wrapper"><table class="data-table">
+    <thead><tr><th><span class="col-header ${sortCls('name')}" onclick="onWsContentSort('name')">名称 ${sortIcon('name')}</span></th><th style="width:80px">状态</th><th style="width:80px">发布版本</th><th style="width:80px">类型</th><th style="width:90px">创建者</th><th style="width:90px">负责人</th><th style="width:110px"><span class="col-header ${sortCls('editedAt')}" onclick="onWsContentSort('editedAt')">最后编辑 ${sortIcon('editedAt')}</span></th><th style="width:110px">操作</th></tr></thead>
+    <tbody>
       ${showFolders ? sortedFolders.map(f => {
         const subF = getSubFolderCount(ws.id, f.id), subW = getSubWfCount(ws.id, f.id);
-        return `<div class="content-list-item" onclick="navigateIntoFolder(${f.id}, '${f.name.replace(/'/g, "\\'")}')" style="cursor:pointer">
-          <div class="content-item-main" style="flex:2.5"><div class="content-item-icon folder-icon">${icons.folder}</div><div><div class="content-item-name">${f.name}</div><div class="content-item-desc">${subW} 个工作流${subF > 0 ? `，${subF} 个子文件夹` : ''}</div></div></div>
-          <div style="flex:0.7"><span style="font-size:var(--font-size-xs);color:var(--md-outline)">—</span></div>
-          <div style="flex:0.6"><span style="font-size:var(--font-size-xs);color:var(--md-outline)">—</span></div>
-          <div style="flex:0.6"><span class="badge badge-type" style="font-size:11px">${icons.folder} 文件夹</span></div>
-          <div style="flex:0.8;font-size:var(--font-size-sm);color:var(--md-on-surface-variant)">${f.creator}</div>
-          <div style="flex:0.8"><span style="font-size:var(--font-size-xs);color:var(--md-outline)">—</span></div>
-          <div style="flex:0.9;font-size:var(--font-size-sm);color:var(--md-outline)">${f.editedAt}</div>
-          <div class="content-item-actions" style="width:110px" onclick="event.stopPropagation()">
+        return `<tr onclick="navigateIntoFolder(${f.id}, '${f.name.replace(/'/g, "\\'")}')" style="cursor:pointer">
+          <td><div style="display:flex;align-items:center;gap:var(--space-3)"><div class="content-item-icon folder-icon">${icons.folder}</div><div class="ds-name-cell"><span class="ds-name">${f.name}</span><span class="ds-desc">${subW} 个工作流${subF > 0 ? `，${subF} 个子文件夹` : ''}</span></div></div></td>
+          <td><span style="font-size:var(--font-size-xs);color:var(--md-outline)">—</span></td>
+          <td><span style="font-size:var(--font-size-xs);color:var(--md-outline)">—</span></td>
+          <td><span class="badge badge-type" style="font-size:11px">${icons.folder} 文件夹</span></td>
+          <td style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant)">${f.creator}</td>
+          <td><span style="font-size:var(--font-size-xs);color:var(--md-outline)">—</span></td>
+          <td style="font-size:var(--font-size-sm);color:var(--md-outline)">${f.editedAt}</td>
+          <td onclick="event.stopPropagation()"><div class="table-actions">
             ${isMemberOrAbove ? `<button class="table-action-btn" title="编辑" onclick="showEditFolderModal(${f.id})">${icons.edit}</button><div class="more-menu-wrapper"><button class="table-action-btn" title="更多" onclick="event.stopPropagation();toggleMoreMenu(this)">${icons.chevronDown}</button><div class="more-menu-panel hidden"><div class="more-menu-item" onclick="showMoveFolderModal(${f.id})">${icons.move}<span>移动</span></div></div></div>` : ''}
-          </div></div>`;
+          </div></td></tr>`;
       }).join('') : ''}
       ${sortedWf.map(wf => {
         const canExec = wf.status === 'published';
         const wfOwnerNames = wf.owners.map(oid => { const u = ssoUsers.find(x => x.id === oid); return u ? u.name : ''; }).filter(Boolean).join(', ');
-        return `<div class="content-list-item" onclick="openDesigner(${ws.id}, ${wf.id})" style="cursor:pointer">
-          <div class="content-item-main" style="flex:2.5"><div class="content-item-icon wf-icon">${icons.workflow}</div><div><div class="content-item-name" style="color:var(--md-primary)">${wf.name}${isSearchMode ? `<span style="font-size:11px;color:var(--md-outline);margin-left:8px">${getFolderPath(ws.id, wf.folderId) || '根目录'}</span>` : ''}</div><div class="content-item-desc">${icons.hash} ${wf.code}${wf.desc ? ` · ${wf.desc}` : ''}</div></div></div>
-          <div style="flex:0.7"><span class="status-badge ${statusClass[wf.status]}">${statusLabel[wf.status]}</span></div>
-          <div style="flex:0.6">${wf.version > 0 ? `<span class="version-badge">v${wf.version}</span>` : '<span style="color:var(--md-outline);font-size:var(--font-size-xs)">-</span>'}</div>
-          <div style="flex:0.6"><span class="badge badge-type" style="font-size:11px">${typeLabel[wf.type]}</span></div>
-          <div style="flex:0.8;font-size:var(--font-size-sm);color:var(--md-on-surface-variant)">${wf.creator}</div>
-          <div style="flex:0.8;font-size:var(--font-size-sm);color:var(--md-on-surface-variant)">${wfOwnerNames || '-'}</div>
-          <div style="flex:0.9;font-size:var(--font-size-sm);color:var(--md-outline)">${wf.editedAt}</div>
-          <div class="content-item-actions" style="width:110px" onclick="event.stopPropagation()">
+        return `<tr onclick="openDesigner(${ws.id}, ${wf.id})" style="cursor:pointer">
+          <td><div style="display:flex;align-items:center;gap:var(--space-3)"><div class="content-item-icon wf-icon">${icons.workflow}</div><div class="ds-name-cell"><span class="ds-name" style="color:var(--md-primary)">${wf.name}${isSearchMode ? `<span style="font-size:11px;color:var(--md-outline);margin-left:8px">${getFolderPath(ws.id, wf.folderId) || '根目录'}</span>` : ''}</span><span class="ds-desc" style="max-width:400px">${icons.hash} ${wf.code}${wf.desc ? ` · ${wf.desc}` : ''}</span></div></div></td>
+          <td><span class="status-badge ${statusClass[wf.status]}">${statusLabel[wf.status]}</span></td>
+          <td>${wf.version > 0 ? `<span class="version-badge">v${wf.version}</span>` : '<span style="color:var(--md-outline);font-size:var(--font-size-xs)">-</span>'}</td>
+          <td><span class="badge badge-type" style="font-size:11px">${typeLabel[wf.type]}</span></td>
+          <td style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant)">${wf.creator}</td>
+          <td style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant)">${wfOwnerNames || '-'}</td>
+          <td style="font-size:var(--font-size-sm);color:var(--md-outline)">${wf.editedAt}</td>
+          <td onclick="event.stopPropagation()"><div class="table-actions">
             ${isMemberOrAbove ? `<button class="table-action-btn" title="编辑流程" onclick="openDesigner(${ws.id}, ${wf.id})" style="color:var(--md-primary)">${icons.edit}</button>` : `<button class="table-action-btn" title="查看流程" onclick="openDesigner(${ws.id}, ${wf.id})">${icons.eye}</button>`}
             ${canExec ? `<button class="table-action-btn" title="执行" onclick="executeWf(${wf.id})" style="color:var(--md-tertiary)">${icons.play}</button>` : ''}
             <div class="more-menu-wrapper"><button class="table-action-btn" title="更多" onclick="event.stopPropagation();toggleMoreMenu(this)">${icons.chevronDown}</button><div class="more-menu-panel hidden">
@@ -1204,9 +1213,9 @@ function renderWsWorkflowsTab(ws) {
               ${isMemberOrAbove ? `<div class="more-menu-item" onclick="showMoveWfModal(${wf.id})">${icons.move}<span>移动</span></div>` : ''}
               ${isAdmin ? `<div style="border-top:1px solid var(--md-outline-variant);margin:4px 0"></div><div class="more-menu-item danger" onclick="showDeleteWfModal(${wf.id})">${icons.trash}<span>删除</span></div>` : ''}
             </div></div>
-          </div></div>`;
+          </div></td></tr>`;
       }).join('')}
-    </div>`}`;
+    </tbody></table></div></div>`}`;
 }
 
 function onWsContentSearch(val) { wsContentSearch = val; render(); }
@@ -1883,7 +1892,7 @@ function renderWsExecutionsTab(ws) {
 
   return `
     <div class="filter-bar" style="margin-top:var(--space-3)">
-      <div class="filter-search" style="flex:1;max-width:300px">${icons.search}<input type="text" placeholder="搜索工作流名称或实例ID..." value="${wsExecSearch}" oninput="onExecSearch(this.value)" /></div>
+      <div class="filter-search" style="flex:1;max-width:300px">${icons.search}<input type="text" placeholder="搜索工作流名称或实例ID..." value="${wsExecSearch}" oninput="onExecSearch(this.value)" />${wsExecSearch ? `<button class="search-clear-btn" onclick="event.stopPropagation();clearSearchInput('wsExec')" title="清空">×</button>` : ''}</div>
       <div class="filter-actions" style="display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap">
         <select class="form-input" style="width:auto;padding:4px 8px;font-size:var(--font-size-sm)" onchange="onExecStatusFilter(this.value)">
           <option value="all" ${wsExecStatusFilter === 'all' ? 'selected' : ''}>全部状态</option>
@@ -2471,6 +2480,10 @@ render = function() {
   const _wsSearchEl = document.getElementById('wsSearchInput');
   const _wsSearchWasFocused = document.activeElement && document.activeElement === _wsSearchEl;
   const _wsSearchCursorPos = (_wsSearchWasFocused && _wsSearchEl) ? (_wsSearchEl.selectionStart || 0) : 0;
+  // Workspace LIST search input (space management page)
+  const _wsListSearchEl = document.getElementById('wsListSearchInput');
+  const _wsListSearchWasFocused = document.activeElement && document.activeElement === _wsListSearchEl;
+  const _wsListSearchCursorPos = (_wsListSearchWasFocused && _wsListSearchEl) ? (_wsListSearchEl.selectionStart || 0) : 0;
 
   // Detect actual view/page change (not just filter operations)
   const newViewKey = `${currentModule}-${currentView}-${currentDsId || ''}-${wsCurrentView}-${wsCurrentId || ''}-${wsInternalTab || ''}-${currentTab || ''}`;
@@ -2509,6 +2522,11 @@ render = function() {
         const si = document.getElementById('wsSearchInput');
         if (si) { si.focus(); si.setSelectionRange(_wsSearchCursorPos, _wsSearchCursorPos); }
       }
+    }
+    // Workspace LIST: restore space list search focus
+    if (currentModule === 'workspace' && wsCurrentView === 'list' && _wsListSearchWasFocused) {
+      const si = document.getElementById('wsListSearchInput');
+      if (si) { si.focus(); si.setSelectionRange(_wsListSearchCursorPos, _wsListSearchCursorPos); }
     }
   });
 };
