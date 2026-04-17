@@ -1602,7 +1602,7 @@ function showCreateWfModal() {
     <div class="form-group" style="flex:1"><label class="form-label">流程负责人 <span class="required">*</span></label>${buildPersonPickerHtml('wfOwner', [101], true)}</div>
   </div>
   <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">描述</label><textarea class="form-textarea" id="wfDesc" placeholder="选填，500字以内" maxlength="500" rows="2"></textarea></div>
-  <div class="form-group"><label class="form-label">允许被引用</label><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="wfAllowRef" /><span style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant)">开启后该流程可作为子流程被其他工作流引用</span></label></div>
+  <div class="form-group"><label class="form-label">允许被引用</label><div style="display:flex;align-items:center;gap:10px"><label class="toggle-sm"><input type="checkbox" id="wfAllowRef" /><span class="toggle-sm-slider"></span></label><span style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant)">开启后该流程可作为子流程被其他工作流引用</span></div></div>
   </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="createWf()">保存</button></div></div>`);
   setTimeout(() => document.getElementById('wfName')?.focus(), 300);
 }

@@ -852,7 +852,7 @@ function renderDesignerSettingsPanel() {
         <div class="config-field"><div class="config-field-label">所属文件夹</div><div style="font-size:var(--font-size-sm);color:var(--md-outline)">${getFolderPath(wf.wsId, wf.folderId) || '根目录'} (不可修改)</div></div>
         <div class="config-field">
           <div class="config-field-label">允许被引用</div>
-          <label class="toggle-sm"><input type="checkbox" ${wf.allowRef ? 'checked' : ''} /><span class="toggle-sm-slider"></span></label>
+          <div style="display:flex;align-items:center;gap:10px"><label class="toggle-sm"><input type="checkbox" ${wf.allowRef ? 'checked' : ''} /><span class="toggle-sm-slider"></span></label><span style="font-size:var(--font-size-xs);color:var(--md-on-surface-variant)">开启后该流程可作为子流程被其他工作流引用</span></div>
         </div>
       </div>
 
