@@ -1068,20 +1068,25 @@ function renderConditionRows(conditions, addFnStr, removeFnPfx, updateFnPfx) {
     if (idx > 0) {
       html += `<div class="condition-and-tag">AND</div>`;
     }
+    // isPreset: left value matches one of the preset options (excluding __custom__)
     const isPreset = COND_VAR_PRESETS.slice(0, -1).some(p => p.value === cond.left);
+    // isCustomMode: user explicitly chose "custom" but hasn't typed yet (left === __custom__),
+    //               or left is a non-preset non-empty string they typed
+    const isCustomMode = !isPreset;
+    const customDisplayVal = (cond.left === '__custom__' || !cond.left) ? '' : cond.left;
     const opIsNoRight = noRightOps.includes(cond.op);
 
-    // Find op label for display
-    const opObj = COND_OPS.find(o => o.value === (cond.op || 'eq')) || COND_OPS[0];
-
     html += `<div class="condition-visual-row">
-      <!-- Row 1: variable selector -->
+      <!-- Row 1: variable selector or custom input -->
       <div class="cond-row-top">
         ${isPreset
-          ? `<select class="cond-left-select" onchange="${updateFnPfx}${idx},'left',this.value)">
+          ? `<select class="cond-left-select" onchange="if(this.value==='__custom__'){${updateFnPfx}${idx},'left','__custom__');}else{${updateFnPfx}${idx},'left',this.value);}">
               ${COND_VAR_PRESETS.map(p => `<option value="${escHtml(p.value)}" ${cond.left === p.value ? 'selected' : ''}>${p.label}</option>`).join('')}
             </select>`
-          : `<input class="cond-left-input" value="${escHtml(cond.left || '')}" placeholder="输入变量路径" onchange="${updateFnPfx}${idx},'left',this.value)" />`
+          : `<div style="display:flex;flex:1;align-items:center;min-width:0">
+              <input class="cond-left-input" value="${escHtml(customDisplayVal)}" placeholder="输入变量路径，如 vars.amount" onchange="${updateFnPfx}${idx},'left',this.value)" style="flex:1" />
+              <button class="cond-back-btn" onclick="${updateFnPfx}${idx},'left','vars.status')" title="返回选择预设变量">↩</button>
+            </div>`
         }
         ${conditions.length > 1
           ? `<button class="cond-delete-btn" onclick="${removeFnPfx}${idx})" title="删除此条件">${icons.close}</button>`
@@ -1274,12 +1279,11 @@ function renderCodeConfig(node) {
       ${renderExprEditor({
         id: `code_script_${node.id}`,
         value: node.config?.script || '// 处理逻辑\nconst result = input;\nreturn result;',
-        placeholder: '// 在此编写代码，可用 {{变量名}} 引用上游输出',
+        placeholder: '// 在此编写代码，输入 {{ 可快速插入变量',
         nodeId: node.id,
         minHeight: 120,
         onChange: `updateNodeConfig(${node.id}, 'script', this.value)`
       })}
-      <div class="config-field-help">输入 <code>{{</code> 可快速插入变量引用，代码中可直接使用变量名</div>
     </div>
     ${upstreamPreview}
   </div>`;
@@ -1290,18 +1294,18 @@ function renderDelayConfig(node) {
     <div class="config-section-title">延迟配置</div>
     <div class="config-field">
       <div class="config-field-label">延迟方式</div>
-      <select class="config-select"><option>固定时长</option><option>到指定时间</option></select>
+      <select class="config-select" onchange="updateNodeConfig(${node.id}, 'delayMode', this.value)"><option>固定时长</option><option>到指定时间</option></select>
     </div>
     <div class="config-field">
       <div class="config-field-label">延迟时长</div>
-      <div style="display:flex;gap:6px"><input class="config-input" type="number" value="5" style="flex:1" /><select class="config-select" style="width:80px"><option>秒</option><option>分钟</option><option>小时</option></select></div>
+      <div style="display:flex;gap:6px"><input class="config-input" type="number" value="${node.config?.delayValue || 5}" style="flex:1" onchange="updateNodeConfig(${node.id}, 'delayValue', this.value)" /><select class="config-select" style="width:80px"><option>秒</option><option>分钟</option><option>小时</option></select></div>
     </div>
   </div>`;
 }
 
 function renderAssignConfig(node) {
   const upstreamPreview = renderUpstreamOutputPreview(node.id);
-  const assignments = node.config?.assignments || [{ target: 'processedData', source: 'response.data' }];
+  const assignments = node.config?.assignments || [{ target: 'processedData', source: '' }];
   
   return `<div class="config-section">
     <div class="config-section-title">赋值规则</div>
@@ -1313,7 +1317,7 @@ function renderAssignConfig(node) {
         ${renderExprEditor({
           id: `assign_src_${node.id}_${i}`,
           value: a.source,
-          placeholder: '{{上游节点.输出变量}}',
+          placeholder: '{{节点.输出变量}}',
           nodeId: node.id,
           singleLine: true,
           onChange: `updateAssignment(${node.id}, ${i}, 'source', this.value)`
@@ -1328,7 +1332,8 @@ function renderAssignConfig(node) {
 function updateAssignment(nodeId, index, field, value) {
   const node = designerNodes.find(n => n.id === nodeId);
   if (!node) return;
-  if (!node.config.assignments) node.config.assignments = [{ target: 'processedData', source: 'response.data' }];
+  if (!node.config) node.config = {};
+  if (!node.config.assignments) node.config.assignments = [{ target: 'processedData', source: '' }];
   if (node.config.assignments[index]) {
     node.config.assignments[index][field] = value;
   }
@@ -1338,6 +1343,7 @@ function updateAssignment(nodeId, index, field, value) {
 function addAssignment(nodeId) {
   const node = designerNodes.find(n => n.id === nodeId);
   if (!node) return;
+  if (!node.config) node.config = {};
   if (!node.config.assignments) node.config.assignments = [];
   node.config.assignments.push({ target: 'newVar', source: '' });
   designerDirty = true;
@@ -1361,7 +1367,7 @@ function renderOutputConfig(node) {
       ${renderExprEditor({
         id: `output_content_${node.id}`,
         value: node.config?.content || '',
-        placeholder: '输出内容或 {{变量名}} 引用',
+        placeholder: '输出内容或 {{变量名}}',
         nodeId: node.id,
         minHeight: 60,
         onChange: `updateNodeConfig(${node.id}, 'content', this.value)`
@@ -1373,7 +1379,57 @@ function renderOutputConfig(node) {
 
 function renderLoopConfig(node) {
   const mode = node.config?.loopMode || 'forEach';
-  return `<div class="config-section">
+
+  // Detect current loop body connection status
+  const loopBodyConn = designerConnections.find(c => c.from === node.id && c.fromPort === 'loop');
+  const doneConn = designerConnections.find(c => c.from === node.id && c.fromPort === 'done');
+  const loopBodyNode = loopBodyConn ? designerNodes.find(n => n.id === loopBodyConn.to) : null;
+  const doneNode = doneConn ? designerNodes.find(n => n.id === doneConn.to) : null;
+
+  const loopBodyStatus = loopBodyNode
+    ? `<span style="color:#7c3aed;font-weight:600">已连接 → ${loopBodyNode.name}</span>`
+    : `<span style="color:var(--md-error)">未连接 — 从底部端口拖线到循环体第一个节点</span>`;
+  const doneStatus = doneNode
+    ? `<span style="color:#16a34a;font-weight:600">已连接 → ${doneNode.name}</span>`
+    : `<span style="color:var(--md-outline)">未连接 — 从右侧端口拖线到循环完成后的节点</span>`;
+
+  return `
+  <div class="config-section loop-guide-card" style="background:linear-gradient(135deg,#f5f3ff 0%,#fafafa 100%);border:1px solid #ddd6fe;border-radius:var(--radius-md);padding:var(--space-3);margin-bottom:0">
+    <div style="font-size:var(--font-size-xs);font-weight:700;color:#7c3aed;margin-bottom:8px;letter-spacing:0.3px">循环体配置指引</div>
+    <div style="font-size:var(--font-size-xs);color:var(--md-on-surface-variant);line-height:2">
+      <div style="display:flex;gap:6px;align-items:flex-start;margin-bottom:4px">
+        <span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;background:#7c3aed;color:#fff;border-radius:50%;font-size:9px;font-weight:700;flex-shrink:0;margin-top:1px">1</span>
+        <span>配置循环参数（遍历列表 / 循环条件）</span>
+      </div>
+      <div style="display:flex;gap:6px;align-items:flex-start;margin-bottom:4px">
+        <span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;background:#7c3aed;color:#fff;border-radius:50%;font-size:9px;font-weight:700;flex-shrink:0;margin-top:1px">2</span>
+        <span>在画布上添加循环体内的节点（如 HTTP、赋值等）</span>
+      </div>
+      <div style="display:flex;gap:6px;align-items:flex-start;margin-bottom:4px">
+        <span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;background:#7c3aed;color:#fff;border-radius:50%;font-size:9px;font-weight:700;flex-shrink:0;margin-top:1px">3</span>
+        <span>从循环节点<strong>底部紫色端口</strong>拖线到循环体第一个节点</span>
+      </div>
+      <div style="display:flex;gap:6px;align-items:flex-start;margin-bottom:4px">
+        <span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;background:#7c3aed;color:#fff;border-radius:50%;font-size:9px;font-weight:700;flex-shrink:0;margin-top:1px">4</span>
+        <span>循环体内节点依次连线，<strong>最后一个节点无需连出口</strong>（自动返回下次迭代）</span>
+      </div>
+      <div style="display:flex;gap:6px;align-items:flex-start">
+        <span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;background:#16a34a;color:#fff;border-radius:50%;font-size:9px;font-weight:700;flex-shrink:0;margin-top:1px">5</span>
+        <span>从循环节点<strong>右侧绿色端口</strong>拖线到循环完成后的节点</span>
+      </div>
+    </div>
+    <div style="margin-top:10px;padding-top:10px;border-top:1px solid #ddd6fe;font-size:var(--font-size-xs);display:flex;flex-direction:column;gap:4px">
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#ede9fe;border:2px solid #7c3aed;flex-shrink:0"></span>
+        <span style="color:var(--md-on-surface-variant)">循环体：${loopBodyStatus}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#dcfce7;border:2px solid #16a34a;flex-shrink:0"></span>
+        <span style="color:var(--md-on-surface-variant)">完成后：${doneStatus}</span>
+      </div>
+    </div>
+  </div>
+  <div class="config-section">
     <div class="config-section-title">循环配置</div>
     <div class="config-field">
       <div class="config-field-label">循环模式 <span class="required">*</span></div>
@@ -1403,7 +1459,7 @@ function renderLoopConfig(node) {
       <div class="config-field">
         <div class="config-field-label">当前元素变量名</div>
         <input class="config-input" value="${node.config?.itemVar || 'item'}" style="font-family:var(--font-family-mono)" onchange="updateNodeConfig(${node.id}, 'itemVar', this.value)" />
-        <div class="config-field-help">每次循环中，当前元素会被赋值到此变量</div>
+        <div class="config-field-help">每次循环中，当前元素会被赋值到此变量，循环体内节点可直接引用</div>
       </div>
       <div class="config-field">
         <div class="config-field-label">索引变量名</div>
@@ -1413,7 +1469,7 @@ function renderLoopConfig(node) {
       <div class="config-field">
         <div class="config-field-label">循环条件 <span class="required">*</span></div>
         <textarea class="expr-editor" style="min-height:40px" placeholder="retryCount < 3 && !success" onchange="updateNodeConfig(${node.id}, 'whileCondition', this.value)">${node.config?.whileCondition || ''}</textarea>
-        <div class="config-field-help">条件为 true 时继续执行循环体</div>
+        <div class="config-field-help">条件为 true 时继续执行循环体；每次循环体执行完毕后重新判断</div>
       </div>
     `}
     <div class="config-field">
@@ -1439,27 +1495,12 @@ function renderLoopConfig(node) {
     <div class="config-field">
       <div class="config-field-label">输出变量名</div>
       <input class="config-input" value="${node.config?.outputVar || 'loopResult'}" style="font-family:var(--font-family-mono)" onchange="updateNodeConfig(${node.id}, 'outputVar', this.value)" placeholder="loopResult" />
-      <div class="config-field-help">每次循环的输出将被收集到此数组变量中，循环完成后可在"完成"出口的后续节点中引用</div>
+      <div class="config-field-help">每次循环的输出将被收集到此数组变量中，循环完成后可在"完成"出口的后续节点中引用 <code style="font-size:10px;font-family:var(--font-family-mono);background:var(--md-surface-container);padding:0 3px;border-radius:2px">\${${node.config?.outputVar || 'loopResult'}}</code></div>
     </div>
     <div class="config-field">
       <div style="display:flex;align-items:center;gap:10px">
         <label class="toggle-sm"><input type="checkbox" ${node.config?.collectOutput !== false ? 'checked' : ''} onchange="updateNodeConfig(${node.id}, 'collectOutput', this.checked)" /><span class="toggle-sm-slider"></span></label>
         <span style="font-size:var(--font-size-xs);color:var(--md-on-surface-variant)">启用结果收集（关闭则循环体输出不汇总）</span>
-      </div>
-    </div>
-  </div>
-  <div class="config-section">
-    <div class="config-section-title" style="display:flex;align-items:center;gap:6px">
-      <span>端口说明</span>
-    </div>
-    <div style="font-size:var(--font-size-xs);color:var(--md-on-surface-variant);line-height:1.8">
-      <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:6px">
-        <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#ede9fe;border:2px solid #7c3aed;flex-shrink:0;margin-top:2px"></span>
-        <span><strong style="color:#7c3aed">循环体</strong>（底部端口）— 连接循环体内的第一个节点，每次迭代都会执行此路径</span>
-      </div>
-      <div style="display:flex;align-items:flex-start;gap:8px">
-        <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#dcfce7;border:2px solid #16a34a;flex-shrink:0;margin-top:2px"></span>
-        <span><strong style="color:#16a34a">完成</strong>（右侧端口）— 所有迭代结束后继续执行的路径，可引用收集到的 <code style="font-family:var(--font-family-mono);font-size:10px;background:var(--md-surface-container);padding:0 3px;border-radius:2px">\${${node.config?.outputVar || 'loopResult'}}</code></span>
       </div>
     </div>
   </div>`;
@@ -2251,6 +2292,9 @@ function completeConnection(fromNodeId, fromPort, targetId) {
     showToast('warning', '提示', '不允许节点连接到自身'); return;
   }
 
+  // Resolve fromNode early — needed for all checks below
+  const fromNode = designerNodes.find(n => n.id === fromNodeId);
+
   // Check for duplicate
   if (designerConnections.some(c => c.from === fromNodeId && c.to === targetId)) {
     showToast('warning', '提示', '该连线已存在'); return;
@@ -2262,15 +2306,14 @@ function completeConnection(fromNodeId, fromPort, targetId) {
       showToast('warning', '提示', `"${portName}"端口已连接，请先删除原有连线再重新连接`); return;
     }
   }
-  // Cycle detection
-  if (detectCycle(fromNodeId, targetId)) {
+  // Cycle detection — skip for loop body port (it's a deliberate forward branch, not a true cycle)
+  if (fromPort !== 'loop' && detectCycle(fromNodeId, targetId)) {
     showToast('error', '检测到环', '该连线会形成循环依赖，不允许创建'); return;
   }
 
   pushUndoState();
 
-  // Determine label for Switch branches
-  const fromNode = designerNodes.find(n => n.id === fromNodeId);
+  // Determine label for Switch / Loop branches
   let connLabel = fromPort === 'true' ? 'TRUE' : fromPort === 'false' ? 'FALSE' : '';
   if (fromNode && fromNode.type === 'switch' && fromPort.startsWith('case') && fromPort !== 'caseDefault') {
     const caseIdx = parseInt(fromPort.replace('case', ''));
@@ -2440,8 +2483,8 @@ function updateIfCondition(nodeId, condIdx, field, value) {
   if (!node.config.conditions[condIdx]) return;
   node.config.conditions[condIdx][field] = value;
   designerDirty = true;
-  // Re-render only if op changes (might hide/show right input)
-  if (field === 'op') renderDesigner();
+  // Re-render when op changes (hides/shows right input) or left changes (preset vs custom switch)
+  if (field === 'op' || field === 'left') renderDesigner();
 }
 
 // --- Switch node per-branch condition operations ---
@@ -2482,7 +2525,7 @@ function updateSwitchCondition(nodeId, branchIdx, condIdx, field, value) {
   if (!branch || !branch.conditions || !branch.conditions[condIdx]) return;
   branch.conditions[condIdx][field] = value;
   designerDirty = true;
-  if (field === 'op') renderDesigner();
+  if (field === 'op' || field === 'left') renderDesigner();
 }
 
 // --- Right Panel Resize ---

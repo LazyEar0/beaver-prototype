@@ -1730,6 +1730,29 @@
   background: var(--md-primary-container);
 }
 
+/* Back to preset selector button (↩) */
+.cond-back-btn {
+  flex-shrink: 0;
+  width: 26px;
+  height: 28px;
+  border: none;
+  border-left: 1px solid var(--md-outline-variant);
+  background: var(--md-surface-container);
+  color: var(--md-outline);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 13px;
+  transition: var(--transition-fast);
+  padding: 0;
+}
+
+.cond-back-btn:hover {
+  color: var(--md-primary);
+  background: var(--md-primary-container);
+}
+
 /* AND tag between rows */
 .condition-and-tag {
   display: flex;
@@ -1804,14 +1827,14 @@
 
 /* IF node if-block */
 .if-block {
-  padding: 8px 10px;
+  padding: 10px;
   background: var(--md-surface-container);
   border-radius: 6px;
   border-left: 3px solid var(--md-primary);
 }
 
 .if-block-label {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   color: var(--md-primary);
   text-transform: uppercase;
