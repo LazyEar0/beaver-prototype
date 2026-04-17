@@ -1176,7 +1176,7 @@ function renderWsWorkflowsTab(ws) {
       </div>
     </div>
 
-    ${isEmpty ? (isSearchMode ? renderEmptyState('searchNoResult') : (wsCurrentFolderId !== null ? `<div class="empty-state" style="padding:var(--space-10)"><img src="./public/images/empty-folder-content.png" class="empty-state-img" /><div class="empty-state-title">该文件夹为空</div><div class="empty-state-desc">在此文件夹中创建工作流或子文件夹</div><div style="display:flex;gap:var(--space-2);margin-top:var(--space-4)">${isMemberOrAbove ? `<button class="btn btn-primary btn-sm" onclick="showCreateWfModal()">${icons.plus}<span>新建工作流</span></button>` : ''}${canCreateFolder ? `<button class="btn btn-secondary btn-sm" onclick="showCreateFolderModal()">${icons.folder}<span>新建子文件夹</span></button>` : ''}</div></div>` : `<div class="empty-state" style="padding:var(--space-10)"><img src="./public/images/empty-folder-content.png" class="empty-state-img" /><div class="empty-state-title">暂无内容</div><div class="empty-state-desc">创建工作流或文件夹来组织您的空间</div><div style="display:flex;gap:var(--space-2);margin-top:var(--space-4)">${isMemberOrAbove ? `<button class="btn btn-primary btn-sm" onclick="showCreateWfModal()">${icons.plus}<span>新建工作流</span></button><button class="btn btn-secondary btn-sm" onclick="showCreateFolderModal()">${icons.folder}<span>新建文件夹</span></button>` : ''}</div></div>`)) : `
+    <div class="ws-content-area">${isEmpty ? (isSearchMode ? renderEmptyState('searchNoResult') : (wsCurrentFolderId !== null ? `<div class="empty-state" style="padding:var(--space-10)"><img src="./public/images/empty-folder-content.png" class="empty-state-img" /><div class="empty-state-title">该文件夹为空</div><div class="empty-state-desc">在此文件夹中创建工作流或子文件夹</div><div style="display:flex;gap:var(--space-2);margin-top:var(--space-4)">${isMemberOrAbove ? `<button class="btn btn-primary btn-sm" onclick="showCreateWfModal()">${icons.plus}<span>新建工作流</span></button>` : ''}${canCreateFolder ? `<button class="btn btn-secondary btn-sm" onclick="showCreateFolderModal()">${icons.folder}<span>新建子文件夹</span></button>` : ''}</div></div>` : `<div class="empty-state" style="padding:var(--space-10)"><img src="./public/images/empty-folder-content.png" class="empty-state-img" /><div class="empty-state-title">暂无内容</div><div class="empty-state-desc">创建工作流或文件夹来组织您的空间</div><div style="display:flex;gap:var(--space-2);margin-top:var(--space-4)">${isMemberOrAbove ? `<button class="btn btn-primary btn-sm" onclick="showCreateWfModal()">${icons.plus}<span>新建工作流</span></button><button class="btn btn-secondary btn-sm" onclick="showCreateFolderModal()">${icons.folder}<span>新建文件夹</span></button>` : ''}</div></div>`)) : `
     <div class="table-card"><div class="table-wrapper"><table class="data-table">
     <thead><tr><th><span class="col-header ${sortCls('name')}" onclick="onWsContentSort('name')">名称 ${sortIcon('name')}</span></th><th style="width:80px">状态</th><th style="width:80px">发布版本</th><th style="width:80px">类型</th><th style="width:90px">创建者</th><th style="width:90px">负责人</th><th style="width:110px"><span class="col-header ${sortCls('editedAt')}" onclick="onWsContentSort('editedAt')">最后编辑 ${sortIcon('editedAt')}</span></th><th style="width:110px">操作</th></tr></thead>
     <tbody>
@@ -1215,7 +1215,7 @@ function renderWsWorkflowsTab(ws) {
             </div></div>
           </div></td></tr>`;
       }).join('')}
-    </tbody></table></div></div>`}`;
+    </tbody></table></div></div>`}</div>`;
 }
 
 function onWsContentSearch(val) { wsContentSearch = val; render(); }
@@ -1229,18 +1229,99 @@ function clearAllWsFilters() { wsContentSearch = ''; wsContentStatusFilter = 'al
 function clearWsCreatorFilter() { wsContentCreatorFilter = []; render(); }
 function clearWsOwnerFilter() { wsContentOwnerFilter = []; render(); }
 function toggleWsCreatorDropdown() { wsCreatorDropdownOpen = !wsCreatorDropdownOpen; wsCreatorSearch = ''; wsOwnerDropdownOpen = false; render(); }
-function onWsCreatorSearch(val) { wsCreatorSearch = val; render(); }
+function onWsCreatorSearch(val) {
+  wsCreatorSearch = val;
+  const listEl = document.getElementById('wsCreatorList');
+  if (!listEl) return;
+  const ws = workspaces.find(w => w.id === wsCurrentId);
+  if (!ws) return;
+  const allWsWorkflows = wsWorkflows[ws.id] || [];
+  const creators = [...new Set(allWsWorkflows.map(wf => wf.creator))].sort();
+  const filtered = val ? creators.filter(c => c.toLowerCase().includes(val.toLowerCase())) : creators;
+  if (filtered.length === 0) { listEl.innerHTML = '<div class="creator-dropdown-empty">无匹配结果</div>'; }
+  else { listEl.innerHTML = filtered.map(c => { const sel = wsContentCreatorFilter.includes(c); return `<div class="creator-dropdown-item ${sel ? 'selected' : ''}" onclick="toggleWsCreatorSelection('${c}')"><span class="creator-avatar-sm">${c.charAt(0)}</span><span>${c}</span><span class="check-icon">${icons.check}</span></div>`; }).join(''); }
+}
 function toggleWsCreatorSelection(name) {
   const idx = wsContentCreatorFilter.indexOf(name);
   if (idx > -1) wsContentCreatorFilter.splice(idx, 1); else wsContentCreatorFilter.push(name);
-  render();
+  // --- Targeted DOM updates (no full render, no flash) ---
+  // 1. Toggle dropdown item visual state
+  document.querySelectorAll('#wsCreatorList .creator-dropdown-item').forEach(el => {
+    if (el.children[1] && el.children[1].textContent === name) el.classList.toggle('selected');
+  });
+  // 2. Update trigger display
+  const panel = document.getElementById('wsCreatorList')?.closest('.creator-dropdown');
+  const trigger = panel?.querySelector('.creator-dropdown-trigger');
+  if (trigger) {
+    const f = wsContentCreatorFilter;
+    trigger.innerHTML = f.length === 0
+      ? '<span style="color:var(--md-on-surface-variant)">创建者</span>'
+      : f.length <= 2
+        ? `<span class="creator-mini-tags">${f.map(c => `<span class="creator-mini-tag">${c}</span>`).join('')}</span>`
+        : `<span class="creator-mini-tags"><span class="creator-mini-tag">${f[0]}</span><span class="creator-mini-tag-more">+${f.length - 1}</span></span>`;
+  }
+  // 3. Update footer clear button
+  const footer = document.getElementById('wsCreatorList')?.closest('.creator-dropdown-panel')?.querySelector('.creator-dropdown-footer');
+  if (footer) {
+    footer.innerHTML = `${wsContentCreatorFilter.length > 0 ? `<button class="creator-dropdown-clear" onclick="event.stopPropagation();clearWsCreatorFilter()">清空</button>` : ''}<button class="creator-dropdown-done" onclick="event.stopPropagation();toggleWsCreatorDropdown()">确定</button>`;
+  }
+  // 4. Update badge + refresh content area
+  updateWsFilterBadge();
+  refreshWsContentArea();
 }
 function toggleWsOwnerDropdown() { wsOwnerDropdownOpen = !wsOwnerDropdownOpen; wsOwnerSearch = ''; wsCreatorDropdownOpen = false; render(); }
-function onWsOwnerSearch(val) { wsOwnerSearch = val; render(); }
+function onWsOwnerSearch(val) {
+  wsOwnerSearch = val;
+  const listEl = document.getElementById('wsOwnerList');
+  if (!listEl) return;
+  const ws = workspaces.find(w => w.id === wsCurrentId);
+  if (!ws) return;
+  const allWsWorkflows = wsWorkflows[ws.id] || [];
+  const allOwnerIds = [...new Set(allWsWorkflows.flatMap(wf => wf.owners || []))];
+  const ownerNames = allOwnerIds.map(oid => { const u = ssoUsers.find(x => x.id === oid); return u ? u.name : ''; }).filter(Boolean).sort();
+  const filtered = val ? ownerNames.filter(c => c.toLowerCase().includes(val.toLowerCase())) : ownerNames;
+  if (filtered.length === 0) { listEl.innerHTML = '<div class="creator-dropdown-empty">无匹配结果</div>'; }
+  else { listEl.innerHTML = filtered.map(c => { const sel = wsContentOwnerFilter.includes(c); return `<div class="creator-dropdown-item ${sel ? 'selected' : ''}" onclick="toggleWsOwnerSelection('${c}')"><span class="creator-avatar-sm">${c.charAt(0)}</span><span>${c}</span><span class="check-icon">${icons.check}</span></div>`; }).join(''); }
+}
 function toggleWsOwnerSelection(name) {
   const idx = wsContentOwnerFilter.indexOf(name);
   if (idx > -1) wsContentOwnerFilter.splice(idx, 1); else wsContentOwnerFilter.push(name);
-  render();
+  // --- Targeted DOM updates (no full render, no flash) ---
+  document.querySelectorAll('#wsOwnerList .creator-dropdown-item').forEach(el => {
+    if (el.children[1] && el.children[1].textContent === name) el.classList.toggle('selected');
+  });
+  const panel = document.getElementById('wsOwnerList')?.closest('.creator-dropdown');
+  const trigger = panel?.querySelector('.creator-dropdown-trigger');
+  if (trigger) {
+    const f = wsContentOwnerFilter;
+    trigger.innerHTML = f.length === 0
+      ? '<span style="color:var(--md-on-surface-variant)">负责人</span>'
+      : f.length <= 2
+        ? `<span class="creator-mini-tags">${f.map(c => `<span class="creator-mini-tag">${c}</span>`).join('')}</span>`
+        : `<span class="creator-mini-tags"><span class="creator-mini-tag">${f[0]}</span><span class="creator-mini-tag-more">+${f.length - 1}</span></span>`;
+  }
+  const footer = document.getElementById('wsOwnerList')?.closest('.creator-dropdown-panel')?.querySelector('.creator-dropdown-footer');
+  if (footer) {
+    footer.innerHTML = `${wsContentOwnerFilter.length > 0 ? `<button class="creator-dropdown-clear" onclick="event.stopPropagation();clearWsOwnerFilter()">清空</button>` : ''}`;
+  }
+  updateWsFilterBadge();
+  refreshWsContentArea();
+}
+function updateWsFilterBadge() {
+  const cnt = (wsContentStatusFilter !== 'all' ? 1 : 0) + (wsContentCreatorFilter.length > 0 ? 1 : 0) + (wsContentOwnerFilter.length > 0 ? 1 : 0) + (wsContentTypeFilter !== 'all' ? 1 : 0);
+  const badge = document.querySelector('.filter-toggle-btn .filter-badge');
+  if (cnt > 0) { if (badge) badge.textContent = cnt; else { const s = document.createElement('span'); s.className = 'filter-badge'; s.textContent = cnt; document.querySelector('.filter-toggle-btn')?.appendChild(s); } }
+  else { if (badge) badge.remove(); }
+}
+function refreshWsContentArea() {
+  const old = document.querySelector('.ws-content-area');
+  if (!old) return;
+  const ws = workspaces.find(w => w.id === wsCurrentId);
+  if (!ws) return;
+  const full = renderWsWorkflowsTab(ws);
+  const tmp = document.createElement('div'); tmp.innerHTML = full;
+  const fresh = tmp.querySelector('.ws-content-area');
+  if (fresh) old.replaceWith(fresh);
 }
 function toggleMoreMenu(btn) {
   const panel = btn.nextElementSibling;
@@ -1249,7 +1330,6 @@ function toggleMoreMenu(btn) {
   const close = (e) => { if (!btn.parentElement.contains(e.target)) { panel.classList.add('hidden'); document.removeEventListener('click', close); } };
   if (!panel.classList.contains('hidden')) setTimeout(() => document.addEventListener('click', close), 0);
 }
-function openDesigner(wsId, wfId) { showToast('info', '流程设计器', '流程设计器将在 Phase 2 中实现（当前为原型占位）'); }
 function resetWsFilters() { wsContentSearch = ''; wsContentStatusFilter = 'all'; wsContentCreatorFilter = []; wsContentOwnerFilter = []; wsContentTypeFilter = 'all'; wsCreatorDropdownOpen = false; wsOwnerDropdownOpen = false; wsCreatorSearch = ''; wsOwnerSearch = ''; wsFilterPanelOpen = false; }
 function navigateIntoFolder(folderId, folderName) { wsFolderPath.push({ id: folderId, name: folderName }); wsCurrentFolderId = folderId; resetWsFilters(); render(); }
 function navigateToWsFolder(folderId) { wsCurrentFolderId = folderId; if (folderId === null) wsFolderPath = []; resetWsFilters(); render(); }

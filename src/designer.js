@@ -47,10 +47,10 @@ let designerBottomResizing = false; // Bottom panel resize
 const nodeTypes = [
   { type: 'trigger', name: '触发器', icon: '⚡', color: 'node-color-trigger', category: '流程控制', desc: '流程入口节点', code: 'trigger' },
   { type: 'end', name: '结束', icon: '🏁', color: 'node-color-end', category: '流程控制', desc: '流程出口节点', code: 'end' },
-  { type: 'if', name: 'IF 条件', icon: '🔀', color: 'node-color-logic', category: '逻辑控制', desc: '条件判断分支', code: 'if' },
-  { type: 'switch', name: 'Switch', icon: '🔃', color: 'node-color-logic', category: '逻辑控制', desc: '多条件分支', code: 'switch' },
-  { type: 'loop', name: '循环', icon: '🔄', color: 'node-color-logic', category: '逻辑控制', desc: '循环执行', code: 'loop' },
-  { type: 'delay', name: '延迟', icon: '⏱️', color: 'node-color-logic', category: '逻辑控制', desc: '延时执行', code: 'delay' },
+  { type: 'if', name: 'IF 条件', icon: '🔀', color: 'node-color-logic', category: '流程控制', desc: '条件判断分支', code: 'if' },
+  { type: 'switch', name: 'Switch', icon: '🔃', color: 'node-color-logic', category: '流程控制', desc: '多条件分支', code: 'switch' },
+  { type: 'loop', name: '循环', icon: '🔄', color: 'node-color-logic', category: '流程控制', desc: '循环执行', code: 'loop' },
+  { type: 'delay', name: '延迟', icon: '⏱️', color: 'node-color-logic', category: '流程控制', desc: '延时执行', code: 'delay' },
   { type: 'assign', name: '赋值', icon: '📝', color: 'node-color-data', category: '数据处理', desc: '变量赋值', code: 'assign' },
   { type: 'output', name: '输出', icon: '📤', color: 'node-color-data', category: '数据处理', desc: '日志输出', code: 'output' },
   { type: 'code', name: '代码', icon: '💻', color: 'node-color-data', category: '数据处理', desc: '自定义代码', code: 'code' },
@@ -846,7 +846,7 @@ function renderDesignerSettingsPanel() {
       <div class="settings-section">
         <div class="settings-section-title">${icons.info} 基本信息</div>
         <div class="config-field"><div class="config-field-label">名称</div><input class="config-input" value="${wf.name}" /></div>
-        <div class="config-field"><div class="config-field-label">编号</div><input class="config-input" value="${wf.code}" style="font-family:var(--font-family-mono)" /></div>
+        <div class="config-field"><div class="config-field-label">编号</div><input class="config-input" value="${wf.code}" style="font-family:var(--font-family-mono);color:var(--md-outline)" readonly /></div>
         <div class="config-field"><div class="config-field-label">描述</div><textarea class="config-textarea" style="min-height:50px">${wf.desc || ''}</textarea></div>
         <div class="config-field"><div class="config-field-label">类型</div><div style="font-size:var(--font-size-sm);color:var(--md-outline)">${wf.type === 'app' ? '应用流' : '对话流'} (不可修改)</div></div>
         <div class="config-field"><div class="config-field-label">所属文件夹</div><div style="font-size:var(--font-size-sm);color:var(--md-outline)">${getFolderPath(wf.wsId, wf.folderId) || '根目录'} (不可修改)</div></div>
