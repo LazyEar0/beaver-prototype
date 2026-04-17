@@ -335,7 +335,6 @@ function renderDesigner() {
       </div>
       <div class="designer-toolbar-center">
         <button class="toolbar-btn" onclick="designerUndo()" title="撤销上一步操作 (Ctrl+Z)">${icons.arrowLeft}</button>
-        <button class="toolbar-btn" onclick="designerRedo()" title="重做上一步操作 (Ctrl+Y)">${icons.redo}</button>
         <span class="toolbar-divider"></span>
         <button class="toolbar-btn" onclick="autoLayout()" title="自动优化节点排列">${icons.workflow}</button>
         <button class="toolbar-btn ${designerMinimapVisible ? 'active' : ''}" onclick="toggleMinimap()" title="${designerMinimapVisible ? '隐藏小地图' : '显示小地图'}">
@@ -372,10 +371,6 @@ function renderDesigner() {
             </div>
             <div class="more-dropdown-item" onclick="showDesignerVersions();closeDesignerMoreMenu()">
               ${icons.history} <span>版本历史</span>
-            </div>
-            <div class="more-dropdown-divider"></div>
-            <div class="more-dropdown-item" onclick="exportDesignerJSON();closeDesignerMoreMenu()">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> <span>导出 JSON</span>
             </div>
           </div>` : ''}
         </div>
@@ -2107,15 +2102,17 @@ function enterDebugMode() {
   const triggerNode = designerNodes.find(n => n.type === 'trigger');
   if (triggerNode) triggerNode._debugStatus = 'success';
 
-  // Animate through nodes
-  setTimeout(() => {
+  // Animate through nodes (guard against exited debug mode)
+  _debugTimer1 = setTimeout(() => {
+    if (!designerDebugMode) return;
     designerNodes.forEach(n => {
       if (n.type !== 'trigger' && n.type !== 'end') n._debugStatus = 'success';
     });
     designerDebugLog.push({ time: ts, level: 'info', message: '所有节点执行完成' });
     renderDesigner();
 
-    setTimeout(() => {
+    _debugTimer2 = setTimeout(() => {
+      if (!designerDebugMode) return;
       const endNode = designerNodes.find(n => n.type === 'end');
       if (endNode) endNode._debugStatus = 'success';
       designerDebugLog.push({ time: ts, level: 'info', message: '调试执行完成 - 通过' });
@@ -2135,10 +2132,19 @@ function enterDebugMode() {
   renderDesigner();
 }
 
+// Debug timer IDs for cleanup
+let _debugTimer1 = null;
+let _debugTimer2 = null;
+
 function exitDebugMode() {
+  // Clear pending debug animation timers
+  if (_debugTimer1) { clearTimeout(_debugTimer1); _debugTimer1 = null; }
+  if (_debugTimer2) { clearTimeout(_debugTimer2); _debugTimer2 = null; }
+
   designerDebugMode = false;
   designerNodes.forEach(n => { n._debugStatus = null; });
   designerConnections.forEach(c => { c._debugActive = false; });
+  designerBottomPanel = null;
   renderDesigner();
 }
 
