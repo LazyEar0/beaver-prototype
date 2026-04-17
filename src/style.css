@@ -6150,3 +6150,244 @@ img { display: block; max-width: 100%; }
   transition: background 0.3s ease 0.1s, width 0.3s ease;
 }
 }
+
+/* ================================================
+   NODE SEARCH IN TIMELINE
+   ================================================ */
+.ed-node-search {
+  margin-bottom: var(--space-3);
+}
+.ed-node-search-inner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 6px 10px;
+  background: var(--color-bg-page);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+  transition: border-color 0.2s;
+}
+.ed-node-search-inner:focus-within {
+  border-color: var(--md-primary);
+  box-shadow: 0 0 0 2px rgba(103, 80, 164, 0.08);
+}
+.ed-node-search-inner svg {
+  width: 14px;
+  height: 14px;
+  color: var(--md-outline);
+  flex-shrink: 0;
+}
+.ed-node-search-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-size: var(--font-size-sm);
+  color: var(--md-on-surface);
+  outline: none;
+  min-width: 0;
+}
+.ed-node-search-input::placeholder { color: var(--md-outline); }
+.ed-node-search-clear {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  color: var(--md-outline);
+  padding: 0 2px;
+}
+.ed-node-search-clear:hover { color: var(--md-error); }
+.ed-node-search-empty {
+  text-align: center;
+  padding: var(--space-5);
+  color: var(--md-outline);
+  font-size: var(--font-size-sm);
+}
+.ed-search-mark {
+  background: rgba(234, 179, 8, 0.3);
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+.section-count-filter {
+  font-size: var(--font-size-xs);
+  font-weight: 400;
+  color: var(--md-primary);
+  padding: 0 6px;
+  background: rgba(103, 80, 164, 0.08);
+  border-radius: var(--radius-full);
+  margin-left: var(--space-2);
+}
+
+/* ================================================
+   EXECUTION LOGS / JOURNAL
+   ================================================ */
+.ed-log-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-3);
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.ed-log-filters {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.ed-log-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  font-size: var(--font-size-xs);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  background: var(--color-bg-page);
+  color: var(--md-outline);
+  border: 1px solid var(--color-border-light);
+  transition: all 0.15s;
+  user-select: none;
+}
+.ed-log-chip:hover { background: var(--md-surface-variant); }
+.ed-log-chip.active {
+  background: var(--md-primary);
+  color: #fff;
+  border-color: var(--md-primary);
+}
+.ed-log-count {
+  font-size: var(--font-size-xs);
+  color: var(--md-outline);
+  white-space: nowrap;
+}
+.ed-log-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  max-height: 400px;
+  overflow-y: auto;
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-page);
+}
+.ed-log-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: 5px 10px;
+  font-size: var(--font-size-xs);
+  border-bottom: 1px solid rgba(0,0,0,0.04);
+  line-height: 1.5;
+  transition: background 0.1s;
+}
+.ed-log-item:last-child { border-bottom: none; }
+.ed-log-item:hover { background: rgba(103, 80, 164, 0.03); }
+.ed-log-time {
+  font-family: 'Roboto Mono', monospace;
+  color: var(--md-outline);
+  white-space: nowrap;
+  flex-shrink: 0;
+  min-width: 60px;
+}
+.ed-log-level-badge {
+  display: inline-flex;
+  padding: 0 5px;
+  border-radius: var(--radius-sm);
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.ed-log-level-info { background: rgba(103, 80, 164, 0.08); color: var(--md-primary); }
+.ed-log-level-warn { background: rgba(234, 179, 8, 0.12); color: #B8860B; }
+.ed-log-level-error { background: rgba(179, 38, 30, 0.08); color: var(--md-error); }
+.ed-log-level-debug { background: rgba(0, 0, 0, 0.05); color: var(--md-outline); }
+.ed-log-node {
+  display: inline-flex;
+  padding: 0 5px;
+  border-radius: var(--radius-sm);
+  font-size: 10px;
+  font-weight: 500;
+  background: rgba(103, 80, 164, 0.06);
+  color: var(--md-primary);
+  white-space: nowrap;
+  flex-shrink: 0;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ed-log-msg {
+  color: var(--md-on-surface);
+  word-break: break-all;
+  flex: 1;
+  min-width: 0;
+}
+.ed-log-empty {
+  text-align: center;
+  padding: var(--space-5);
+  color: var(--md-outline);
+  font-size: var(--font-size-sm);
+}
+/* Log level row tinting */
+.ed-log-item.ed-log-error { background: rgba(179, 38, 30, 0.02); }
+.ed-log-item.ed-log-warn { background: rgba(234, 179, 8, 0.02); }
+
+/* ================================================
+   KV-CARD JSON TOGGLE (for nested/Object params)
+   ================================================ */
+.kv-card-json {
+  grid-column: 1 / -1;
+}
+.kv-json-details {
+  margin-top: 4px;
+}
+.kv-json-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--font-size-xs);
+  color: var(--md-primary);
+  cursor: pointer;
+  user-select: none;
+  padding: 2px 0;
+}
+.kv-json-toggle svg {
+  width: 12px;
+  height: 12px;
+  transition: transform 0.2s;
+}
+.kv-json-details[open] .kv-json-toggle svg {
+  transform: rotate(90deg);
+}
+.kv-json-pre {
+  font-size: var(--font-size-xs);
+  font-family: 'Roboto Mono', monospace;
+  background: var(--color-bg-page);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  margin-top: 4px;
+  max-height: 200px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  line-height: 1.5;
+  color: var(--md-on-surface);
+  border: 1px solid var(--color-border-light);
+}
+
+/* ================================================
+   WORKSPACE CARD: ALWAYS SHOW RUNNING COUNT
+   ================================================ */
+.ws-stat-running {
+  color: var(--color-success) !important;
+}
+.ws-stat-running svg {
+  animation: spin 2s linear infinite;
+}
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.ws-stat-idle {
+  color: var(--md-outline) !important;
+  opacity: 0.7;
+}

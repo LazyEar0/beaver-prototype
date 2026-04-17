@@ -54,6 +54,8 @@ const icons = {
   chevronDown: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>',
   chevronUp: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m18 15-6-6-6 6"/></svg>',
   upload: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>',
+  list: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/></svg>',
+  code: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>',
 };
 
 // ============================================
@@ -195,6 +197,8 @@ let wsExecTriggerFilter = 'all';
 let wsExecTimeRange = 'all';
 let wsExecDetailId = null;
 let wsExecSelectedNodeIdx = null; // right panel: selected node index
+let wsExecNodeSearch = ''; // node timeline search filter
+let wsExecLogFilter = 'all'; // log level filter: all | info | warn | error | debug
 let wfNextId = 100;
 let folderNextId = 200;
 
@@ -1060,7 +1064,7 @@ function renderWsListPage() {
       const cc = wsCardColors[ws.id % wsCardColors.length];
       const rl = { admin: '管理员', member: '成员', viewer: '只读查看者' };
       const rc = { admin: 'role-badge-admin', member: 'role-badge-member', viewer: 'role-badge-viewer' };
-      return `<div class="workspace-card spotlight-card glare-hover" onclick="wsNavigateTo('detail', ${ws.id})"><div class="workspace-card-header"><div class="workspace-card-icon" style="background:${cc.bg};color:${cc.color}">${ws.name.charAt(0)}</div><div class="workspace-card-title-group"><div class="workspace-card-name">${ws.name}</div><span class="workspace-card-code">${icons.hash} ${ws.code}</span></div><div class="workspace-card-actions" onclick="event.stopPropagation()">${ws.myRole === 'admin' ? `<button class="table-action-btn" title="编辑" onclick="showEditWsModal(${ws.id})">${icons.edit}</button>` : ''}</div></div><div class="workspace-card-desc" title="${ws.desc}">${ws.desc || '暂无描述'}</div><div class="workspace-card-stats"><span class="ws-stat-item">${icons.users} <span class="ws-stat-value" data-count-up="${ws.members.length}">${ws.members.length}</span> 成员</span><span class="ws-stat-item">${icons.workflow} <span class="ws-stat-value" data-count-up="${ws.workflowCount}">${ws.workflowCount}</span> 工作流</span>${ws.runningInstances > 0 ? `<span class="ws-stat-item" style="color:var(--md-success)">${icons.sync} <span class="ws-stat-value" data-count-up="${ws.runningInstances}">${ws.runningInstances}</span> 运行中</span>` : ''}</div><div class="workspace-card-footer"><span class="role-badge ${rc[ws.myRole]}">${icons.shield} ${rl[ws.myRole]}</span><span class="workspace-card-time">${icons.clock} 活跃于 ${ws.lastActiveAt}</span></div></div>`;
+      return `<div class="workspace-card spotlight-card glare-hover" onclick="wsNavigateTo('detail', ${ws.id})"><div class="workspace-card-header"><div class="workspace-card-icon" style="background:${cc.bg};color:${cc.color}">${ws.name.charAt(0)}</div><div class="workspace-card-title-group"><div class="workspace-card-name">${ws.name}</div><span class="workspace-card-code">${icons.hash} ${ws.code}</span></div><div class="workspace-card-actions" onclick="event.stopPropagation()">${ws.myRole === 'admin' ? `<button class="table-action-btn" title="编辑" onclick="showEditWsModal(${ws.id})">${icons.edit}</button>` : ''}</div></div><div class="workspace-card-desc" title="${ws.desc}">${ws.desc || '暂无描述'}</div><div class="workspace-card-stats"><span class="ws-stat-item">${icons.users} <span class="ws-stat-value" data-count-up="${ws.members.length}">${ws.members.length}</span> 成员</span><span class="ws-stat-item">${icons.workflow} <span class="ws-stat-value" data-count-up="${ws.workflowCount}">${ws.workflowCount}</span> 工作流</span>${ws.runningInstances > 0 ? `<span class="ws-stat-item ws-stat-running">${icons.sync} <span class="ws-stat-value" data-count-up="${ws.runningInstances}">${ws.runningInstances}</span> 运行中</span>` : `<span class="ws-stat-item ws-stat-idle">${icons.sync} <span class="ws-stat-value">0</span> 运行中</span>`}</div><div class="workspace-card-footer"><span class="role-badge ${rc[ws.myRole]}">${icons.shield} ${rl[ws.myRole]}</span><span class="workspace-card-time">${icons.clock} 活跃于 ${ws.lastActiveAt}</span></div></div>`;
     }).join('')}</div>
     ${totalPages > 1 || total > 12 ? `<div class="pagination"><div class="pagination-info">第 ${start + 1}-${Math.min(start + wsListState.pageSize, total)} 条，共 ${total} 条</div><div class="pagination-controls">${wsListState.page > 1 ? `<button class="pagination-btn" onclick="wsListState.page--;render()">${icons.chevronLeft}</button>` : `<button class="pagination-btn disabled">${icons.chevronLeft}</button>`}${Array.from({length: totalPages}, (_, i) => `<button class="pagination-btn ${wsListState.page === i + 1 ? 'active' : ''}" onclick="wsListState.page=${i + 1};render()">${i + 1}</button>`).join('')}${wsListState.page < totalPages ? `<button class="pagination-btn" onclick="wsListState.page++;render()">${icons.chevronRight}</button>` : `<button class="pagination-btn disabled">${icons.chevronRight}</button>`}</div><div class="pagination-size"><span>每页</span><select onchange="wsListState.pageSize=parseInt(this.value);wsListState.page=1;render()"><option value="12" ${wsListState.pageSize === 12 ? 'selected' : ''}>12</option><option value="24" ${wsListState.pageSize === 24 ? 'selected' : ''}>24</option><option value="48" ${wsListState.pageSize === 48 ? 'selected' : ''}>48</option></select><span>条</span></div></div>` : ''}`}`;
 }
@@ -2146,7 +2150,7 @@ function onExecTriggerFilter(val) { wsExecTriggerFilter = val; wsExecPage = 1; r
 function onExecTimeRange(val) { wsExecTimeRange = val; wsExecPage = 1; render(); }
 function goToExecPage(p) { wsExecPage = p; render(); }
 function onExecPageSizeChange(val) { wsExecPageSize = parseInt(val); wsExecPage = 1; render(); }
-function viewExecDetail(execId) { wsExecDetailId = execId; wsExecSelectedNodeIdx = null; render(); }
+function viewExecDetail(execId) { wsExecDetailId = execId; wsExecSelectedNodeIdx = null; wsExecNodeSearch = ''; wsExecLogFilter = 'all'; render(); }
 
 function renderExecDetail(ws) {
   const exec = (wsExecutions[ws.id] || []).find(e => e.id === wsExecDetailId);
@@ -2174,8 +2178,57 @@ function renderExecDetail(ws) {
     if (!params || Object.keys(params).length === 0) return '';
     return `<div class="kv-cards">${Object.entries(params).map(([key, p]) => {
       const isJson = p.type === 'Object' || (typeof p.value === 'string' && (p.value.trim().startsWith('{') || p.value.trim().startsWith('[')));
-      return `<div class="kv-card"><div class="kv-card-header"><span class="kv-card-name">${p.label || key}</span><span class="kv-card-type">${p.type}</span></div><div class="kv-card-value ${isJson ? 'json-value' : ''}">${escHtml(String(p.value))}</div></div>`;
+      const valStr = String(p.value);
+      if (isJson) {
+        let formatted = valStr;
+        try { formatted = JSON.stringify(JSON.parse(valStr), null, 2); } catch(e) { formatted = valStr; }
+        return `<div class="kv-card kv-card-json"><div class="kv-card-header"><span class="kv-card-name">${p.label || key}</span><span class="kv-card-type">${p.type}</span></div><details class="kv-json-details"><summary class="kv-json-toggle">${icons.chevronRight} 展开 JSON (${valStr.length} 字符)</summary><pre class="kv-json-pre">${escHtml(formatted)}</pre></details></div>`;
+      }
+      return `<div class="kv-card"><div class="kv-card-header"><span class="kv-card-name">${p.label || key}</span><span class="kv-card-type">${p.type}</span></div><div class="kv-card-value">${escHtml(valStr)}</div></div>`;
     }).join('')}</div>`;
+  }
+
+  // --- Helper: Generate execution logs from node data ---
+  function generateExecLogs(exec) {
+    const logs = [];
+    const baseDate = exec.startTime.split(' ')[0];
+    const trigLbl = { manual: '手动', scheduled: '定时', event: '事件触发', subflow: '工作流调用' };
+    logs.push({ time: exec.startTime + '.000', level: 'info', event: 'workflow.started', node: null, message: '工作流开始执行，触发方式: ' + (trigLbl[exec.trigger]||exec.trigger) + '，触发人: ' + exec.triggerUser });
+    if (exec.nodes) {
+      exec.nodes.forEach(node => {
+        const st = node.startTime.includes(' ') ? node.startTime : baseDate + ' ' + node.startTime;
+        logs.push({ time: st + '.000', level: 'info', event: 'node.started', node: node.name, message: '节点开始执行 (' + node.type + ')' });
+        if (node.inputData && node.inputData.url) {
+          logs.push({ time: st + '.010', level: 'debug', event: 'http.request', node: node.name, message: (node.inputData.method||'GET') + ' ' + node.inputData.url });
+        }
+        if (node.variables && Object.keys(node.variables).length > 0) {
+          const varKeys = Object.keys(node.variables).filter(k => k !== 'env' && k !== 'traceId').slice(0,2);
+          if (varKeys.length > 0) logs.push({ time: st + '.020', level: 'debug', event: 'variable.set', node: node.name, message: '变量写入: ' + varKeys.map(k => k + '=' + JSON.stringify(node.variables[k])).join(', ') });
+        }
+        if (node.status === 'success') {
+          if (node.outputData && node.outputData.statusCode) logs.push({ time: st + '.080', level: 'debug', event: 'http.response', node: node.name, message: 'HTTP ' + node.outputData.statusCode + ' OK' + (node.outputData.responseSize ? ', 大小: ' + node.outputData.responseSize : '') });
+          logs.push({ time: st + '.100', level: 'info', event: 'node.completed', node: node.name, message: '节点执行完成，耗时 ' + node.duration });
+        } else if (node.status === 'failed') {
+          logs.push({ time: st + '.100', level: 'error', event: 'node.failed', node: node.name, message: '节点执行失败: ' + (node.error || '未知错误') + '，耗时 ' + node.duration });
+        } else if (node.status === 'running') {
+          logs.push({ time: st + '.050', level: 'info', event: 'node.running', node: node.name, message: '节点执行中...' });
+        } else if (node.status === 'paused') {
+          logs.push({ time: st + '.100', level: 'warn', event: 'node.paused', node: node.name, message: '节点已暂停' });
+        } else if (node.status === 'cancelled') {
+          logs.push({ time: st + '.100', level: 'warn', event: 'node.cancelled', node: node.name, message: '节点已取消' });
+        } else if (node.status === 'skipped') {
+          logs.push({ time: st + '.000', level: 'info', event: 'node.skipped', node: node.name, message: '节点已跳过 (上游取消)' });
+        }
+      });
+    }
+    if (exec.status === 'completed') logs.push({ time: exec.endTime + '.000', level: 'info', event: 'workflow.completed', node: null, message: '工作流执行完成，总耗时 ' + exec.duration + '，共 ' + (exec.nodes?exec.nodes.length:0) + ' 个节点' });
+    else if (exec.status === 'failed') logs.push({ time: exec.endTime + '.000', level: 'error', event: 'workflow.failed', node: null, message: '工作流执行失败，总耗时 ' + exec.duration });
+    else if (exec.status === 'cancelled') logs.push({ time: exec.endTime + '.000', level: 'warn', event: 'workflow.cancelled', node: null, message: '工作流已取消，总耗时 ' + exec.duration });
+    if (exec.alerts && exec.alerts.length > 0) {
+      exec.alerts.forEach(a => { logs.push({ time: a.time + '.000', level: a.level === '严重' ? 'error' : 'warn', event: 'alert.triggered', node: null, message: '告警: ' + a.type + ' (' + a.level + ')' }); });
+    }
+    logs.sort((a, b) => a.time.localeCompare(b.time));
+    return logs;
   }
 
   // --- Build: Compact Top Bar ---
@@ -2210,10 +2263,9 @@ function renderExecDetail(ws) {
       <div class="ed-overview-chip"><span class="ed-overview-chip-label">耗时</span><strong>${exec.duration}</strong></div>
     </div>`;
 
-  // --- Build: Node Timeline ---
+  // --- Build: Node Timeline (with search) ---
   let timelineHtml = '';
   if (exec.nodes && exec.nodes.length > 0) {
-    // Node status summary for complex workflows
     const nSuccess = exec.nodes.filter(n => n.status === 'success').length;
     const nFailed = exec.nodes.filter(n => n.status === 'failed' || n.status === 'cancelled').length;
     const nRunning = exec.nodes.filter(n => n.status === 'running').length;
@@ -2227,16 +2279,26 @@ function renderExecDetail(ws) {
       ${nPaused ? `<span class="ed-node-summary-item running">${icons.pause} ${nPaused} 已暂停</span>` : ''}
       ${nSkipped ? `<span class="ed-node-summary-item skipped">${nSkipped} 跳过</span>` : ''}
     </div>` : '';
+    // Node search filter
+    const showNodeSearch = exec.nodes.length >= 5;
+    const nodeSearchHtml = showNodeSearch ? `<div class="ed-node-search"><div class="ed-node-search-inner">${icons.search}<input type="text" class="ed-node-search-input" placeholder="搜索节点名称或类型..." value="${escHtml(wsExecNodeSearch)}" oninput="onExecNodeSearch(this.value)" />${wsExecNodeSearch ? '<button class="ed-node-search-clear" onclick="onExecNodeSearch(\'\')">&times;</button>' : ''}</div></div>` : '';
+    const filteredNodes = wsExecNodeSearch ? exec.nodes.filter((n, idx) => { const q = wsExecNodeSearch.toLowerCase(); return n.name.toLowerCase().includes(q) || n.type.toLowerCase().includes(q); }) : exec.nodes;
+    const filteredCount = wsExecNodeSearch ? `<span class="section-count-filter">显示 ${filteredNodes.length} / ${exec.nodes.length}</span>` : '';
     timelineHtml = `
       <div class="ed-section">
-        <div class="ed-section-title">${icons.workflow} 节点执行时间线 <span class="section-count">${exec.nodes.length} 个节点</span></div>
+        <div class="ed-section-title">${icons.workflow} 节点执行时间线 <span class="section-count">${exec.nodes.length} 个节点</span>${filteredCount}</div>
         ${summaryHtml}
-        <div class="node-timeline-v2">${exec.nodes.map((node, idx) => `
+        ${nodeSearchHtml}
+        <div class="node-timeline-v2">${filteredNodes.length === 0 && wsExecNodeSearch ? '<div class="ed-node-search-empty">未找到匹配的节点</div>' : filteredNodes.map((node, _fi) => {
+          const idx = exec.nodes.indexOf(node);
+          const q = wsExecNodeSearch ? wsExecNodeSearch.toLowerCase() : '';
+          const highlightName = q && node.name.toLowerCase().includes(q) ? node.name.replace(new RegExp('(' + q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi'), '<mark class="ed-search-mark">$1</mark>') : node.name;
+          return `
           <div class="node-item-v2 ${node.status === 'failed' ? 'node-item-failed' : ''} ${wsExecSelectedNodeIdx === idx ? 'active' : ''}" data-node-idx="${idx}" onclick="selectExecNode(${idx})">
             <div class="node-dot ${nodeStatusClass[node.status] || ''}"></div>
             <div class="node-main">
               <div class="node-header-row">
-                <span class="node-name-text">${node.name}</span>
+                <span class="node-name-text">${highlightName}</span>
                 <span class="badge badge-type" style="font-size:10px">${node.type}</span>
                 <span class="exec-status ${statusClass[node.status] || ''}" style="font-size:11px">${nodeStatusLabel[node.status] || node.status}</span>
               </div>
@@ -2244,7 +2306,8 @@ function renderExecDetail(ws) {
               ${node.error ? `<div class="node-error-brief">${node.error}</div>` : ''}
             </div>
             <div class="node-select-arrow">${icons.chevronRight}</div>
-          </div>`).join('')}</div>
+          </div>`;
+        }).join('')}</div>
       </div>`;
   }
 
@@ -2285,6 +2348,36 @@ function renderExecDetail(ws) {
       </div>
     </details>`;
 
+  // --- Build: Execution Logs / Journal (collapsible) ---
+  const execLogs = exec.logs || generateExecLogs(exec);
+  const logLevelIcon = { info: icons.info, warn: icons.alertTriangle, error: icons.xCircle, debug: icons.code || '⚙' };
+  const logLevelLabel = { info: '信息', warn: '警告', error: '错误', debug: '调试' };
+  const filteredLogs = wsExecLogFilter === 'all' ? execLogs : execLogs.filter(l => l.level === wsExecLogFilter);
+  const logsHtml = `
+    <details class="ed-collapsible">
+      <summary class="ed-collapsible-header">${icons.list || icons.workflow} 执行日志 <span class="section-count">${execLogs.length} 条</span></summary>
+      <div class="ed-collapsible-body">
+        <div class="ed-log-toolbar">
+          <div class="ed-log-filters">
+            <span class="ed-log-chip ${wsExecLogFilter === 'all' ? 'active' : ''}" onclick="onExecLogFilter('all')">全部</span>
+            <span class="ed-log-chip ${wsExecLogFilter === 'info' ? 'active' : ''}" onclick="onExecLogFilter('info')">信息</span>
+            <span class="ed-log-chip ${wsExecLogFilter === 'warn' ? 'active' : ''}" onclick="onExecLogFilter('warn')">警告</span>
+            <span class="ed-log-chip ${wsExecLogFilter === 'error' ? 'active' : ''}" onclick="onExecLogFilter('error')">错误</span>
+            <span class="ed-log-chip ${wsExecLogFilter === 'debug' ? 'active' : ''}" onclick="onExecLogFilter('debug')">调试</span>
+          </div>
+          <span class="ed-log-count">${filteredLogs.length} / ${execLogs.length} 条</span>
+        </div>
+        <div class="ed-log-list">${filteredLogs.length === 0 ? '<div class="ed-log-empty">无匹配的日志条目</div>' : filteredLogs.map(log => `
+          <div class="ed-log-item ed-log-${log.level}">
+            <span class="ed-log-time">${log.time.split('.')[0].split(' ')[1] || log.time}</span>
+            <span class="ed-log-level-badge ed-log-level-${log.level}">${logLevelLabel[log.level] || log.level}</span>
+            ${log.node ? `<span class="ed-log-node">${escHtml(log.node)}</span>` : ''}
+            <span class="ed-log-msg">${escHtml(log.message)}</span>
+          </div>`).join('')}
+        </div>
+      </div>
+    </details>`;
+
   // --- Build: Right Panel ---
   let panelHtml = '';
   if (hasPanel && selectedNode) {
@@ -2320,7 +2413,7 @@ function renderExecDetail(ws) {
       </aside>`;
   }
 
-  // --- Assemble Full Page ---
+  // --- Assemble Full Page (inputs above timeline) ---
   return `
     <div class="ed-page">
       <div class="ed-header">
@@ -2329,10 +2422,11 @@ function renderExecDetail(ws) {
       </div>
       <div class="ed-body ${hasPanel ? 'panel-open' : ''}">
         <div class="ed-left">
-          ${timelineHtml}
           ${inputsHtml}
+          ${timelineHtml}
           ${outputsHtml}
           ${alertsHtml}
+          ${logsHtml}
         </div>
         ${exec.nodes && exec.nodes.length > 0 ? panelHtml : ''}
       </div>
@@ -2349,6 +2443,21 @@ function selectExecNode(idx) {
       if (activeNode) activeNode.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     });
   }
+}
+
+function onExecNodeSearch(val) {
+  wsExecNodeSearch = val;
+  render();
+  // Preserve focus on search input after re-render
+  requestAnimationFrame(() => {
+    const input = document.querySelector('.ed-node-search-input');
+    if (input) { input.focus(); input.setSelectionRange(input.value.length, input.value.length); }
+  });
+}
+
+function onExecLogFilter(level) {
+  wsExecLogFilter = level;
+  render();
 }
 
 function closeExecNodePanel() {
