@@ -1,0 +1,16 @@
+# Dependencies
+node_modules/
+
+# Build output
+vue-app/dist/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+
+# Logs
+*.log
