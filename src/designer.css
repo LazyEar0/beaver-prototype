@@ -1448,7 +1448,7 @@
 }
 
 /* --- Responsive adjustments for designer panels --- */
-.designer-shell svg {
+.designer-shell svg:not(.canvas-svg) {
   width: 16px;
   height: 16px;
   flex-shrink: 0;
