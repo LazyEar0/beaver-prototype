@@ -771,6 +771,86 @@ function renderNodeConfigFields(node, nt) {
   return html;
 }
 
+function parseCronToText(expr) {
+  if (!expr || typeof expr !== 'string') return '';
+  const parts = expr.trim().split(/\s+/);
+  // Support both 5-part (min hour dom month dow) and 6-part (sec min hour dom month dow)
+  let min, hour, dom, month, dow;
+  if (parts.length === 6) {
+    [, min, hour, dom, month, dow] = parts;
+  } else if (parts.length === 5) {
+    [min, hour, dom, month, dow] = parts;
+  } else {
+    return '无法识别的 Cron 表达式';
+  }
+
+  const weekNames = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+  const monthNames = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
+
+  function fmtTime(h, m) {
+    const hh = h === '*' ? null : parseInt(h, 10);
+    const mm = m === '*' ? null : parseInt(m, 10);
+    if (hh === null && mm === null) return '每分钟';
+    if (hh === null) return `每小时第 ${mm} 分`;
+    if (mm === null) return `${hh} 点整`;
+    return `${hh} 点 ${mm} 分`;
+  }
+
+  // Every minute
+  if (min === '*' && hour === '*' && dom === '*' && month === '*' && dow === '*') return '每分钟执行一次';
+
+  // Every hour at :mm
+  if (hour === '*' && dom === '*' && month === '*' && dow === '*') {
+    const mm = min === '*' ? 0 : parseInt(min, 10);
+    return `每小时第 ${mm} 分执行`;
+  }
+
+  const timeStr = fmtTime(hour, min);
+
+  // Every day
+  if (dom === '*' && month === '*' && dow === '*') return `每天 ${timeStr} 执行`;
+
+  // Day of week
+  if (dom === '*' && month === '*' && dow !== '*') {
+    if (/^\d$/.test(dow)) {
+      const d = parseInt(dow, 10);
+      return `每${weekNames[d] || ('周' + d)} ${timeStr} 执行`;
+    }
+    if (dow.includes(',')) {
+      const days = dow.split(',').map(d => weekNames[parseInt(d, 10)] || ('周' + d)).join('、');
+      return `每周${days} ${timeStr} 执行`;
+    }
+    if (dow.includes('-')) {
+      const [s, e] = dow.split('-').map(Number);
+      return `每周${weekNames[s]}至${weekNames[e]} ${timeStr} 执行`;
+    }
+    return `每周第 ${dow} 天 ${timeStr} 执行`;
+  }
+
+  // Day of month
+  if (dom !== '*' && month === '*' && dow === '*') {
+    if (/^\d+$/.test(dom)) {
+      return `每月 ${parseInt(dom, 10)} 日 ${timeStr} 执行`;
+    }
+    if (dom.includes(',')) {
+      const days = dom.split(',').map(d => parseInt(d, 10) + ' 日').join('、');
+      return `每月 ${days} ${timeStr} 执行`;
+    }
+    return `每月第 ${dom} 天 ${timeStr} 执行`;
+  }
+
+  // Specific month + day
+  if (dom !== '*' && month !== '*' && dow === '*') {
+    const mNum = parseInt(month, 10);
+    const dNum = parseInt(dom, 10);
+    const mStr = !isNaN(mNum) ? monthNames[mNum - 1] : (month + '月');
+    const dStr = !isNaN(dNum) ? (dNum + ' 日') : dom;
+    return `${mStr}${dStr} ${timeStr} 执行`;
+  }
+
+  return `Cron: ${expr}`;
+}
+
 function renderTriggerConfig(node) {
   const tt = node.config?.triggerType || 'manual';
   const inputParams = node.config?.inputParams || [];
@@ -784,17 +864,25 @@ function renderTriggerConfig(node) {
         <option value="webhook" ${tt === 'webhook' ? 'selected' : ''}>Webhook</option>
       </select>
     </div>
-    ${tt === 'scheduled' ? `
+    ${tt === 'scheduled' ? (() => {
+      const cronVal = node.config?.cron || '0 0 * * *';
+      const cronText = parseCronToText(cronVal);
+      const presets = [
+        { label: '每小时', value: '0 * * * *' },
+        { label: '每天', value: '0 0 * * *' },
+        { label: '每周一', value: '0 0 * * 1' },
+        { label: '每月1号', value: '0 0 1 * *' },
+      ];
+      return `
       <div class="config-field">
         <div class="config-field-label">Cron 表达式</div>
-        <input class="config-input" value="${node.config?.cron || '0 0 * * *'}" onchange="updateNodeConfig(${node.id}, 'cron', this.value)" style="font-family:var(--font-family-mono)" placeholder="0 0 * * *" />
+        <input class="config-input" id="cron-input-${node.id}" value="${cronVal}" onchange="updateNodeConfig(${node.id}, 'cron', this.value); renderDesigner()" style="font-family:var(--font-family-mono)" placeholder="0 0 * * *" />
         <div class="cron-presets">
-          <span class="cron-preset-chip" onclick="this.parentElement.previousElementSibling.value='0 * * * *'">每小时</span>
-          <span class="cron-preset-chip" onclick="this.parentElement.previousElementSibling.value='0 0 * * *'">每天</span>
-          <span class="cron-preset-chip" onclick="this.parentElement.previousElementSibling.value='0 0 * * 1'">每周一</span>
-          <span class="cron-preset-chip" onclick="this.parentElement.previousElementSibling.value='0 0 1 * *'">每月1号</span>
+          ${presets.map(p => `<span class="cron-preset-chip${cronVal === p.value ? ' active' : ''}" onclick="updateNodeConfig(${node.id}, 'cron', '${p.value}'); renderDesigner()">${p.label}</span>`).join('')}
         </div>
-      </div>` : ''}
+        ${cronText ? `<div class="cron-description"><span class="cron-description-icon">🕐</span><span>${cronText}</span></div>` : ''}
+      </div>`;
+    })() : ''}
     ${tt === 'event' ? `
       <div class="config-field">
         <div class="config-field-label">事件源标识 <span class="required">*</span></div>

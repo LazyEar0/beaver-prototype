@@ -1568,6 +1568,27 @@
   color: var(--md-on-primary-container);
 }
 
+.cron-description {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 8px 10px;
+  background: var(--md-surface-container-low, rgba(103, 80, 164, 0.05));
+  border: 1px solid var(--md-outline-variant);
+  border-left: 3px solid var(--md-primary);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  color: var(--md-on-surface-variant);
+  line-height: 1.4;
+}
+
+.cron-description-icon {
+  font-style: normal;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
 /* Drag ghost for node */
 .node-drag-ghost {
   position: fixed;
