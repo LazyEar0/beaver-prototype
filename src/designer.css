@@ -399,8 +399,9 @@
 }
 
 .canvas-svg path:hover {
-  stroke-width: 3.5;
-  filter: drop-shadow(0 0 3px rgba(103, 80, 164, 0.4));
+  stroke: #1890FF !important;
+  stroke-width: 4;
+  filter: drop-shadow(0 0 4px rgba(24, 144, 255, 0.5));
 }
 
 .canvas-nodes {

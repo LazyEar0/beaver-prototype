@@ -392,7 +392,7 @@ function renderDesigner() {
           <svg class="canvas-svg" id="canvasSvg">
             <defs>
               <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
-                <polygon points="0 0, 10 3.5, 0 7" fill="#555" />
+                <polygon points="0 0, 10 3.5, 0 7" fill="#222" />
               </marker>
               <marker id="arrowhead-active" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
                 <polygon points="0 0, 10 3.5, 0 7" fill="#1890FF" />
@@ -573,7 +573,7 @@ function renderConnections() {
 
     const isActive = designerDebugMode && conn._debugActive;
 
-    return `<path d="${path}" fill="none" stroke="${isActive ? '#1890FF' : '#555'}" stroke-width="${isActive ? 2.5 : 2}" marker-end="url(#${isActive ? 'arrowhead-active' : 'arrowhead'})" ${isActive ? 'class="connection-flow"' : ''} onclick="onConnectionClick(event, ${conn.id})" style="cursor:pointer" />
+    return `<path d="${path}" fill="none" stroke="${isActive ? '#1890FF' : '#222'}" stroke-width="${isActive ? 3.5 : 2.5}" marker-end="url(#${isActive ? 'arrowhead-active' : 'arrowhead'})" ${isActive ? 'class="connection-flow"' : ''} onclick="onConnectionClick(event, ${conn.id})" style="cursor:pointer" />
     ${conn.label ? `<text x="${(fromPos.x + toPos.x) / 2}" y="${(fromPos.y + toPos.y) / 2 - 10}" text-anchor="middle" font-size="11" fill="${conn.label === 'TRUE' ? '#16a34a' : conn.label === 'FALSE' ? '#dc2626' : conn.label === 'Default' ? '#94a3b8' : '#1890FF'}" font-weight="700" font-family="Roboto, sans-serif" paint-order="stroke" stroke="#fff" stroke-width="3">${conn.label}</text>` : ''}`;
   }).join('');
 }
