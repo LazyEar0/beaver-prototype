@@ -1721,7 +1721,7 @@ function renderWsExecutionsTab(ws) {
       </div></td>
     </tr>`).join('')}
     </tbody></table></div>
-    ${execPaginationHtml}`};
+    ${execPaginationHtml}`}`;
 }
 
 function onExecSearch(val) { wsExecSearch = val; wsExecPage = 1; render(); }
