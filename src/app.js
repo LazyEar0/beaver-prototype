@@ -469,7 +469,7 @@ function renderDsListPage() {
   // Build creator dropdown panel
   const filteredCreators = listState.creatorSearch ? creators.filter(c => c.toLowerCase().includes(listState.creatorSearch.toLowerCase())) : creators;
   const creatorPanelHtml = listState.creatorDropdownOpen ? `<div class="creator-dropdown-panel" onclick="event.stopPropagation()">
-    <div class="creator-dropdown-search">${icons.search}<input type="text" placeholder="搜索创建人..." value="${listState.creatorSearch}" oninput="onCreatorSearch(this.value)" autofocus /></div>
+    <div class="creator-dropdown-search">${icons.search}<input type="text" placeholder="搜索创建人..." value="${escHtml(listState.creatorSearch)}" oninput="onCreatorSearch(this.value)" oncompositionstart="isComposing=true" oncompositionend="isComposing=false;onCreatorSearch(this.value)" autofocus /></div>
     <div class="creator-dropdown-list">${filteredCreators.length === 0 ? '<div class="creator-dropdown-empty">无匹配结果</div>' : filteredCreators.map(c => {
       const sel = listState.creatorFilter.includes(c);
       return `<div class="creator-dropdown-item ${sel ? 'selected' : ''}" onclick="toggleCreatorSelection('${c}')"><span class="creator-avatar-sm">${c.charAt(0)}</span><span>${c}</span><span class="check-icon">${icons.check}</span></div>`;
@@ -666,14 +666,19 @@ function renderDataItemsTab(ds) {
   const addBtn = addBtnDisabled
     ? `<span title="已达数据项上限（500条），无法继续添加" style="cursor:not-allowed"><button class="btn btn-primary btn-sm" disabled style="opacity:0.5;cursor:not-allowed;pointer-events:none">${icons.plus}<span>添加数据项</span></button></span>`
     : `<button class="btn btn-primary btn-sm" onclick="showAddItemModal(${ds.id})">${icons.plus}<span>添加数据项</span></button>`;
-  const searchHtml = `<div class="filter-search" style="width:240px;height:34px">${icons.search}<input type="text" placeholder="搜索 Key / Value ..." value="${escHtml(itemSearchKeyword)}" oninput="onItemSearch(this.value)" />${itemSearchKeyword ? `<button class="search-clear-btn" onclick="event.stopPropagation();clearSearchInput('item')" title="清空">×</button>` : ''}</div>`;
+  const searchHtml = `<div class="filter-search" style="width:240px;height:34px">${icons.search}<input type="text" placeholder="搜索 Key / Value ..." value="${escHtml(itemSearchKeyword)}" oninput="onItemSearch(this.value)" oncompositionstart="isComposing=true" oncompositionend="isComposing=false;onItemSearch(this.value)" />${itemSearchKeyword ? `<button class="search-clear-btn" onclick="event.stopPropagation();clearSearchInput('item')" title="清空">×</button>` : ''}</div>`;
   return `<div class="tab-toolbar"><div class="tab-toolbar-left">${searchHtml}</div><div class="tab-toolbar-right">${addBtn}</div></div>
   ${total === 0 && itemSearchKeyword ? `<div style="padding:var(--space-12) var(--space-8);text-align:center;color:var(--md-on-surface-variant)"><div style="font-size:var(--font-size-lg);margin-bottom:var(--space-2)">未找到匹配的数据项</div><div style="font-size:var(--font-size-sm)">尝试调整搜索关键词</div></div>` : `<div class="table-wrapper"><table class="data-table"><thead><tr><th style="width:180px" class="sortable" onclick="toggleItemSort('key')">Key <span class="sort-icon">${si('key')}</span></th><th class="sortable" onclick="toggleItemSort('value')">Value <span class="sort-icon">${si('value')}</span></th><th style="width:90px">类型</th><th style="width:130px">更新时间</th><th style="width:90px">操作</th></tr></thead><tbody>
   ${paged.map(item => `<tr><td style="width:180px"><code class="item-key">${item.key}</code></td><td><div style="max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(item.value)}">${item.value}</div></td><td><span class="badge badge-type">${item.type}</span></td><td style="font-size:var(--font-size-xs);color:var(--md-outline)">${item.updatedAt || '-'}</td><td><div class="table-actions"><button class="table-action-btn" title="编辑" onclick="showEditItemModal(${ds.id}, '${item.key}')">${icons.edit}</button><button class="table-action-btn danger" title="删除" onclick="deleteItem(${ds.id}, '${item.key}')">${icons.trash}</button></div></td></tr>`).join('')}
   </tbody></table></div>
   ${totalPages > 1 ? `<div class="pagination"><div class="pagination-info"><span class="pagination-size"><label>每页</label><select onchange="onItemPageSizeChange(this.value)">${[10,20,50].map(n => `<option value="${n}" ${itemPageSize === n ? 'selected' : ''}>${n}</option>`).join('')}</select><label>条</label></span></div><div class="pagination-controls"><button class="pagination-btn" ${itemPage <= 1 ? 'disabled' : ''} onclick="onItemPageChange(${itemPage - 1})">${icons.chevronLeft}</button>${Array.from({length: totalPages}, (_, i) => i + 1).map(p => `<button class="pagination-btn ${p === itemPage ? 'active' : ''}" onclick="onItemPageChange(${p})">${p}</button>`).join('')}<button class="pagination-btn" ${itemPage >= totalPages ? 'disabled' : ''} onclick="onItemPageChange(${itemPage + 1})">${icons.chevronRight}</button></div></div>` : ''}`}`;
 }
-function onItemSearch(val) { itemSearchKeyword = val; itemPage = 1; render(); }
+function onItemSearch(val) {
+  if (isComposing) return;
+  itemSearchKeyword = val;
+  itemPage = 1;
+  render();
+}
 function toggleItemSort(field) { if (itemSortField === field) itemSortAsc = !itemSortAsc; else { itemSortField = field; itemSortAsc = true; } render(); }
 
 function renderAuthTab(ds) {
@@ -900,7 +905,7 @@ function showAddSpaceModal(dsId) {
   if (available.length === 0) { showToast('info', '提示', '所有空间均已授权'); return; }
   _selectedSpaces = [];
   showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">添加授权空间</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
-  <div style="margin-bottom:var(--space-3)"><div class="filter-search" style="width:100%">${icons.search}<input type="text" id="spaceSearchInput" placeholder="搜索空间名称..." oninput="filterSpaceList(${dsId})" /></div></div>
+  <div style="margin-bottom:var(--space-3)"><div class="filter-search" style="width:100%">${icons.search}<input type="text" id="spaceSearchInput" placeholder="搜索空间名称..." oninput="filterSpaceList(${dsId})" oncompositionend="filterSpaceList(${dsId})" /></div></div>
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-2);padding:0 var(--space-1)">
     <label style="display:flex;align-items:center;gap:var(--space-2);cursor:pointer;font-size:var(--font-size-sm);color:var(--md-on-surface-variant);user-select:none"><input type="checkbox" id="selectAllSpaces" onchange="toggleSelectAllSpaces(${dsId})" style="width:16px;height:16px;cursor:pointer;accent-color:var(--md-primary)" /> 全选</label>
     <span id="spaceSelectionCount" style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant)">已选 0 / ${available.length} 个空间</span>
@@ -1210,7 +1215,7 @@ function renderWsWorkflowsTab(ws) {
       : `<span class="creator-mini-tags"><span class="creator-mini-tag">${wsContentCreatorFilter[0]}</span><span class="creator-mini-tag-more">+${wsContentCreatorFilter.length - 1}</span></span>`;
   const filteredWsCreators = wsCreatorSearch ? creators.filter(c => c.toLowerCase().includes(wsCreatorSearch.toLowerCase())) : creators;
   const creatorPanelHtml = wsCreatorDropdownOpen ? `<div class="creator-dropdown-panel" onclick="event.stopPropagation()">
-    <div class="creator-dropdown-search">${icons.search}<input type="text" placeholder="搜索创建人..." value="${wsCreatorSearch}" oninput="onWsCreatorSearch(this.value)" autofocus /></div>
+    <div class="creator-dropdown-search">${icons.search}<input type="text" placeholder="搜索创建人..." value="${escHtml(wsCreatorSearch)}" oninput="onWsCreatorSearch(this.value)" oncompositionstart="isComposing=true" oncompositionend="isComposing=false;onWsCreatorSearch(this.value)" autofocus /></div>
     <div class="creator-dropdown-list" id="wsCreatorList">${filteredWsCreators.length === 0 ? '<div class="creator-dropdown-empty">无匹配结果</div>' : filteredWsCreators.map(c => {
       const sel = wsContentCreatorFilter.includes(c);
       return `<div class="creator-dropdown-item ${sel ? 'selected' : ''}" onclick="toggleWsCreatorSelection('${c}')"><span class="creator-avatar-sm">${c.charAt(0)}</span><span>${c}</span><span class="check-icon">${icons.check}</span></div>`;
@@ -1225,7 +1230,7 @@ function renderWsWorkflowsTab(ws) {
       : `<span class="creator-mini-tags"><span class="creator-mini-tag">${wsContentOwnerFilter[0]}</span><span class="creator-mini-tag-more">+${wsContentOwnerFilter.length - 1}</span></span>`;
   const filteredWsOwners = wsOwnerSearch ? ownerNames.filter(c => c.toLowerCase().includes(wsOwnerSearch.toLowerCase())) : ownerNames;
   const ownerPanelHtml = wsOwnerDropdownOpen ? `<div class="creator-dropdown-panel" onclick="event.stopPropagation()">
-    <div class="creator-dropdown-search">${icons.search}<input type="text" placeholder="搜索负责人..." value="${wsOwnerSearch}" oninput="onWsOwnerSearch(this.value)" autofocus /></div>
+    <div class="creator-dropdown-search">${icons.search}<input type="text" placeholder="搜索负责人..." value="${escHtml(wsOwnerSearch)}" oninput="onWsOwnerSearch(this.value)" oncompositionstart="isComposing=true" oncompositionend="isComposing=false;onWsOwnerSearch(this.value)" autofocus /></div>
     <div class="creator-dropdown-list" id="wsOwnerList">${filteredWsOwners.length === 0 ? '<div class="creator-dropdown-empty">无匹配结果</div>' : filteredWsOwners.map(c => {
       const sel = wsContentOwnerFilter.includes(c);
       return `<div class="creator-dropdown-item ${sel ? 'selected' : ''}" onclick="toggleWsOwnerSelection('${c}')"><span class="creator-avatar-sm">${c.charAt(0)}</span><span>${c}</span><span class="check-icon">${icons.check}</span></div>`;
@@ -2112,7 +2117,7 @@ function renderWsExecutionsTab(ws) {
 
   return `
     <div class="filter-bar" style="margin-top:var(--space-3)">
-      <div class="filter-search" style="flex:1;max-width:300px">${icons.search}<input type="text" placeholder="搜索工作流名称或实例ID..." value="${wsExecSearch}" oninput="onExecSearch(this.value)" />${wsExecSearch ? `<button class="search-clear-btn" onclick="event.stopPropagation();clearSearchInput('wsExec')" title="清空">×</button>` : ''}</div>
+      <div class="filter-search" style="flex:1;max-width:300px">${icons.search}<input type="text" placeholder="搜索工作流名称或实例ID..." value="${escHtml(wsExecSearch)}" oninput="onExecSearch(this.value)" oncompositionstart="isComposing=true" oncompositionend="isComposing=false;onExecSearch(this.value)" />${wsExecSearch ? `<button class="search-clear-btn" onclick="event.stopPropagation();clearSearchInput('wsExec')" title="清空">×</button>` : ''}</div>
       <div class="filter-actions" style="display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap">
         <select class="form-input" style="width:auto;padding:4px 8px;font-size:var(--font-size-sm)" onchange="onExecStatusFilter(this.value)">
           <option value="all" ${wsExecStatusFilter === 'all' ? 'selected' : ''}>全部状态</option>
@@ -2163,7 +2168,12 @@ function renderWsExecutionsTab(ws) {
     ${execPaginationHtml}`}`;
 }
 
-function onExecSearch(val) { wsExecSearch = val; wsExecPage = 1; render(); }
+function onExecSearch(val) {
+  if (isComposing) return;
+  wsExecSearch = val;
+  wsExecPage = 1;
+  render();
+}
 function onExecStatusFilter(val) { wsExecStatusFilter = val; wsExecPage = 1; render(); }
 function onExecTriggerFilter(val) { wsExecTriggerFilter = val; wsExecPage = 1; render(); }
 function onExecTimeRange(val) { wsExecTimeRange = val; wsExecPage = 1; render(); }
@@ -2971,13 +2981,13 @@ render = function() {
   const _creatorInputEl = document.querySelector('.creator-dropdown-search input');
   const _creatorWasFocused = document.activeElement && document.activeElement === _creatorInputEl;
   const _creatorCursorPos = (_creatorWasFocused && _creatorInputEl) ? (_creatorInputEl.selectionStart || 0) : 0;
-  // Workspace search input
+  // Workspace search input (wsContentSearchFocused)
   const _wsSearchEl = document.getElementById('wsSearchInput');
-  const _wsSearchWasFocused = document.activeElement && document.activeElement === _wsSearchEl;
+  const _wsSearchWasFocused = wsContentSearchFocused || (document.activeElement && document.activeElement === _wsSearchEl);
   const _wsSearchCursorPos = (_wsSearchWasFocused && _wsSearchEl) ? (_wsSearchEl.selectionStart || 0) : 0;
-  // Workspace LIST search input (space management page)
+  // Workspace LIST search input (wsListSearchFocused)
   const _wsListSearchEl = document.getElementById('wsListSearchInput');
-  const _wsListSearchWasFocused = document.activeElement && document.activeElement === _wsListSearchEl;
+  const _wsListSearchWasFocused = wsListSearchFocused || (document.activeElement && document.activeElement === _wsListSearchEl);
   const _wsListSearchCursorPos = (_wsListSearchWasFocused && _wsListSearchEl) ? (_wsListSearchEl.selectionStart || 0) : 0;
 
   // Detect actual view/page change (not just filter operations)

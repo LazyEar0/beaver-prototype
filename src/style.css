@@ -6149,7 +6149,6 @@ img { display: block; max-width: 100%; }
 .delete-step-line {
   transition: background 0.3s ease 0.1s, width 0.3s ease;
 }
-}
 
 /* ================================================
    NODE SEARCH IN TIMELINE

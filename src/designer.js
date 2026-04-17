@@ -990,53 +990,162 @@ function removeTriggerParam(nodeId, index) {
   renderDesigner();
 }
 
+// Preset variable options for condition builder
+const COND_VAR_PRESETS = [
+  { label: '应用变量 – keyword', value: 'vars.keyword' },
+  { label: '应用变量 – status', value: 'vars.status' },
+  { label: '上一节点输出 – response.data', value: 'response.data' },
+  { label: '上一节点输出 – response.status', value: 'response.status' },
+  { label: '触发器输入 – input.userId', value: 'input.userId' },
+  { label: '自定义...', value: '__custom__' },
+];
+
+// Operator options
+const COND_OPS = [
+  { label: '等于 (==)', value: 'eq' },
+  { label: '不等于 (!=)', value: 'neq' },
+  { label: '大于 (>)', value: 'gt' },
+  { label: '小于 (<)', value: 'lt' },
+  { label: '大于等于 (>=)', value: 'gte' },
+  { label: '小于等于 (<=)', value: 'lte' },
+  { label: '包含', value: 'contains' },
+  { label: '不包含', value: 'notContains' },
+  { label: '为空', value: 'isEmpty' },
+  { label: '不为空', value: 'isNotEmpty' },
+];
+
+// Render visual condition rows for IF / Switch nodes
+// addFnStr   : full JS call to add a condition, e.g. "addIfCondition(3)"
+// removeFnPfx: function + leading args WITHOUT the condIdx arg, e.g. "removeIfCondition(3,"
+//              → rendered as removeFnPfx + idx + ")"
+// updateFnPfx: function + leading args WITHOUT (condIdx,field,value), e.g. "updateIfCondition(3,"
+//              → rendered as updateFnPfx + idx + ",'left',this.value)"
+function renderConditionRows(conditions, addFnStr, removeFnPfx, updateFnPfx) {
+  const noRightOps = ['isEmpty', 'isNotEmpty'];
+  let html = '';
+  conditions.forEach((cond, idx) => {
+    if (idx > 0) {
+      html += `<div class="condition-and-tag">AND</div>`;
+    }
+    const isPreset = COND_VAR_PRESETS.slice(0, -1).some(p => p.value === cond.left);
+    const opIsNoRight = noRightOps.includes(cond.op);
+    html += `<div class="condition-visual-row">
+      ${isPreset
+        ? `<select class="cond-left-select" onchange="${updateFnPfx}${idx},'left',this.value)">
+            ${COND_VAR_PRESETS.map(p => `<option value="${escHtml(p.value)}" ${cond.left === p.value ? 'selected' : ''}>${p.label}</option>`).join('')}
+          </select>`
+        : `<input class="cond-left-input" value="${escHtml(cond.left || '')}" placeholder="输入变量路径" onchange="${updateFnPfx}${idx},'left',this.value)" />`
+      }
+      <select class="cond-op-select" onchange="${updateFnPfx}${idx},'op',this.value)">
+        ${COND_OPS.map(o => `<option value="${o.value}" ${cond.op === o.value ? 'selected' : ''}>${o.label}</option>`).join('')}
+      </select>
+      ${opIsNoRight
+        ? `<span style="flex:1;font-size:11px;color:var(--md-outline);padding:0 4px;text-align:center">—</span>`
+        : `<input class="cond-right-input" value="${escHtml(cond.right || '')}" placeholder="输入或引用值" onchange="${updateFnPfx}${idx},'right',this.value)" />`
+      }
+      ${conditions.length > 1
+        ? `<button class="cond-delete-btn" onclick="${removeFnPfx}${idx})" title="删除此条件">${icons.close}</button>`
+        : `<span style="width:22px;flex-shrink:0"></span>`
+      }
+    </div>`;
+  });
+  html += `<button class="cond-add-btn" onclick="${addFnStr}">${icons.plus} 添加条件</button>`;
+  return html;
+}
+
 function renderIfConfig(node) {
+  if (!node.config) node.config = {};
+  const condMode = node.config.condMode || 'visual';
+  if (!node.config.conditions || node.config.conditions.length === 0) {
+    node.config.conditions = [{ left: 'response.status', op: 'eq', right: '200' }];
+  }
+  const conditions = node.config.conditions;
+  const nid = node.id;
+
   return `<div class="config-section">
-    <div class="config-section-title">条件配置</div>
-    <div style="display:flex;gap:4px;margin-bottom:var(--space-3)">
-      <button class="toolbar-btn active" style="font-size:11px;height:28px">可视化构建器</button>
-      <button class="toolbar-btn" style="font-size:11px;height:28px" onclick="showToast('info','提示','切换到表达式编辑器')">表达式编辑器</button>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-3)">
+      <div class="config-section-title" style="margin-bottom:0">条件配置</div>
+      <div class="cond-mode-tabs">
+        <button class="cond-mode-tab ${condMode === 'visual' ? 'active' : ''}" onclick="toggleIfCondMode(${nid},'visual')">可视化</button>
+        <button class="cond-mode-tab ${condMode === 'expr' ? 'active' : ''}" onclick="toggleIfCondMode(${nid},'expr')">表达式</button>
+      </div>
     </div>
-    <div class="condition-row">
-      <input class="config-input" style="flex:1" placeholder="变量" value="${node.config?.condLeft || 'response.status'}" />
-      <select class="config-select" style="width:60px"><option>==</option><option>!=</option><option>&gt;</option><option>&lt;</option></select>
-      <input class="config-input" style="flex:1" placeholder="值" value="${node.config?.condRight || '200'}" />
-    </div>
-    <div class="config-field" style="margin-top:var(--space-3)">
+    ${condMode === 'visual' ? `
+    <div class="if-block">
+      <div class="if-block-label">如果（满足以下全部条件）</div>
+      ${renderConditionRows(
+        conditions,
+        `addIfCondition(${nid})`,
+        `removeIfCondition(${nid},`,
+        `updateIfCondition(${nid},`
+      )}
+    </div>` : `
+    <div class="config-field">
       <div class="config-field-label">条件表达式</div>
-      <textarea class="expr-editor" placeholder="response.status == 200">${node.config?.condition || 'response.status == 200'}</textarea>
-    </div>
-    <div style="display:flex;gap:var(--space-3);margin-top:var(--space-3)">
-      <div style="flex:1;padding:8px;background:#E8F5E9;border-radius:6px;text-align:center"><div style="font-size:10px;color:#2E7D32;font-weight:600">TRUE 分支</div></div>
-      <div style="flex:1;padding:8px;background:#FFEBEE;border-radius:6px;text-align:center"><div style="font-size:10px;color:#C62828;font-weight:600">FALSE 分支</div></div>
+      <textarea class="expr-editor" placeholder="response.status == 200" onchange="updateNodeConfig(${nid},'condition',this.value)">${node.config?.condition || 'response.status == 200'}</textarea>
+      <div style="font-size:11px;color:var(--md-outline);margin-top:4px">支持 JS 表达式，变量通过 <code style="background:var(--md-surface-container);padding:1px 4px;border-radius:3px">vars.xxx</code> 引用</div>
+    </div>`}
+    <div class="if-else-block">
+      <div class="if-else-label">否则</div>
+      <div class="if-else-desc">以上条件不满足时执行此分支</div>
     </div>
   </div>`;
 }
 
 function renderSwitchConfig(node) {
   if (!node.config) node.config = {};
-  if (!node.config.branches) node.config.branches = [{ name: '分支1', condition: '' }, { name: '分支2', condition: '' }];
+  if (!node.config.branches) node.config.branches = [
+    { name: '分支1', condition: '', condMode: 'visual', conditions: [{ left: 'vars.status', op: 'eq', right: '' }] },
+    { name: '分支2', condition: '', condMode: 'visual', conditions: [{ left: 'vars.status', op: 'eq', right: '' }] },
+  ];
+  // Migrate old branches that don't have conditions yet
+  node.config.branches.forEach(b => {
+    if (!b.conditions) b.conditions = [{ left: b.condition ? '__custom__' : 'vars.status', op: 'eq', right: '' }];
+    if (!b.condMode) b.condMode = 'visual';
+  });
   const branches = node.config.branches;
+  const nid = node.id;
   return `<div class="config-section">
-    <div class="config-section-title">分支配置 <span style="font-size:10px;color:var(--md-outline);font-weight:400">(${branches.length}/50)</span></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-2)">
+      <div class="config-section-title" style="margin-bottom:0">分支配置 <span style="font-size:10px;color:var(--md-outline);font-weight:400">(${branches.length}/50)</span></div>
+    </div>
     <div class="config-field">
       <div class="config-field-label">匹配模式</div>
-      <select class="config-select" onchange="updateNodeConfig(${node.id}, 'matchMode', this.value)">
-        <option value="first" ${node.config.matchMode === 'first' ? 'selected' : ''}>首次匹配</option>
-        <option value="all" ${node.config.matchMode === 'all' ? 'selected' : ''}>所有匹配</option>
+      <select class="config-select" onchange="updateNodeConfig(${nid}, 'matchMode', this.value)">
+        <option value="first" ${node.config.matchMode === 'first' ? 'selected' : ''}>首次匹配（命中第一个满足条件的分支）</option>
+        <option value="all" ${node.config.matchMode === 'all' ? 'selected' : ''}>全部匹配（所有满足条件的分支都执行）</option>
       </select>
     </div>
-    ${branches.map((b, i) => `
-      <div class="branch-card" style="border-left-color:hsl(${i * 60}, 60%, 50%)">
+    ${branches.map((b, i) => {
+      const condMode = b.condMode || 'visual';
+      const conditions = b.conditions || [{ left: 'vars.status', op: 'eq', right: '' }];
+      const branchColor = `hsl(${i * 60}, 55%, 48%)`;
+      return `
+      <div class="branch-card" style="border-left-color:${branchColor}">
         <div class="branch-card-header">
-          <input class="config-input" style="flex:1;height:28px;font-size:12px;font-weight:500" value="${b.name}" onchange="updateSwitchBranchName(${node.id}, ${i}, this.value)" />
-          <button class="table-action-btn" style="width:24px;height:24px" onclick="removeSwitchBranch(${node.id}, ${i})" title="删除分支">${icons.close}</button>
+          <input class="config-input" style="flex:1;height:28px;font-size:12px;font-weight:500" value="${escHtml(b.name)}" onchange="updateSwitchBranchName(${nid}, ${i}, this.value)" placeholder="分支名称" />
+          <div class="cond-mode-tabs" style="margin-left:4px">
+            <button class="cond-mode-tab ${condMode === 'visual' ? 'active' : ''}" onclick="toggleSwitchCondMode(${nid},${i},'visual')" title="可视化配置">可视化</button>
+            <button class="cond-mode-tab ${condMode === 'expr' ? 'active' : ''}" onclick="toggleSwitchCondMode(${nid},${i},'expr')" title="表达式编辑">表达式</button>
+          </div>
+          <button class="table-action-btn" style="width:24px;height:24px;flex-shrink:0" onclick="removeSwitchBranch(${nid}, ${i})" title="删除分支">${icons.close}</button>
         </div>
-        <textarea class="expr-editor" style="min-height:36px;font-size:11px" placeholder="输入分支条件表达式..." onchange="updateSwitchBranchCondition(${node.id}, ${i}, this.value)">${b.condition}</textarea>
-      </div>
-    `).join('')}
-    <button class="btn btn-ghost btn-sm" onclick="addSwitchBranch(${node.id})" style="width:100%;justify-content:center;margin-top:var(--space-2)">${icons.plus} 添加分支</button>
-    <div style="margin-top:var(--space-3);padding:8px;background:var(--md-surface-container);border-radius:6px;text-align:center"><div style="font-size:10px;color:var(--md-outline);font-weight:500">Default 分支（兜底）</div></div>
+        ${condMode === 'visual'
+          ? renderConditionRows(
+              conditions,
+              `addSwitchCondition(${nid},${i})`,
+              `removeSwitchCondition(${nid},${i},`,
+              `updateSwitchCondition(${nid},${i},`
+            )
+          : `<textarea class="expr-editor" style="min-height:36px;font-size:11px" placeholder="输入分支条件表达式..." onchange="updateSwitchBranchCondition(${nid}, ${i}, this.value)">${escHtml(b.condition || '')}</textarea>`
+        }
+      </div>`;
+    }).join('')}
+    <button class="btn btn-ghost btn-sm" onclick="addSwitchBranch(${nid})" style="width:100%;justify-content:center;margin-top:var(--space-2)">${icons.plus} 添加分支</button>
+    <div style="margin-top:var(--space-3);padding:8px 10px;background:var(--md-surface-container);border-radius:6px;border-left:3px solid #94a3b8">
+      <div style="font-size:11px;font-weight:700;color:var(--md-outline);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:2px">Default</div>
+      <div style="font-size:11px;color:var(--md-on-surface-variant)">以上所有分支均不匹配时执行（兜底）</div>
+    </div>
   </div>`;
 }
 
@@ -2049,10 +2158,13 @@ function addSwitchBranch(nodeId) {
   if (!node) return;
   pushUndoState();
   if (!node.config) node.config = {};
-  if (!node.config.branches) node.config.branches = [{ name: '分支1', condition: '' }, { name: '分支2', condition: '' }];
+  if (!node.config.branches) node.config.branches = [
+    { name: '分支1', condition: '', condMode: 'visual', conditions: [{ left: 'vars.status', op: 'eq', right: '' }] },
+    { name: '分支2', condition: '', condMode: 'visual', conditions: [{ left: 'vars.status', op: 'eq', right: '' }] },
+  ];
   if (node.config.branches.length >= 50) { showToast('warning', '限制', '最多支持50个分支'); return; }
   const count = node.config.branches.length + 1;
-  node.config.branches.push({ name: `分支${count}`, condition: '' });
+  node.config.branches.push({ name: `分支${count}`, condition: '', condMode: 'visual', conditions: [{ left: 'vars.status', op: 'eq', right: '' }] });
   designerDirty = true;
   syncDesignerState();
   renderDesigner();
@@ -2098,6 +2210,86 @@ function updateSwitchBranchCondition(nodeId, branchIdx, newCondition) {
   if (!node || !node.config || !node.config.branches) return;
   node.config.branches[branchIdx].condition = newCondition;
   designerDirty = true;
+}
+
+// --- IF node condition operations ---
+function toggleIfCondMode(nodeId, mode) {
+  const node = designerNodes.find(n => n.id === nodeId);
+  if (!node) return;
+  if (!node.config) node.config = {};
+  node.config.condMode = mode;
+  designerDirty = true;
+  renderDesigner();
+}
+
+function addIfCondition(nodeId) {
+  const node = designerNodes.find(n => n.id === nodeId);
+  if (!node) return;
+  if (!node.config) node.config = {};
+  if (!node.config.conditions) node.config.conditions = [];
+  node.config.conditions.push({ left: 'vars.status', op: 'eq', right: '' });
+  designerDirty = true;
+  renderDesigner();
+}
+
+function removeIfCondition(nodeId, condIdx) {
+  const node = designerNodes.find(n => n.id === nodeId);
+  if (!node || !node.config || !node.config.conditions) return;
+  if (node.config.conditions.length <= 1) return;
+  node.config.conditions.splice(condIdx, 1);
+  designerDirty = true;
+  renderDesigner();
+}
+
+function updateIfCondition(nodeId, condIdx, field, value) {
+  const node = designerNodes.find(n => n.id === nodeId);
+  if (!node || !node.config || !node.config.conditions) return;
+  if (!node.config.conditions[condIdx]) return;
+  node.config.conditions[condIdx][field] = value;
+  designerDirty = true;
+  // Re-render only if op changes (might hide/show right input)
+  if (field === 'op') renderDesigner();
+}
+
+// --- Switch node per-branch condition operations ---
+function toggleSwitchCondMode(nodeId, branchIdx, mode) {
+  const node = designerNodes.find(n => n.id === nodeId);
+  if (!node || !node.config || !node.config.branches) return;
+  node.config.branches[branchIdx].condMode = mode;
+  designerDirty = true;
+  renderDesigner();
+}
+
+function addSwitchCondition(nodeId, branchIdx) {
+  const node = designerNodes.find(n => n.id === nodeId);
+  if (!node || !node.config || !node.config.branches) return;
+  const branch = node.config.branches[branchIdx];
+  if (!branch) return;
+  if (!branch.conditions) branch.conditions = [];
+  branch.conditions.push({ left: 'vars.status', op: 'eq', right: '' });
+  designerDirty = true;
+  renderDesigner();
+}
+
+function removeSwitchCondition(nodeId, branchIdx, condIdx) {
+  const node = designerNodes.find(n => n.id === nodeId);
+  if (!node || !node.config || !node.config.branches) return;
+  const branch = node.config.branches[branchIdx];
+  if (!branch || !branch.conditions) return;
+  if (branch.conditions.length <= 1) return;
+  branch.conditions.splice(condIdx, 1);
+  designerDirty = true;
+  renderDesigner();
+}
+
+function updateSwitchCondition(nodeId, branchIdx, condIdx, field, value) {
+  const node = designerNodes.find(n => n.id === nodeId);
+  if (!node || !node.config || !node.config.branches) return;
+  const branch = node.config.branches[branchIdx];
+  if (!branch || !branch.conditions || !branch.conditions[condIdx]) return;
+  branch.conditions[condIdx][field] = value;
+  designerDirty = true;
+  if (field === 'op') renderDesigner();
 }
 
 // --- Zoom Controls ---
