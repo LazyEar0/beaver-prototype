@@ -1006,12 +1006,13 @@ function renderWsDetailPage(ws) {
         <span class="ws-detail-meta-item">${icons.clock} 活跃 ${ws.lastActiveAt}</span>
       </div>
     </div>
-    <div class="ws-tabs-bar">
-      <button class="ws-tab-btn ${wsInternalTab === 'workflows' ? 'active' : ''}" onclick="switchWsTab('workflows')">${icons.workflow}<span>工作流</span></button>
-      <button class="ws-tab-btn ${wsInternalTab === 'executions' ? 'active' : ''}" onclick="switchWsTab('executions')">${icons.clock}<span>执行记录</span></button>
-      ${isAdmin ? `<button class="ws-tab-btn ${wsInternalTab === 'settings' ? 'active' : ''}" onclick="switchWsTab('settings')">${icons.settings}<span>空间设置</span></button>` : ''}
+    <div class="tabs-container">
+    <div class="tabs-header">
+      <div class="tab-item ${wsInternalTab === 'workflows' ? 'active' : ''}" onclick="switchWsTab('workflows')">${icons.workflow}<span>工作流</span></div>
+      <div class="tab-item ${wsInternalTab === 'executions' ? 'active' : ''}" onclick="switchWsTab('executions')">${icons.clock}<span>执行记录</span></div>
+      ${isAdmin ? `<div class="tab-item ${wsInternalTab === 'settings' ? 'active' : ''}" onclick="switchWsTab('settings')">${icons.settings}<span>空间设置</span></div>` : ''}
     </div>
-    <div class="ws-tab-content">${wsInternalTab === 'workflows' ? renderWsWorkflowsTab(ws) : wsInternalTab === 'executions' ? renderWsExecutionsTab(ws) : renderWsSettingsTab(ws)}</div>`;
+    <div class="tab-content">${wsInternalTab === 'workflows' ? renderWsWorkflowsTab(ws) : wsInternalTab === 'executions' ? renderWsExecutionsTab(ws) : renderWsSettingsTab(ws)}</div></div>`;
 }
 function switchWsTab(tab) {
   wsInternalTab = tab;
@@ -1333,9 +1334,11 @@ function showMoveFolderModal(folderId) {
   function getDescIds(pid) { const ch = allFolders.filter(x => x.parentId === pid); let ids = ch.map(c => c.id); ch.forEach(c => { ids = ids.concat(getDescIds(c.id)); }); return ids; }
   const invalidIds = new Set([folderId, ...getDescIds(folderId)]);
   const treeHtml = buildFolderTree(allFolders, null, invalidIds, f.parentId, `moveFolder(${folderId}, __ID__)`, 0);
-  showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">移动文件夹</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body"><p style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant);margin-bottom:var(--space-3)">将「${f.name}」移动到：</p>
-  <div class="folder-tree">
-    <div class="folder-tree-node ${f.parentId === null ? 'is-current' : ''}" onclick="${f.parentId === null ? '' : `moveFolder(${folderId}, null)`}" style="cursor:${f.parentId === null ? 'default' : 'pointer'}">
+  showModal(`<div class="modal" style="max-width:480px"><div class="modal-header"><h2 class="modal-title">移动文件夹</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
+  <div class="move-modal-info"><span class="move-modal-info-icon">${icons.folder}</span><div><div class="move-modal-info-name">${f.name}</div><div class="move-modal-info-hint">选择目标位置，点击文件夹即可完成移动</div></div></div>
+  <div class="move-modal-search">${icons.search}<input type="text" class="move-modal-search-input" placeholder="搜索文件夹..." oninput="filterMoveTree(this.value)" /></div>
+  <div class="folder-tree" id="moveTreeContainer">
+    <div class="folder-tree-node ${f.parentId === null ? 'is-current' : ''}" onclick="${f.parentId === null ? '' : `moveFolder(${folderId}, null)`}" style="cursor:${f.parentId === null ? 'default' : 'pointer'}" data-folder-name="${ws.name}（根目录）">
       <span class="folder-tree-icon">${icons.folder}</span><span class="folder-tree-label">${ws.name}（根目录）</span>${f.parentId === null ? '<span class="folder-tree-badge">当前位置</span>' : ''}
     </div>
     ${treeHtml}
@@ -1352,9 +1355,9 @@ function buildFolderTree(allFolders, parentId, invalidIds, currentParentId, acti
     const subTree = buildFolderTree(allFolders, f.id, invalidIds, currentParentId, actionTpl, depth + 1);
     const action = actionTpl.replace('__ID__', f.id);
     const clickable = !isInvalid && !isCurrent;
-    return `<div class="folder-tree-branch${depth === 0 ? '' : ''}">
+    return `<div class="folder-tree-branch${depth === 0 ? '' : ''}" data-folder-name="${f.name.toLowerCase()}">
       <div class="folder-tree-node depth-${depth + 1} ${isCurrent ? 'is-current' : ''} ${isInvalid ? 'is-disabled' : ''}"
-        onclick="${clickable ? action : ''}" style="cursor:${clickable ? 'pointer' : 'default'};padding-left:${(depth + 1) * 20 + 8}px">
+        onclick="${clickable ? action : ''}" style="cursor:${clickable ? 'pointer' : 'default'};padding-left:${(depth + 1) * 20 + 8}px" data-folder-name="${f.name.toLowerCase()}">
         ${hasChildren || subTree ? `<span class="folder-tree-toggle" onclick="event.stopPropagation();this.closest('.folder-tree-branch').classList.toggle('collapsed')">${icons.chevronRight}</span>` : '<span class="folder-tree-toggle-placeholder"></span>'}
         <span class="folder-tree-icon">${icons.folder}</span>
         <span class="folder-tree-label">${f.name}</span>
@@ -1364,6 +1367,30 @@ function buildFolderTree(allFolders, parentId, invalidIds, currentParentId, acti
       ${subTree ? `<div class="folder-tree-children">${subTree}</div>` : ''}
     </div>`;
   }).join('');
+}
+function filterMoveTree(val) {
+  const term = val.trim().toLowerCase();
+  const container = document.getElementById('moveTreeContainer');
+  if (!container) return;
+  const branches = container.querySelectorAll('.folder-tree-branch');
+  if (!term) {
+    branches.forEach(b => { b.style.display = ''; b.classList.remove('collapsed'); });
+    container.querySelectorAll('.folder-tree-node').forEach(n => n.style.display = '');
+    return;
+  }
+  branches.forEach(b => {
+    const name = b.getAttribute('data-folder-name') || '';
+    if (name.includes(term)) {
+      b.style.display = '';
+      b.classList.remove('collapsed');
+      let parent = b.parentElement?.closest('.folder-tree-branch');
+      while (parent) { parent.style.display = ''; parent.classList.remove('collapsed'); parent = parent.parentElement?.closest('.folder-tree-branch'); }
+    } else {
+      const childMatch = Array.from(b.querySelectorAll('.folder-tree-branch')).some(cb => (cb.getAttribute('data-folder-name') || '').includes(term));
+      b.style.display = childMatch ? '' : 'none';
+      if (childMatch) b.classList.remove('collapsed');
+    }
+  });
 }
 
 function moveFolder(folderId, targetParentId) {
@@ -1569,9 +1596,11 @@ function showMoveWfModal(wfId) {
   const ws = workspaces.find(w => w.id === wsCurrentId);
   const allFolders = wsFolders[wsCurrentId] || [];
   const treeHtml = buildFolderTree(allFolders, null, null, wf.folderId, `moveWf(${wfId}, __ID__)`, 0);
-  showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">移动工作流</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body"><p style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant);margin-bottom:var(--space-3)">将「${wf.name}」移动到：</p>
-  <div class="folder-tree">
-    <div class="folder-tree-node ${wf.folderId === null ? 'is-current' : ''}" onclick="${wf.folderId === null ? '' : `moveWf(${wfId}, null)`}" style="cursor:${wf.folderId === null ? 'default' : 'pointer'}">
+  showModal(`<div class="modal" style="max-width:480px"><div class="modal-header"><h2 class="modal-title">移动工作流</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
+  <div class="move-modal-info"><span class="move-modal-info-icon" style="background:var(--md-primary-container);color:var(--md-on-primary-container)">${icons.workflow}</span><div><div class="move-modal-info-name">${wf.name}</div><div class="move-modal-info-hint">选择目标位置，点击文件夹即可完成移动</div></div></div>
+  <div class="move-modal-search">${icons.search}<input type="text" class="move-modal-search-input" placeholder="搜索文件夹..." oninput="filterMoveTree(this.value)" /></div>
+  <div class="folder-tree" id="moveTreeContainer">
+    <div class="folder-tree-node ${wf.folderId === null ? 'is-current' : ''}" onclick="${wf.folderId === null ? '' : `moveWf(${wfId}, null)`}" style="cursor:${wf.folderId === null ? 'default' : 'pointer'}" data-folder-name="${ws.name}（根目录）">
       <span class="folder-tree-icon">${icons.folder}</span><span class="folder-tree-label">${ws.name}（根目录）</span>${wf.folderId === null ? '<span class="folder-tree-badge">当前位置</span>' : ''}
     </div>
     ${treeHtml}
@@ -1758,8 +1787,9 @@ function batchMove() {
   const allFolders = wsFolders[wsCurrentId] || [];
   const treeHtml = buildFolderTree(allFolders, null, null, null, `confirmBatchMove(__ID__)`, 0);
   showModal(`<div class="modal" style="max-width:480px"><div class="modal-header"><h2 class="modal-title">批量移动 (${batchSelectedIds.size}项)</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
-  <p style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant);margin-bottom:var(--space-3)">选择目标文件夹：</p>
-  <div class="folder-tree">
+  <div class="move-modal-info"><span class="move-modal-info-icon" style="background:var(--md-primary-container);color:var(--md-on-primary-container)">${icons.workflow}</span><div><div class="move-modal-info-name">已选择 ${batchSelectedIds.size} 个工作流</div><div class="move-modal-info-hint">选择目标位置，点击文件夹即可完成移动</div></div></div>
+  <div class="move-modal-search">${icons.search}<input type="text" class="move-modal-search-input" placeholder="搜索文件夹..." oninput="filterMoveTree(this.value)" /></div>
+  <div class="folder-tree" id="moveTreeContainer">
     <div class="folder-tree-node" onclick="confirmBatchMove(null)" style="cursor:pointer"><span class="folder-tree-icon">${icons.folder}</span><span class="folder-tree-label">${ws.name}（根目录）</span></div>
     ${treeHtml}
   </div></div></div>`);

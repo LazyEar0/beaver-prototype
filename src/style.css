@@ -1382,6 +1382,174 @@ img { display: block; max-width: 100%; }
   color: var(--md-outline);
 }
 
+/* === Person Picker (Searchable, Multi-select, Company-wide) === */
+.person-picker {
+  position: relative;
+}
+.pp-trigger {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 38px;
+  padding: 4px 8px 4px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: var(--transition-fast);
+  background: var(--color-bg-page);
+}
+.pp-trigger:hover { border-color: var(--md-primary); }
+.pp-tags-area {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+  align-items: center;
+}
+.pp-placeholder {
+  font-size: var(--font-size-sm);
+  color: var(--md-outline);
+  padding: 2px 0;
+}
+.pp-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px 2px 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--md-on-surface);
+  background: var(--md-surface-container);
+  border-radius: var(--radius-full);
+  white-space: nowrap;
+  line-height: 1.4;
+}
+.pp-tag-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--md-primary);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.pp-tag-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border: none;
+  background: none;
+  color: var(--md-outline);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0;
+  border-radius: 50%;
+  line-height: 1;
+}
+.pp-tag-remove:hover { background: var(--md-error-container); color: var(--md-error); }
+.pp-arrow {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  color: var(--md-outline);
+}
+.pp-arrow svg { width: 16px; height: 16px; }
+.pp-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: var(--color-bg-page);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  z-index: 1000;
+  overflow: hidden;
+}
+.pp-dropdown.hidden { display: none; }
+.pp-search-box {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-border-light);
+  color: var(--md-outline);
+}
+.pp-search-box svg { width: 16px; height: 16px; flex-shrink: 0; }
+.pp-search-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: var(--font-size-sm);
+  background: transparent;
+  color: var(--md-on-surface);
+}
+.pp-list {
+  max-height: 240px;
+  overflow-y: auto;
+  padding: var(--space-1) 0;
+}
+.pp-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+.pp-item:hover { background: rgba(103, 80, 164, 0.06); }
+.pp-item.is-selected { background: var(--color-primary-light); }
+.pp-item-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--md-primary-container);
+  color: var(--md-on-primary-container);
+  font-size: 12px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.pp-item-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.pp-item-name {
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--md-on-surface);
+  line-height: 1.3;
+}
+.pp-item-dept {
+  font-size: 11px;
+  color: var(--md-outline);
+  line-height: 1.3;
+}
+.pp-item-check {
+  display: flex;
+  align-items: center;
+  color: var(--md-primary);
+  flex-shrink: 0;
+}
+.pp-item-check svg { width: 16px; height: 16px; }
+.pp-empty {
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
+  font-size: var(--font-size-sm);
+  color: var(--md-outline);
+}
+
 /* --- People Picker Modal (org tree + selected) --- */
 .people-picker {
   display: flex;
@@ -2207,6 +2375,9 @@ img { display: block; max-width: 100%; }
 }
 
 .tab-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   padding: var(--space-4) var(--space-5);
   font-size: var(--font-size-base);
   font-weight: 500;
@@ -2215,6 +2386,11 @@ img { display: block; max-width: 100%; }
   position: relative;
   transition: var(--transition-base);
   white-space: nowrap;
+}
+
+.tab-item svg {
+  width: 18px;
+  height: 18px;
 }
 
 .tab-item:hover {
@@ -3553,8 +3729,7 @@ img { display: block; max-width: 100%; }
 }
 
 /* Tab indicator shimmer for active tabs */
-.tab-item.active::after,
-.ws-tab-btn.active::after {
+.tab-item.active::after {
   background: linear-gradient(90deg, var(--md-primary) 0%, var(--md-primary-container) 50%, var(--md-primary) 100%);
   background-size: 200% 100%;
   animation: tabIndicatorShimmer 2.5s ease-in-out infinite;
