@@ -3469,7 +3469,75 @@
 
 /* ========== Output Variables Section (输出变量区域) ========== */
 
+.output-vars-section {
+  background: linear-gradient(135deg, #f0fdf4 0%, #fafafa 100%);
+  border: 1px solid #bbf7d0;
+  border-radius: var(--radius-md);
+}
+
+/* 可编辑变量区域 */
+.output-vars-editable {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.output-var-edit-row {
+  padding: var(--space-2);
+  background: var(--md-surface);
+  border-radius: 6px;
+  border: 1px solid var(--md-outline-variant);
+}
+
+.output-var-edit-main {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.output-var-input {
+  height: 28px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 4px;
+  font-size: var(--font-size-xs);
+  background: var(--md-surface);
+  color: var(--md-on-surface);
+  outline: none;
+  transition: var(--transition-fast);
+}
+
+.output-var-input:focus {
+  border-color: var(--md-primary);
+  box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.1);
+}
+
+.output-var-desc {
+  font-size: 10px;
+  color: var(--md-on-surface-variant);
+  margin-top: 4px;
+  padding-left: 28px;
+}
+
+/* 固定变量区域 */
+.output-vars-fixed {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: var(--space-2);
+  border-top: 1px dashed var(--md-outline-variant);
+  margin-top: var(--space-2);
+}
+
 .output-var-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 6px var(--space-2);
+  background: var(--md-surface);
+  border-radius: 4px;
+  cursor: pointer;
   transition: var(--transition-fast);
 }
 
@@ -3482,7 +3550,45 @@
   background: var(--md-surface-container-highest) !important;
 }
 
+.output-var-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.output-var-name {
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  color: var(--md-on-surface);
+  font-family: var(--font-family-mono);
+}
+
+.output-var-desc-inline {
+  font-size: 10px;
+  color: var(--md-on-surface-variant);
+}
+
+.output-vars-hint {
+  font-size: 10px;
+  color: var(--md-outline);
+  margin-top: var(--space-3);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 /* Output variable type badges */
+.var-icon {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
 .var-icon.type-String { background: #dbeafe; color: #2563eb; }
 .var-icon.type-Number { background: #fef3c7; color: #d97706; }
 .var-icon.type-Boolean { background: #fce7f3; color: #db2777; }
@@ -3499,4 +3605,11 @@
   padding: 2px 6px;
   border-radius: 3px;
   white-space: nowrap;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.var-ref-tag:hover {
+  background: var(--md-primary);
+  color: white;
 }

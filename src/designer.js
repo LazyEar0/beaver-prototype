@@ -184,8 +184,9 @@ function initDesignerNodes(wf) {
       { name: 'output', type: 'Object', scope: '输出变量', desc: '工作流输出结果' },
     ];
 
-    // Add more nodes for published workflows to make it look realistic
-    if (wf.status === 'published' && wf.execCount > 0) {
+    // Add more nodes for published workflows (or the designated loop demo wf#8) to look realistic
+    const isLoopDemo = wf.id === 8 || (wf.name && (wf.name.includes('批量') || wf.name.includes('遍历') || wf.name.includes('循环') || wf.name.includes('列表') || wf.name.includes('预警')));
+    if (isLoopDemo || (wf.status === 'published' && wf.execCount > 0)) {
       const extraNodes = generateRealisticNodes(wf);
       wf._designerNodes = extraNodes.nodes;
       wf._designerConns = extraNodes.conns;
