@@ -48,12 +48,31 @@
             <template v-if="wfHasFilters && !wfFilterOpen">
               <v-chip v-if="wfStatusFilter !== 'all'" closable size="small" @click:close="wfStatusFilter = 'all'">状态：{{ statusLabel[wfStatusFilter] }}</v-chip>
               <v-chip v-if="wfTypeFilter !== 'all'" closable size="small" @click:close="wfTypeFilter = 'all'">类型：{{ typeLabel[wfTypeFilter] }}</v-chip>
+              <v-chip v-if="wfCreatorFilter.length > 0" closable size="small" @click:close="wfCreatorFilter = []">创建者：{{ wfCreatorFilter.join(', ') }}</v-chip>
+              <v-chip v-if="wfOwnerFilter.length > 0" closable size="small" @click:close="wfOwnerFilter = []">负责人：{{ wfOwnerFilter.join(', ') }}</v-chip>
             </template>
             <v-btn v-if="wfHasFilters" variant="text" size="small" prepend-icon="mdi-close" @click="clearWfFilters">清除</v-btn>
             <v-spacer />
-            <v-btn v-if="isMember" color="primary" size="small" prepend-icon="mdi-plus" @click="showCreateWf = true">新建工作流</v-btn>
-            <v-btn v-if="canCreateFolder" variant="outlined" size="small" prepend-icon="mdi-folder-plus-outline" @click="showCreateFolder = true">新建文件夹</v-btn>
+            <!-- Batch mode toggle -->
+            <v-btn v-if="isMember && !batchMode" variant="text" size="small" prepend-icon="mdi-checkbox-multiple-outline" @click="batchMode = true; batchSelectedIds = []">批量</v-btn>
+            <v-btn v-if="batchMode" variant="tonal" size="small" prepend-icon="mdi-close" @click="batchMode = false; batchSelectedIds = []">退出批量</v-btn>
+            <v-btn v-if="isMember && !batchMode" color="primary" size="small" prepend-icon="mdi-plus" @click="showCreateWf = true">新建工作流</v-btn>
+            <v-btn v-if="canCreateFolder && !batchMode" variant="outlined" size="small" prepend-icon="mdi-folder-plus-outline" @click="showCreateFolder = true">新建文件夹</v-btn>
           </div>
+
+          <!-- Batch toolbar -->
+          <div v-if="batchMode" class="d-flex align-center ga-2 px-3 pb-3">
+            <v-divider class="mb-0" />
+          </div>
+          <div v-if="batchMode" class="d-flex align-center ga-2 px-3 pb-3">
+            <v-checkbox :model-value="batchAllSelected" :indeterminate="batchSelectedIds.length > 0 && !batchAllSelected" hide-details density="compact" label="全选" @update:model-value="toggleBatchSelectAll" />
+            <span class="text-caption text-grey">已选 {{ batchSelectedIds.length }} 项</span>
+            <v-spacer />
+            <v-btn v-if="isAdmin" variant="outlined" color="error" size="small" prepend-icon="mdi-delete-outline" :disabled="batchSelectedIds.length === 0" @click="showBatchDelete = true">批量删除</v-btn>
+            <v-btn variant="outlined" size="small" prepend-icon="mdi-folder-move-outline" :disabled="batchSelectedIds.length === 0" @click="showBatchMove = true">批量移动</v-btn>
+            <v-btn v-if="isAdmin" variant="outlined" size="small" prepend-icon="mdi-cancel" :disabled="batchSelectedIds.length === 0" @click="batchDisable">批量停用</v-btn>
+          </div>
+
           <!-- Filter panel -->
           <v-expand-transition>
             <div v-if="wfFilterOpen" class="px-3 pb-3">
@@ -64,6 +83,56 @@
                   <v-chip-group v-model="wfStatusFilter" mandatory>
                     <v-chip v-for="s in statusOptions" :key="s.value" :value="s.value" filter variant="tonal" size="small">{{ s.label }}</v-chip>
                   </v-chip-group>
+                </div>
+                <!-- Creator dropdown -->
+                <div>
+                  <div class="text-caption text-grey mb-1">创建者</div>
+                  <v-menu v-model="wfCreatorOpen" :close-on-content-click="false">
+                    <template #activator="{ props }">
+                      <v-btn v-bind="props" variant="outlined" size="small" append-icon="mdi-chevron-down" style="text-transform:none">
+                        {{ wfCreatorFilter.length > 0 ? `已选 ${wfCreatorFilter.length} 人` : '全部创建者' }}
+                      </v-btn>
+                    </template>
+                    <v-card min-width="220">
+                      <v-text-field v-model="wfCreatorSearch" placeholder="搜索..." prepend-inner-icon="mdi-magnify" hide-details density="compact" class="ma-2" />
+                      <v-list density="compact" style="max-height:200px;overflow-y:auto">
+                        <v-list-item v-for="c in filteredWfCreators" :key="c" @click="toggleWfCreator(c)">
+                          <template #prepend><v-checkbox-btn :model-value="wfCreatorFilter.includes(c)" /></template>
+                          <v-list-item-title>{{ c }}</v-list-item-title>
+                        </v-list-item>
+                      </v-list>
+                      <v-divider />
+                      <div class="d-flex justify-end pa-2 ga-2">
+                        <v-btn v-if="wfCreatorFilter.length > 0" variant="text" size="x-small" @click="wfCreatorFilter = []">清空</v-btn>
+                        <v-btn variant="tonal" size="x-small" @click="wfCreatorOpen = false">确定</v-btn>
+                      </div>
+                    </v-card>
+                  </v-menu>
+                </div>
+                <!-- Owner dropdown -->
+                <div>
+                  <div class="text-caption text-grey mb-1">负责人</div>
+                  <v-menu v-model="wfOwnerOpen" :close-on-content-click="false">
+                    <template #activator="{ props }">
+                      <v-btn v-bind="props" variant="outlined" size="small" append-icon="mdi-chevron-down" style="text-transform:none">
+                        {{ wfOwnerFilter.length > 0 ? `已选 ${wfOwnerFilter.length} 人` : '全部负责人' }}
+                      </v-btn>
+                    </template>
+                    <v-card min-width="220">
+                      <v-text-field v-model="wfOwnerSearch" placeholder="搜索..." prepend-inner-icon="mdi-magnify" hide-details density="compact" class="ma-2" />
+                      <v-list density="compact" style="max-height:200px;overflow-y:auto">
+                        <v-list-item v-for="o in filteredWfOwners" :key="o" @click="toggleWfOwner(o)">
+                          <template #prepend><v-checkbox-btn :model-value="wfOwnerFilter.includes(o)" /></template>
+                          <v-list-item-title>{{ o }}</v-list-item-title>
+                        </v-list-item>
+                      </v-list>
+                      <v-divider />
+                      <div class="d-flex justify-end pa-2 ga-2">
+                        <v-btn v-if="wfOwnerFilter.length > 0" variant="text" size="x-small" @click="wfOwnerFilter = []">清空</v-btn>
+                        <v-btn variant="tonal" size="x-small" @click="wfOwnerOpen = false">确定</v-btn>
+                      </div>
+                    </v-card>
+                  </v-menu>
                 </div>
                 <div>
                   <div class="text-caption text-grey mb-1">类型</div>
@@ -118,14 +187,25 @@
               <div style="flex:0.8" class="text-caption text-grey">{{ f.creator }}</div>
               <div style="flex:0.8"></div>
               <div style="flex:0.9" class="text-caption text-grey">{{ f.editedAt }}</div>
-              <div style="width:110px">
+              <div style="width:110px" class="d-flex ga-1">
                 <v-btn v-if="isMember" icon variant="text" size="x-small" @click.stop="editingFolder = { ...f }; showEditFolder = true"><v-icon size="16">mdi-pencil-outline</v-icon></v-btn>
+                <v-menu v-if="isMember">
+                  <template #activator="{ props }">
+                    <v-btn v-bind="props" icon variant="text" size="x-small"><v-icon size="16">mdi-dots-vertical</v-icon></v-btn>
+                  </template>
+                  <v-list density="compact">
+                    <v-list-item prepend-icon="mdi-folder-move-outline" title="移动" @click="moveFolderTarget = f; showMoveFolder = true" />
+                    <v-divider v-if="isMember" />
+                    <v-list-item prepend-icon="mdi-delete-outline" title="删除" base-color="error" @click="deleteFolderTarget = f; openFolderDeleteDialog(f)" />
+                  </v-list>
+                </v-menu>
               </div>
             </div>
           </template>
           <!-- Workflows -->
           <div v-for="wf in sortedWorkflows" :key="'wf-' + wf.id" class="content-list-item">
             <div class="content-item-main" style="flex:2.5">
+              <v-checkbox v-if="batchMode" :model-value="batchSelectedIds.includes(wf.id)" hide-details density="compact" class="mr-2" @update:model-value="toggleBatchSelect(wf.id)" />
               <div class="content-item-icon wf-icon"><v-icon>mdi-sitemap</v-icon></div>
               <div>
                 <div class="content-item-name" style="cursor:pointer;color:#4F46E5" @click="store.showToast('info','流程设计器','将在 Phase 2 中实现')">
@@ -148,7 +228,7 @@
               <v-btn icon variant="text" size="x-small" :title="isMember ? '编辑流程' : '查看流程'" @click="store.showToast('info','流程设计器','将在 Phase 2 中实现')">
                 <v-icon size="16" :color="isMember ? 'primary' : undefined">{{ isMember ? 'mdi-pencil-outline' : 'mdi-eye-outline' }}</v-icon>
               </v-btn>
-              <v-btn v-if="wf.status === 'published'" icon variant="text" size="x-small" title="执行" @click="executeWf(wf)">
+              <v-btn v-if="wf.status === 'published'" icon variant="text" size="x-small" title="执行" @click="openExecuteDialog(wf)">
                 <v-icon size="16" color="success">mdi-play</v-icon>
               </v-btn>
               <v-menu>
@@ -156,6 +236,11 @@
                   <v-btn v-bind="props" icon variant="text" size="x-small"><v-icon size="16">mdi-dots-vertical</v-icon></v-btn>
                 </template>
                 <v-list density="compact">
+                  <v-list-item v-if="isMember && wf.status === 'draft'" prepend-icon="mdi-publish" title="发布" @click="openPublishDialog(wf)" />
+                  <v-list-item v-if="isAdmin && wf.status === 'published'" prepend-icon="mdi-cancel" title="停用" @click="openDisableDialog(wf)" />
+                  <v-list-item v-if="isAdmin && wf.status === 'disabled'" prepend-icon="mdi-check-circle-outline" title="启用" @click="enableWf(wf)" />
+                  <v-list-item v-if="wf.versions && wf.versions.length > 0" prepend-icon="mdi-history" title="版本历史" @click="versionTarget = wf; showVersionHistory = true" />
+                  <v-divider v-if="isMember" />
                   <v-list-item v-if="isMember" prepend-icon="mdi-content-copy" title="复制" @click="copyWf(wf)" />
                   <v-list-item v-if="isMember" prepend-icon="mdi-folder-move-outline" title="移动" @click="moveTarget = wf; showMoveWf = true" />
                   <v-divider v-if="isAdmin" />
@@ -182,10 +267,10 @@
                 <span v-if="execDetail.stale" class="stale-mark">异常滞留</span>
               </div>
               <div class="d-flex ga-2">
-                <v-btn v-if="execDetail.status === 'running' && isMember" variant="outlined" size="small" prepend-icon="mdi-pause" @click="execDetail.status = 'paused'; store.showToast('success','暂停成功','')">暂停</v-btn>
-                <v-btn v-if="execDetail.status === 'paused' && isMember" color="primary" size="small" prepend-icon="mdi-play" @click="execDetail.status = 'running'; store.showToast('success','已恢复','')">恢复</v-btn>
-                <v-btn v-if="['running','paused'].includes(execDetail.status) && isMember" color="error" size="small" prepend-icon="mdi-stop" @click="execDetail.status = 'cancelled'; store.showToast('success','已取消','')">取消</v-btn>
-                <v-btn v-if="['completed','failed','cancelled'].includes(execDetail.status) && isMember" color="primary" size="small" prepend-icon="mdi-refresh" @click="store.showToast('success','重新执行','已创建新实例')">重新执行</v-btn>
+                <v-btn v-if="execDetail.status === 'running' && isMember" variant="outlined" size="small" prepend-icon="mdi-pause" @click="confirmExecAction = 'pause'; confirmExecTarget = execDetail; showConfirmExec = true">暂停</v-btn>
+                <v-btn v-if="execDetail.status === 'paused' && isMember" color="primary" size="small" prepend-icon="mdi-play" @click="confirmExecAction = 'resume'; confirmExecTarget = execDetail; showConfirmExec = true">恢复</v-btn>
+                <v-btn v-if="['running','paused'].includes(execDetail.status) && isMember" color="error" size="small" prepend-icon="mdi-stop" @click="confirmExecAction = 'cancel'; confirmExecTarget = execDetail; showConfirmExec = true">取消</v-btn>
+                <v-btn v-if="['completed','failed','cancelled'].includes(execDetail.status) && isMember" color="primary" size="small" prepend-icon="mdi-refresh" @click="confirmExecAction = 'reExecute'; confirmExecTarget = execDetail; showConfirmExec = true">重新执行</v-btn>
               </div>
             </div>
             <v-card variant="outlined" class="pa-4 mb-4">
@@ -264,8 +349,10 @@
                   <td>{{ e.triggerUser }}</td>
                   <td>
                     <v-btn icon variant="text" size="x-small" title="查看详情" @click="execDetailId = e.id"><v-icon size="16">mdi-eye-outline</v-icon></v-btn>
-                    <v-btn v-if="['running','paused'].includes(e.status) && isMember" icon variant="text" size="x-small" title="取消" @click="e.status = 'cancelled'; store.showToast('success','已取消','')"><v-icon size="16" color="error">mdi-stop</v-icon></v-btn>
-                    <v-btn v-if="['completed','failed','cancelled'].includes(e.status) && isMember" icon variant="text" size="x-small" title="重新执行" @click="store.showToast('success','重新执行','已创建新实例')"><v-icon size="16">mdi-refresh</v-icon></v-btn>
+                    <v-btn v-if="e.status === 'running' && isMember" icon variant="text" size="x-small" title="暂停" @click="confirmExecAction = 'pause'; confirmExecTarget = e; showConfirmExec = true"><v-icon size="16">mdi-pause</v-icon></v-btn>
+                    <v-btn v-if="e.status === 'paused' && isMember" icon variant="text" size="x-small" title="恢复" @click="confirmExecAction = 'resume'; confirmExecTarget = e; showConfirmExec = true"><v-icon size="16" color="primary">mdi-play</v-icon></v-btn>
+                    <v-btn v-if="['running','paused'].includes(e.status) && isMember" icon variant="text" size="x-small" title="取消" @click="confirmExecAction = 'cancel'; confirmExecTarget = e; showConfirmExec = true"><v-icon size="16" color="error">mdi-stop</v-icon></v-btn>
+                    <v-btn v-if="['completed','failed','cancelled'].includes(e.status) && isMember" icon variant="text" size="x-small" title="重新执行" @click="confirmExecAction = 'reExecute'; confirmExecTarget = e; showConfirmExec = true"><v-icon size="16">mdi-refresh</v-icon></v-btn>
                   </td>
                 </tr>
               </tbody>
@@ -283,7 +370,8 @@
           <h3 class="text-subtitle-1 font-weight-medium">空间设置</h3>
           <div class="d-flex ga-2">
             <v-btn variant="outlined" size="small" prepend-icon="mdi-pencil-outline" @click="editWsForm = { name: ws.name, desc: ws.desc }; showEditWs = true">编辑信息</v-btn>
-            <v-btn color="error" variant="outlined" size="small" prepend-icon="mdi-delete-outline" @click="showDeleteWs = true">删除空间</v-btn>
+            <v-btn v-if="isSingleAdmin" variant="outlined" size="small" prepend-icon="mdi-swap-horizontal" @click="showTransferAdmin = true">转让管理员</v-btn>
+            <v-btn color="error" variant="outlined" size="small" prepend-icon="mdi-delete-outline" @click="deleteWsStep = 1; showDeleteWs = true">删除空间</v-btn>
           </div>
         </div>
 
@@ -363,6 +451,75 @@
       </v-card>
     </v-dialog>
 
+    <!-- Delete Folder Dialog -->
+    <v-dialog v-model="showDeleteFolder" max-width="480" persistent>
+      <v-card v-if="deleteFolderTarget">
+        <v-card-title class="d-flex align-center justify-space-between">删除文件夹<v-btn icon variant="text" @click="showDeleteFolder = false"><v-icon>mdi-close</v-icon></v-btn></v-card-title>
+        <v-card-text>
+          <!-- Empty folder -->
+          <template v-if="deleteFolderIsEmpty">
+            <p class="text-body-2">确定删除文件夹「{{ deleteFolderTarget.name }}」吗？</p>
+          </template>
+          <!-- Non-empty folder -->
+          <template v-else>
+            <div class="delete-warning mb-3">
+              <v-icon color="error" class="mr-2">mdi-alert-outline</v-icon>
+              <div class="text-body-2">该文件夹包含 {{ deleteFolderSubFolderCount }} 个子文件夹和 {{ deleteFolderSubWfCount }} 个工作流</div>
+            </div>
+            <div class="d-flex flex-column ga-3 mt-4">
+              <v-card variant="outlined" class="pa-3" style="cursor:pointer" @click="deleteFolderKeepContent">
+                <div class="d-flex align-center ga-3">
+                  <v-avatar size="36" color="#EEF2FF"><v-icon size="18" color="primary">mdi-folder-move-outline</v-icon></v-avatar>
+                  <div><div class="text-body-2 font-weight-medium">仅删除文件夹，保留内容</div><div class="text-caption text-grey">子内容将移至上级目录</div></div>
+                </div>
+              </v-card>
+              <v-card v-if="isAdmin" variant="outlined" class="pa-3" style="cursor:pointer" @click="showDeleteFolder = false; showCascadeDeleteFolder = true">
+                <div class="d-flex align-center ga-3">
+                  <v-avatar size="36" color="#FEE2E2"><v-icon size="18" color="error">mdi-delete-outline</v-icon></v-avatar>
+                  <div><div class="text-body-2 font-weight-medium">删除文件夹及所有内容</div><div class="text-caption text-grey">级联删除，不可恢复</div></div>
+                </div>
+              </v-card>
+            </div>
+          </template>
+        </v-card-text>
+        <v-card-actions v-if="deleteFolderIsEmpty" class="px-4 pb-4"><v-spacer /><v-btn @click="showDeleteFolder = false">取消</v-btn><v-btn color="error" @click="deleteEmptyFolder">删除</v-btn></v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- Cascade Delete Folder Confirmation -->
+    <v-dialog v-model="showCascadeDeleteFolder" max-width="460" persistent>
+      <v-card>
+        <v-card-title class="d-flex align-center justify-space-between">确认级联删除<v-btn icon variant="text" @click="showCascadeDeleteFolder = false"><v-icon>mdi-close</v-icon></v-btn></v-card-title>
+        <v-card-text>
+          <div class="delete-warning">
+            <v-icon color="error" class="mr-2">mdi-alert-outline</v-icon>
+            <div class="text-body-2">此操作将删除文件夹内的所有工作流及其执行记录，不可恢复。是否继续？</div>
+          </div>
+        </v-card-text>
+        <v-card-actions class="px-4 pb-4"><v-spacer /><v-btn @click="showCascadeDeleteFolder = false">取消</v-btn><v-btn color="error" @click="cascadeDeleteFolder">确认删除</v-btn></v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- Move Folder Dialog -->
+    <v-dialog v-model="showMoveFolder" max-width="460">
+      <v-card v-if="moveFolderTarget">
+        <v-card-title class="d-flex align-center justify-space-between">移动文件夹<v-btn icon variant="text" @click="showMoveFolder = false"><v-icon>mdi-close</v-icon></v-btn></v-card-title>
+        <v-card-text>
+          <p class="text-body-2 text-grey mb-3">将「{{ moveFolderTarget.name }}」移动到：</p>
+          <div class="folder-tree-node" :class="{ 'is-current': moveFolderTarget.parentId === null }" @click="moveFolderTarget.parentId !== null && doMoveFolder(null)">
+            <v-icon size="18">mdi-folder</v-icon>
+            <span>{{ ws.name }}（根目录）</span>
+            <v-chip v-if="moveFolderTarget.parentId === null" size="x-small" variant="tonal" color="primary" class="ml-2">当前位置</v-chip>
+          </div>
+          <div v-for="f in movableFolders" :key="f.id" class="folder-tree-node" :class="{ 'is-current': moveFolderTarget.parentId === f.id }" @click="moveFolderTarget.parentId !== f.id && doMoveFolder(f.id)">
+            <v-icon size="18">mdi-folder</v-icon>
+            <span>{{ f.name }}</span>
+            <v-chip v-if="moveFolderTarget.parentId === f.id" size="x-small" variant="tonal" color="primary" class="ml-2">当前位置</v-chip>
+          </div>
+        </v-card-text>
+      </v-card>
+    </v-dialog>
+
     <!-- Delete Workflow Dialog -->
     <v-dialog v-model="showDeleteWf" max-width="460" persistent>
       <v-card v-if="deleteTarget">
@@ -370,7 +527,9 @@
         <v-card-text>
           <div class="delete-warning mb-3">
             <v-icon color="error" class="mr-2">mdi-alert-outline</v-icon>
-            <div class="text-body-2">删除后，该工作流的所有版本和 {{ deleteTarget.execCount }} 条执行记录将被一并删除，此操作不可恢复。</div>
+            <div class="text-body-2">删除后，该工作流的所有版本和 {{ deleteTarget.execCount }} 条执行记录将被一并删除，此操作不可恢复。
+              <template v-if="deleteTarget.runningCount > 0"><br /><br /><strong style="color:#DC2626">当前有 {{ deleteTarget.runningCount }} 个运行中实例，删除后将被终止。</strong></template>
+            </div>
           </div>
           <v-text-field v-model="deleteConfirmCode" :label="`请输入工作流编号以确认删除：${deleteTarget.code}`" />
         </v-card-text>
@@ -398,6 +557,166 @@
       </v-card>
     </v-dialog>
 
+    <!-- Publish Workflow Dialog -->
+    <v-dialog v-model="showPublishWf" max-width="480" persistent>
+      <v-card v-if="publishTarget">
+        <v-card-title class="d-flex align-center justify-space-between">发布工作流<v-btn icon variant="text" @click="showPublishWf = false"><v-icon>mdi-close</v-icon></v-btn></v-card-title>
+        <v-card-text>
+          <v-card variant="tonal" class="pa-3 mb-4 d-flex align-center ga-3">
+            <div class="content-item-icon wf-icon" style="width:36px;height:36px"><v-icon>mdi-sitemap</v-icon></div>
+            <div class="flex-grow-1"><div class="font-weight-medium">{{ publishTarget.name }}</div><div class="text-caption text-grey"><v-icon size="10">mdi-pound</v-icon> {{ publishTarget.code }}</div></div>
+            <span class="version-badge">v{{ publishTarget.version + 1 }}</span>
+          </v-card>
+          <v-textarea v-model="publishNote" label="发布说明" placeholder="选填，简要描述本次发布变更内容" rows="3" :disabled="!publishTarget.debugPassed" />
+          <div v-if="!publishTarget.debugPassed" class="delete-warning mt-3">
+            <v-icon color="error" class="mr-2">mdi-alert-outline</v-icon>
+            <div class="text-body-2" style="color:#DC2626"><strong>无法发布：</strong>当前流程尚未通过调试验证，请先完成调试后再发布。</div>
+          </div>
+        </v-card-text>
+        <v-card-actions class="px-4 pb-4"><v-spacer /><v-btn @click="showPublishWf = false">取消</v-btn><v-btn color="primary" :disabled="!publishTarget.debugPassed" @click="confirmPublishWf">确认发布</v-btn></v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- Disable Workflow Dialog -->
+    <v-dialog v-model="showDisableWf" max-width="460" persistent>
+      <v-card v-if="disableTarget">
+        <v-card-title class="d-flex align-center justify-space-between">停用工作流<v-btn icon variant="text" @click="showDisableWf = false"><v-icon>mdi-close</v-icon></v-btn></v-card-title>
+        <v-card-text>
+          <template v-if="disableTarget.runningCount > 0">
+            <div class="delete-warning">
+              <v-icon color="error" class="mr-2">mdi-alert-outline</v-icon>
+              <div class="text-body-2">当前有 {{ disableTarget.runningCount }} 个运行中实例，停用后不影响运行中的实例，但不允许启动新的实例。是否继续？</div>
+            </div>
+          </template>
+          <template v-else>
+            <p class="text-body-2">确定停用工作流「{{ disableTarget.name }}」吗？停用后将不允许启动新的执行实例。</p>
+          </template>
+        </v-card-text>
+        <v-card-actions class="px-4 pb-4"><v-spacer /><v-btn @click="showDisableWf = false">取消</v-btn><v-btn color="error" @click="confirmDisableWf">确认停用</v-btn></v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- Version History Dialog -->
+    <v-dialog v-model="showVersionHistory" max-width="600">
+      <v-card v-if="versionTarget">
+        <v-card-title class="d-flex align-center justify-space-between">版本历史 - {{ versionTarget.name }}<v-btn icon variant="text" @click="showVersionHistory = false"><v-icon>mdi-close</v-icon></v-btn></v-card-title>
+        <v-card-text>
+          <div v-if="!versionTarget.versions || versionTarget.versions.length === 0" class="text-center text-grey pa-8">暂无发布版本</div>
+          <div v-else>
+            <div v-for="ver in versionTarget.versions" :key="ver.v" class="d-flex align-center pa-3 mb-2 rounded-lg" style="border:1px solid #E5E7EB">
+              <div class="d-flex align-center ga-3 flex-grow-1">
+                <span class="version-badge" :class="{ 'version-current': ver.status === 'current' }">v{{ ver.v }}</span>
+                <div>
+                  <div class="text-body-2 font-weight-medium">{{ ver.status === 'current' ? '当前生效版本' : ver.status === 'draft' ? '草稿' : '历史版本' }}</div>
+                  <div class="text-caption text-grey">{{ ver.publishedAt }} · {{ ver.publisher }}{{ ver.note ? ` · ${ver.note}` : '' }}</div>
+                </div>
+              </div>
+              <v-btn v-if="ver.status === 'history'" variant="outlined" size="small" prepend-icon="mdi-undo" @click="rollbackTarget = { wf: versionTarget, version: ver.v }; showVersionHistory = false; showRollback = true">回滚</v-btn>
+            </div>
+          </div>
+        </v-card-text>
+      </v-card>
+    </v-dialog>
+
+    <!-- Rollback Confirmation -->
+    <v-dialog v-model="showRollback" max-width="460" persistent>
+      <v-card v-if="rollbackTarget">
+        <v-card-title>确认回滚</v-card-title>
+        <v-card-text>
+          <p class="text-body-2">确定回滚到 v{{ rollbackTarget.version }} 吗？将基于 v{{ rollbackTarget.version }} 创建一个新的草稿版本，当前发布的版本不受影响，您可以在编辑确认后重新发布。</p>
+        </v-card-text>
+        <v-card-actions class="px-4 pb-4"><v-spacer /><v-btn @click="showRollback = false">取消</v-btn><v-btn color="primary" @click="confirmRollback">确认回滚</v-btn></v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- Execute Workflow Dialog -->
+    <v-dialog v-model="showExecuteWf" max-width="520" persistent>
+      <v-card v-if="executeTarget">
+        <v-card-title class="d-flex align-center justify-space-between">
+          {{ executeTarget.inputs?.length > 0 ? `执行工作流 · ${executeTarget.name}` : '确认执行' }}
+          <v-btn icon variant="text" @click="showExecuteWf = false"><v-icon>mdi-close</v-icon></v-btn>
+        </v-card-title>
+        <v-card-text>
+          <div v-if="executeTarget.inputs?.length > 0" class="d-flex align-center ga-2 mb-4 pa-2 rounded" style="background:#F8FAFC;font-size:12px;color:#6B7280">
+            发布版本 v{{ executeTarget.version }} · 手动触发
+          </div>
+          <div v-if="executeTarget.runningCount > 0" class="mb-4 pa-3 rounded" style="background:rgba(234,179,8,0.06);border:1px solid rgba(234,179,8,0.15);font-size:13px;color:#6B7280">
+            当前已有 <strong>{{ executeTarget.runningCount }}</strong> 个运行中实例。
+          </div>
+          <template v-if="!executeTarget.inputs?.length">
+            <p class="text-body-2">确定手动执行工作流「{{ executeTarget.name }}」（v{{ executeTarget.version }}）吗？</p>
+          </template>
+          <template v-else>
+            <div v-for="(inp, idx) in executeTarget.inputs" :key="idx" class="mb-4">
+              <div class="d-flex align-center ga-2 mb-1">
+                <span class="text-body-2 font-weight-medium">{{ inp.label || inp.name }}</span>
+                <span v-if="inp.required" style="color:#DC2626">*</span>
+                <span class="wf-input-type-tag">{{ inp.type }}</span>
+              </div>
+              <div v-if="inp.desc" class="text-caption text-grey mb-1">{{ inp.desc }}</div>
+              <!-- Type-aware input controls -->
+              <v-switch v-if="inp.type === 'Boolean'" v-model="execInputValues[idx]" :label="execInputValues[idx] ? '是' : '否'" hide-details density="compact" color="primary" />
+              <v-text-field v-else-if="inp.type === 'Integer'" v-model="execInputValues[idx]" type="number" step="1" placeholder="请输入整数值" hide-details density="compact" />
+              <v-text-field v-else-if="inp.type === 'Double'" v-model="execInputValues[idx]" type="number" step="0.01" placeholder="请输入数值" hide-details density="compact" />
+              <v-text-field v-else-if="inp.type === 'DateTime'" v-model="execInputValues[idx]" type="datetime-local" hide-details density="compact" />
+              <v-textarea v-else-if="inp.type === 'Object'" v-model="execInputValues[idx]" placeholder="请输入 JSON 格式数据" rows="3" hide-details density="compact" style="font-family:monospace" />
+              <v-file-input v-else-if="inp.type === 'File'" v-model="execInputValues[idx]" placeholder="选择文件" hide-details density="compact" />
+              <v-text-field v-else v-model="execInputValues[idx]" :placeholder="`请输入${inp.label || inp.name}`" hide-details density="compact" />
+            </div>
+            <div class="text-caption text-grey"><span style="color:#DC2626">*</span> 为必填参数</div>
+          </template>
+        </v-card-text>
+        <v-card-actions class="px-4 pb-4"><v-spacer /><v-btn @click="showExecuteWf = false">取消</v-btn><v-btn color="primary" @click="confirmExecuteWf">确认执行</v-btn></v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- Batch Delete Dialog -->
+    <v-dialog v-model="showBatchDelete" max-width="460" persistent>
+      <v-card>
+        <v-card-title class="d-flex align-center justify-space-between">批量删除<v-btn icon variant="text" @click="showBatchDelete = false"><v-icon>mdi-close</v-icon></v-btn></v-card-title>
+        <v-card-text>
+          <div class="delete-warning">
+            <v-icon color="error" class="mr-2">mdi-alert-outline</v-icon>
+            <div class="text-body-2">确定删除选中的 {{ batchSelectedIds.length }} 个工作流吗？此操作不可恢复。</div>
+          </div>
+        </v-card-text>
+        <v-card-actions class="px-4 pb-4"><v-spacer /><v-btn @click="showBatchDelete = false">取消</v-btn><v-btn color="error" @click="confirmBatchDelete">确认删除 ({{ batchSelectedIds.length }})</v-btn></v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- Batch Move Dialog -->
+    <v-dialog v-model="showBatchMove" max-width="460">
+      <v-card>
+        <v-card-title class="d-flex align-center justify-space-between">批量移动 ({{ batchSelectedIds.length }}项)<v-btn icon variant="text" @click="showBatchMove = false"><v-icon>mdi-close</v-icon></v-btn></v-card-title>
+        <v-card-text>
+          <p class="text-body-2 text-grey mb-3">选择目标文件夹：</p>
+          <div class="folder-tree-node" @click="confirmBatchMove(null)">
+            <v-icon size="18">mdi-folder</v-icon><span>{{ ws?.name }}（根目录）</span>
+          </div>
+          <div v-for="f in allFolders" :key="f.id" class="folder-tree-node" @click="confirmBatchMove(f.id)">
+            <v-icon size="18">mdi-folder</v-icon><span>{{ f.name }}</span>
+          </div>
+        </v-card-text>
+      </v-card>
+    </v-dialog>
+
+    <!-- Execution Action Confirmation Dialog -->
+    <v-dialog v-model="showConfirmExec" max-width="460" persistent>
+      <v-card v-if="confirmExecTarget">
+        <v-card-title class="d-flex align-center justify-space-between">{{ execActionTitle }}<v-btn icon variant="text" @click="showConfirmExec = false"><v-icon>mdi-close</v-icon></v-btn></v-card-title>
+        <v-card-text>
+          <p v-if="confirmExecAction === 'pause'" class="text-body-2">确定暂停该执行实例吗？暂停后当前正在执行的节点将完成后挂起，后续节点不再执行。</p>
+          <p v-else-if="confirmExecAction === 'resume'" class="text-body-2">确定恢复执行实例 <strong>#{{ confirmExecTarget.id }}</strong>（{{ confirmExecTarget.wfName }}）吗？恢复后将继续从暂停点执行。</p>
+          <p v-else-if="confirmExecAction === 'cancel'" class="text-body-2">确定取消该执行实例吗？取消后正在执行的节点将被终止，已完成的节点不受影响。</p>
+          <p v-else-if="confirmExecAction === 'reExecute'" class="text-body-2">确定基于工作流「{{ confirmExecTarget.wfName }}」当前版本重新执行吗？将创建一个新的执行实例。</p>
+        </v-card-text>
+        <v-card-actions class="px-4 pb-4">
+          <v-spacer /><v-btn @click="showConfirmExec = false">取消</v-btn>
+          <v-btn :color="confirmExecAction === 'cancel' ? 'error' : 'primary'" @click="doExecAction">{{ execActionBtnText }}</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <!-- Edit Workspace Dialog -->
     <v-dialog v-model="showEditWs" max-width="500" persistent>
       <v-card>
@@ -411,18 +730,72 @@
       </v-card>
     </v-dialog>
 
-    <!-- Delete Workspace Dialog -->
+    <!-- Delete Workspace Dialog (2-step) -->
     <v-dialog v-model="showDeleteWs" max-width="460" persistent>
       <v-card>
-        <v-card-title class="d-flex align-center justify-space-between">删除空间<v-btn icon variant="text" @click="showDeleteWs = false"><v-icon>mdi-close</v-icon></v-btn></v-card-title>
+        <v-card-title class="d-flex align-center justify-space-between">{{ deleteWsStep === 1 ? '删除空间' : '确认删除' }}<v-btn icon variant="text" @click="showDeleteWs = false"><v-icon>mdi-close</v-icon></v-btn></v-card-title>
         <v-card-text>
-          <div class="delete-warning mb-3">
-            <v-icon color="error" class="mr-2">mdi-alert-outline</v-icon>
-            <div class="text-body-2">删除空间后，所有工作流和执行记录将被一并删除，不可恢复。</div>
+          <!-- Step indicator -->
+          <div class="d-flex align-center justify-center ga-3 mb-4">
+            <div class="d-flex align-center ga-1">
+              <v-avatar :color="deleteWsStep >= 1 ? 'primary' : 'grey'" size="24"><span style="font-size:12px;color:white">{{ deleteWsStep > 1 ? '✓' : '1' }}</span></v-avatar>
+              <span class="text-caption" :class="deleteWsStep >= 1 ? 'text-primary' : 'text-grey'">确认风险</span>
+            </div>
+            <v-divider style="max-width:40px" />
+            <div class="d-flex align-center ga-1">
+              <v-avatar :color="deleteWsStep >= 2 ? 'primary' : 'grey'" size="24"><span style="font-size:12px;color:white">2</span></v-avatar>
+              <span class="text-caption" :class="deleteWsStep >= 2 ? 'text-primary' : 'text-grey'">输入确认</span>
+            </div>
           </div>
-          <v-text-field v-model="deleteWsConfirm" :label="`请输入空间名称以确认删除：${ws?.name}`" />
+          <!-- Step 1 -->
+          <template v-if="deleteWsStep === 1">
+            <div class="delete-warning">
+              <v-icon color="error" class="mr-2">mdi-alert-outline</v-icon>
+              <div class="text-body-2">删除空间后，所有工作流和执行记录将被一并删除，不可恢复。
+                <template v-if="ws?.runningInstances > 0"><br /><br /><strong style="color:#DC2626">当前有 {{ ws.runningInstances }} 个运行中实例将被终止。</strong></template>
+              </div>
+            </div>
+          </template>
+          <!-- Step 2 -->
+          <template v-else>
+            <v-text-field v-model="deleteWsConfirm" :label="`请输入空间名称以确认删除：${ws?.name}`" />
+          </template>
         </v-card-text>
-        <v-card-actions class="px-4 pb-4"><v-spacer /><v-btn @click="showDeleteWs = false">取消</v-btn><v-btn color="error" :disabled="deleteWsConfirm !== ws?.name" @click="confirmDeleteWs">确认删除</v-btn></v-card-actions>
+        <v-card-actions class="px-4 pb-4">
+          <v-spacer /><v-btn @click="showDeleteWs = false">取消</v-btn>
+          <v-btn v-if="deleteWsStep === 1" color="error" @click="deleteWsStep = 2">继续</v-btn>
+          <v-btn v-else color="error" :disabled="deleteWsConfirm !== ws?.name" @click="confirmDeleteWs">确认删除</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- Transfer Admin Dialog -->
+    <v-dialog v-model="showTransferAdmin" max-width="460" persistent>
+      <v-card>
+        <v-card-title class="d-flex align-center justify-space-between">转让管理员<v-btn icon variant="text" @click="showTransferAdmin = false"><v-icon>mdi-close</v-icon></v-btn></v-card-title>
+        <v-card-text>
+          <p class="text-body-2 text-grey mb-3">选择要转让管理员权限的成员：</p>
+          <div v-for="m in transferCandidates" :key="m.userId" class="d-flex align-center pa-2 rounded-lg mb-1" style="cursor:pointer" :style="{ background: transferTargetId === m.userId ? '#EEF2FF' : '' }" @click="transferTargetId = m.userId">
+            <div class="member-avatar" :class="'avatar-' + m.role">{{ m.avatar }}</div>
+            <div class="ml-3 flex-grow-1">
+              <div class="text-body-2">{{ m.name }}</div>
+              <div class="text-caption text-grey">{{ roleLabels[m.role] }}</div>
+            </div>
+            <v-icon v-if="transferTargetId === m.userId" color="primary">mdi-check-circle</v-icon>
+          </div>
+        </v-card-text>
+        <v-card-actions class="px-4 pb-4"><v-spacer /><v-btn @click="showTransferAdmin = false">取消</v-btn><v-btn color="primary" :disabled="!transferTargetId" @click="confirmTransferAdmin">确认转让</v-btn></v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- Role Change Confirmation Dialog -->
+    <v-dialog v-model="showRoleChangeConfirm" max-width="400" persistent>
+      <v-card v-if="roleChangeMember">
+        <v-card-title>确认角色变更</v-card-title>
+        <v-card-text>
+          <p class="text-body-2">确定将「{{ roleChangeMember.name }}」的角色从 <strong>{{ roleLabels[roleChangeFrom] }}</strong> 变更为 <strong>{{ roleLabels[roleChangeTo] }}</strong> 吗？</p>
+        </v-card-text>
+        <v-card-actions class="px-4 pb-4"><v-spacer /><v-btn @click="cancelRoleChange">取消</v-btn><v-btn color="primary" @click="confirmRoleChange">确认变更</v-btn></v-card-actions>
       </v-card>
     </v-dialog>
 
@@ -499,13 +872,47 @@ const folderPath = ref([])
 const wfSearch = ref('')
 const wfStatusFilter = ref('all')
 const wfTypeFilter = ref('all')
+const wfCreatorFilter = ref([])
+const wfOwnerFilter = ref([])
+const wfCreatorOpen = ref(false)
+const wfOwnerOpen = ref(false)
+const wfCreatorSearch = ref('')
+const wfOwnerSearch = ref('')
 const wfSortField = ref('editedAt')
 const wfSortAsc = ref(false)
 const wfFilterOpen = ref(false)
 
+// Batch mode
+const batchMode = ref(false)
+const batchSelectedIds = ref([])
+const batchAllSelected = computed(() => {
+  const wfs = sortedWorkflows.value
+  return wfs.length > 0 && batchSelectedIds.value.length === wfs.length
+})
+function toggleBatchSelect(wfId) {
+  const idx = batchSelectedIds.value.indexOf(wfId)
+  if (idx > -1) batchSelectedIds.value.splice(idx, 1)
+  else batchSelectedIds.value.push(wfId)
+}
+function toggleBatchSelectAll(val) {
+  if (val) batchSelectedIds.value = sortedWorkflows.value.map(wf => wf.id)
+  else batchSelectedIds.value = []
+}
+
 const isSearchMode = computed(() => !!wfSearch.value)
-const wfHasFilters = computed(() => wfSearch.value || wfStatusFilter.value !== 'all' || wfTypeFilter.value !== 'all')
-const wfActiveFilterCount = computed(() => (wfStatusFilter.value !== 'all' ? 1 : 0) + (wfTypeFilter.value !== 'all' ? 1 : 0))
+const wfHasFilters = computed(() => wfSearch.value || wfStatusFilter.value !== 'all' || wfTypeFilter.value !== 'all' || wfCreatorFilter.value.length > 0 || wfOwnerFilter.value.length > 0)
+const wfActiveFilterCount = computed(() => (wfStatusFilter.value !== 'all' ? 1 : 0) + (wfTypeFilter.value !== 'all' ? 1 : 0) + (wfCreatorFilter.value.length > 0 ? 1 : 0) + (wfOwnerFilter.value.length > 0 ? 1 : 0))
+
+// Creator/Owner dropdown data
+const allWfCreators = computed(() => [...new Set((store.wsWorkflows[ws.value?.id] || []).map(wf => wf.creator))].sort())
+const allWfOwnerNames = computed(() => {
+  const ids = [...new Set((store.wsWorkflows[ws.value?.id] || []).flatMap(wf => wf.owners || []))]
+  return ids.map(id => store.getUserName(id)).filter(Boolean).sort()
+})
+const filteredWfCreators = computed(() => wfCreatorSearch.value ? allWfCreators.value.filter(c => c.toLowerCase().includes(wfCreatorSearch.value.toLowerCase())) : allWfCreators.value)
+const filteredWfOwners = computed(() => wfOwnerSearch.value ? allWfOwnerNames.value.filter(c => c.toLowerCase().includes(wfOwnerSearch.value.toLowerCase())) : allWfOwnerNames.value)
+function toggleWfCreator(name) { const idx = wfCreatorFilter.value.indexOf(name); if (idx > -1) wfCreatorFilter.value.splice(idx, 1); else wfCreatorFilter.value.push(name) }
+function toggleWfOwner(name) { const idx = wfOwnerFilter.value.indexOf(name); if (idx > -1) wfOwnerFilter.value.splice(idx, 1); else wfOwnerFilter.value.push(name) }
 const canCreateFolder = computed(() => isMember.value && folderPath.value.length < 4)
 
 const allFolders = computed(() => store.wsFolders[ws.value?.id] || [])
@@ -522,6 +929,8 @@ const sortedWorkflows = computed(() => {
     : allWf.filter(wf => wf.folderId === currentFolderId.value)
   if (wfStatusFilter.value !== 'all') wfs = wfs.filter(wf => wf.status === wfStatusFilter.value)
   if (wfTypeFilter.value !== 'all') wfs = wfs.filter(wf => wf.type === wfTypeFilter.value)
+  if (wfCreatorFilter.value.length > 0) wfs = wfs.filter(wf => wfCreatorFilter.value.includes(wf.creator))
+  if (wfOwnerFilter.value.length > 0) wfs = wfs.filter(wf => (wf.owners || []).some(oid => { const u = store.ssoUsers.find(x => x.id === oid); return u && wfOwnerFilter.value.includes(u.name) }))
   return [...wfs].sort((a, b) => {
     if (wfSortField.value === 'name') return wfSortAsc.value ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name)
     const va = a.editedAt, vb = b.editedAt
@@ -538,7 +947,7 @@ function toggleWfSort(field) {
   if (wfSortField.value === field) wfSortAsc.value = !wfSortAsc.value
   else { wfSortField.value = field; wfSortAsc.value = true }
 }
-function clearWfFilters() { wfSearch.value = ''; wfStatusFilter.value = 'all'; wfTypeFilter.value = 'all'; wfFilterOpen.value = false }
+function clearWfFilters() { wfSearch.value = ''; wfStatusFilter.value = 'all'; wfTypeFilter.value = 'all'; wfCreatorFilter.value = []; wfOwnerFilter.value = []; wfCreatorOpen.value = false; wfOwnerOpen.value = false; wfFilterOpen.value = false }
 function navigateIntoFolder(f) { folderPath.value.push({ id: f.id, name: f.name }); currentFolderId.value = f.id; clearWfFilters() }
 function navigateUp() {
   if (folderPath.value.length >= 2) {
@@ -575,8 +984,37 @@ function createWf() {
     lastRun: null, runningCount: 0, execCount: 0, debugPassed: false, inputs: [], versions: [],
   })
   showCreateWf.value = false
+  store.showToast('success', '创建成功', `工作流已创建`)
   wfForm.value = { name: '', code: '', desc: '', type: 'app', allowRef: false, ownerId: 101 }
-  store.showToast('success', '创建成功', `工作流「${wfForm.value.name || ''}」已创建`)
+}
+
+// Execute workflow with input form
+const showExecuteWf = ref(false)
+const executeTarget = ref(null)
+const execInputValues = ref([])
+
+function openExecuteDialog(wf) {
+  if (!wf || wf.status !== 'published') return
+  executeTarget.value = wf
+  execInputValues.value = (wf.inputs || []).map(inp => inp.type === 'Boolean' ? false : '')
+  showExecuteWf.value = true
+}
+
+function confirmExecuteWf() {
+  const wf = executeTarget.value
+  if (!wf) return
+  // Validate required inputs
+  const inputs = wf.inputs || []
+  for (let i = 0; i < inputs.length; i++) {
+    if (inputs[i].required && inputs[i].type !== 'Boolean') {
+      if (!execInputValues.value[i] || (typeof execInputValues.value[i] === 'string' && !execInputValues.value[i].trim())) {
+        store.showToast('error', '参数校验失败', '请填写所有必填参数')
+        return
+      }
+    }
+  }
+  executeWf(wf)
+  showExecuteWf.value = false
 }
 
 function executeWf(wf) {
@@ -592,6 +1030,58 @@ function executeWf(wf) {
   })
   wf.runningCount++; wf.lastRun = 'running'
   store.showToast('success', '工作流已启动', `实例 ID: ${execId}`)
+}
+
+// Publish workflow
+const showPublishWf = ref(false)
+const publishTarget = ref(null)
+const publishNote = ref('')
+
+function openPublishDialog(wf) {
+  publishTarget.value = wf
+  publishNote.value = ''
+  showPublishWf.value = true
+}
+function confirmPublishWf() {
+  const wf = publishTarget.value
+  if (!wf || !wf.debugPassed) return
+  const now = new Date().toISOString()
+  wf.version++
+  if (wf.versions) wf.versions.forEach(v => { if (v.status === 'current') v.status = 'history' })
+  if (!wf.versions) wf.versions = []
+  wf.versions.unshift({ v: wf.version, status: 'current', publishedAt: now.slice(0, 16).replace('T', ' '), publisher: 'Sukey Wu', note: publishNote.value })
+  wf.status = 'published'
+  wf.editedAt = now.slice(0, 16).replace('T', ' ')
+  showPublishWf.value = false
+  store.showToast('success', '发布成功', `工作流 v${wf.version} 已发布`)
+}
+
+// Disable / Enable workflow
+const showDisableWf = ref(false)
+const disableTarget = ref(null)
+
+function openDisableDialog(wf) { disableTarget.value = wf; showDisableWf.value = true }
+function confirmDisableWf() {
+  if (!disableTarget.value) return
+  disableTarget.value.status = 'disabled'
+  showDisableWf.value = false
+  store.showToast('success', '停用成功', `工作流已停用`)
+}
+function enableWf(wf) {
+  wf.status = 'published'
+  store.showToast('success', '启用成功', `工作流已重新启用`)
+}
+
+// Version history + rollback
+const showVersionHistory = ref(false)
+const versionTarget = ref(null)
+const showRollback = ref(false)
+const rollbackTarget = ref(null)
+
+function confirmRollback() {
+  if (!rollbackTarget.value) return
+  showRollback.value = false
+  store.showToast('success', '回滚成功', `已基于 v${rollbackTarget.value.version} 创建新草稿版本`)
 }
 
 function copyWf(wf) {
@@ -629,6 +1119,33 @@ function confirmDeleteWf() {
   store.showToast('success', '删除成功', `工作流已删除`)
 }
 
+// Batch operations
+const showBatchDelete = ref(false)
+const showBatchMove = ref(false)
+
+function confirmBatchDelete() {
+  const ids = [...batchSelectedIds.value]
+  ids.forEach(id => store.deleteWorkflow(ws.value.id, id))
+  batchSelectedIds.value = []; batchMode.value = false; showBatchDelete.value = false
+  store.showToast('success', '批量删除成功', `已删除 ${ids.length} 个工作流`)
+}
+function confirmBatchMove(targetFolderId) {
+  const ids = [...batchSelectedIds.value]
+  const wfs = store.wsWorkflows[ws.value.id] || []
+  wfs.forEach(wf => {
+    if (ids.includes(wf.id)) { wf.folderId = targetFolderId; wf.editedAt = new Date().toISOString().slice(0, 16).replace('T', ' ') }
+  })
+  batchSelectedIds.value = []; batchMode.value = false; showBatchMove.value = false
+  store.showToast('success', '批量移动成功', `已移动 ${ids.length} 个工作流`)
+}
+function batchDisable() {
+  const wfs = (store.wsWorkflows[ws.value.id] || []).filter(wf => batchSelectedIds.value.includes(wf.id) && wf.status === 'published')
+  if (wfs.length === 0) { store.showToast('info', '提示', '选中的工作流中没有已发布状态的工作流'); return }
+  wfs.forEach(wf => { wf.status = 'disabled' })
+  batchSelectedIds.value = []; batchMode.value = false
+  store.showToast('success', '批量停用成功', `已停用 ${wfs.length} 个工作流`)
+}
+
 // Folder CRUD
 const showCreateFolder = ref(false)
 const folderForm = ref({ name: '', desc: '' })
@@ -656,6 +1173,71 @@ function updateFolder() {
   store.showToast('success', '保存成功', '文件夹已更新')
 }
 
+// Folder delete (with cascade options)
+const showDeleteFolder = ref(false)
+const showCascadeDeleteFolder = ref(false)
+const deleteFolderTarget = ref(null)
+
+const deleteFolderSubFolderCount = computed(() => deleteFolderTarget.value ? store.getSubFolderCount(ws.value?.id, deleteFolderTarget.value.id) : 0)
+const deleteFolderSubWfCount = computed(() => deleteFolderTarget.value ? store.getSubWfCount(ws.value?.id, deleteFolderTarget.value.id) : 0)
+const deleteFolderIsEmpty = computed(() => deleteFolderSubFolderCount.value === 0 && deleteFolderSubWfCount.value === 0)
+
+function openFolderDeleteDialog(f) {
+  deleteFolderTarget.value = f
+  showDeleteFolder.value = true
+}
+function deleteEmptyFolder() {
+  if (!deleteFolderTarget.value) return
+  store.deleteFolder(ws.value.id, deleteFolderTarget.value.id)
+  showDeleteFolder.value = false
+  store.showToast('success', '删除成功', '文件夹已删除')
+}
+function deleteFolderKeepContent() {
+  const f = deleteFolderTarget.value
+  if (!f) return
+  const allF = store.wsFolders[ws.value.id] || []
+  allF.forEach(child => { if (child.parentId === f.id) child.parentId = f.parentId })
+  const allW = store.wsWorkflows[ws.value.id] || []
+  allW.forEach(wf => { if (wf.folderId === f.id) wf.folderId = f.parentId })
+  store.deleteFolder(ws.value.id, f.id)
+  showDeleteFolder.value = false
+  store.showToast('success', '删除成功', '文件夹已删除，内容已保留')
+}
+function cascadeDeleteFolder() {
+  const f = deleteFolderTarget.value
+  if (!f) return
+  function getDescendants(parentId) {
+    const children = (store.wsFolders[ws.value.id] || []).filter(x => x.parentId === parentId)
+    let ids = children.map(c => c.id)
+    children.forEach(c => { ids = ids.concat(getDescendants(c.id)) })
+    return ids
+  }
+  const allFolderIds = [f.id, ...getDescendants(f.id)]
+  store.wsWorkflows[ws.value.id] = (store.wsWorkflows[ws.value.id] || []).filter(wf => !allFolderIds.includes(wf.folderId))
+  store.wsFolders[ws.value.id] = (store.wsFolders[ws.value.id] || []).filter(x => !allFolderIds.includes(x.id))
+  showCascadeDeleteFolder.value = false
+  store.showToast('success', '删除成功', '文件夹及所有内容已删除')
+}
+
+// Folder move
+const showMoveFolder = ref(false)
+const moveFolderTarget = ref(null)
+const movableFolders = computed(() => {
+  if (!moveFolderTarget.value) return []
+  const fId = moveFolderTarget.value.id
+  function getDescIds(pid) { const ch = allFolders.value.filter(x => x.parentId === pid); let ids = ch.map(c => c.id); ch.forEach(c => { ids = ids.concat(getDescIds(c.id)) }); return ids }
+  const invalidIds = new Set([fId, ...getDescIds(fId)])
+  return allFolders.value.filter(f => !invalidIds.has(f.id))
+})
+function doMoveFolder(targetParentId) {
+  const f = (store.wsFolders[ws.value.id] || []).find(x => x.id === moveFolderTarget.value?.id)
+  if (!f) return
+  f.parentId = targetParentId
+  f.editedAt = new Date().toISOString().slice(0, 16).replace('T', ' ')
+  showMoveFolder.value = false
+  store.showToast('success', '移动成功', '文件夹已移动')
+}
+
 // === EXECUTIONS TAB ===
 const execSearch = ref('')
 const execStatusFilter = ref('all')
@@ -671,6 +1253,7 @@ const execTriggerLabel = { manual: '手动', scheduled: '定时', event: '事件
 const execStatusOptions = [
   { title: '全部状态', value: 'all' }, { title: '运行中', value: 'running' }, { title: '已暂停', value: 'paused' },
   { title: '已完成', value: 'completed' }, { title: '失败', value: 'failed' }, { title: '已取消', value: 'cancelled' },
+  { title: '异常滞留', value: 'stale' },
 ]
 const execTriggerOptions = [
   { title: '全部触发方式', value: 'all' }, { title: '手动', value: 'manual' }, { title: '定时', value: 'scheduled' }, { title: '事件触发', value: 'event' },
@@ -700,6 +1283,43 @@ const pagedExecs = computed(() => {
 })
 const execDetail = computed(() => execDetailId.value !== null ? (store.getExecutions(ws.value?.id) || []).find(e => e.id === execDetailId.value) : null)
 
+// Execution action confirmations
+const showConfirmExec = ref(false)
+const confirmExecAction = ref('')
+const confirmExecTarget = ref(null)
+
+const execActionTitle = computed(() => ({
+  pause: '暂停执行', resume: '确认恢复执行', cancel: '取消执行', reExecute: '确认重新执行',
+}[confirmExecAction.value] || ''))
+const execActionBtnText = computed(() => ({
+  pause: '确认暂停', resume: '确认恢复', cancel: '确认取消', reExecute: '确认执行',
+}[confirmExecAction.value] || '确认'))
+
+function doExecAction() {
+  const e = confirmExecTarget.value
+  if (!e) return
+  if (confirmExecAction.value === 'pause') {
+    e.status = 'paused'
+    store.showToast('success', '暂停成功', '执行已暂停')
+  } else if (confirmExecAction.value === 'resume') {
+    e.status = 'running'; e.stale = false
+    store.showToast('success', '执行已恢复', '')
+  } else if (confirmExecAction.value === 'cancel') {
+    e.status = 'cancelled'
+    e.endTime = new Date().toISOString().slice(0, 19).replace('T', ' ')
+    e.duration = '已取消'
+    store.showToast('success', '取消成功', '执行已取消')
+  } else if (confirmExecAction.value === 'reExecute') {
+    const wf = store.findWorkflow(ws.value.id, e.wfId)
+    if (wf && wf.status === 'published') {
+      executeWf(wf)
+    } else {
+      store.showToast('warning', '无法执行', '工作流当前状态不支持执行')
+    }
+  }
+  showConfirmExec.value = false
+}
+
 // === SETTINGS TAB ===
 const memberTab = ref('admin')
 const wsAdmins = computed(() => (ws.value?.members || []).filter(m => m.role === 'admin'))
@@ -707,6 +1327,7 @@ const wsMembers = computed(() => (ws.value?.members || []).filter(m => m.role ==
 const wsViewers = computed(() => (ws.value?.members || []).filter(m => m.role === 'viewer'))
 const currentRoleMembers = computed(() => (ws.value?.members || []).filter(m => m.role === memberTab.value))
 const memberRoleOptions = [{ title: '管理员', value: 'admin' }, { title: '成员', value: 'member' }, { title: '只读查看者', value: 'viewer' }]
+const isSingleAdmin = computed(() => wsAdmins.value.length === 1 && wsAdmins.value[0]?.userId === 101)
 
 const showEditWs = ref(false)
 const editWsForm = ref({ name: '', desc: '' })
@@ -715,8 +1336,10 @@ function saveWsEdit() {
   showEditWs.value = false; store.showToast('success', '保存成功', '空间已更新')
 }
 
+// 2-step delete workspace
 const showDeleteWs = ref(false)
 const deleteWsConfirm = ref('')
+const deleteWsStep = ref(1)
 function confirmDeleteWs() {
   store.deleteWorkspace(ws.value.id)
   showDeleteWs.value = false
@@ -724,12 +1347,52 @@ function confirmDeleteWs() {
   router.push('/workspace')
 }
 
+// Transfer admin
+const showTransferAdmin = ref(false)
+const transferTargetId = ref(null)
+const transferCandidates = computed(() => (ws.value?.members || []).filter(m => m.userId !== 101))
+function confirmTransferAdmin() {
+  if (!transferTargetId.value || !ws.value) return
+  const target = ws.value.members.find(m => m.userId === transferTargetId.value)
+  const current = ws.value.members.find(m => m.userId === 101)
+  if (target) target.role = 'admin'
+  if (current) current.role = 'member'
+  showTransferAdmin.value = false
+  transferTargetId.value = null
+  store.showToast('success', '转让成功', `管理员权限已转让`)
+}
+
+// Role change with confirmation
+const showRoleChangeConfirm = ref(false)
+const roleChangeMember = ref(null)
+const roleChangeFrom = ref('')
+const roleChangeTo = ref('')
+
 function onRoleChange(member, newRole) {
-  if (member.role === 'admin' && wsAdmins.value.length <= 1) {
+  if (member.role === newRole) return
+  // Prevent removing last admin
+  if (roleChangeFrom.value === 'admin' && wsAdmins.value.length <= 1 && member.role === 'admin') {
+    member.role = 'admin' // revert
     store.showToast('error', '操作失败', '至少保留一名管理员')
     return
   }
-  store.showToast('success', '角色变更', `已变更为${roleLabels[newRole]}`)
+  roleChangeMember.value = member
+  roleChangeFrom.value = member.role === newRole ? roleChangeFrom.value : (wsAdmins.value.find(a => a.userId === member.userId) ? 'admin' : wsMembers.value.find(m => m.userId === member.userId) ? 'member' : 'viewer')
+  // Since v-select already changed the value, we need to track the original
+  roleChangeFrom.value = memberTab.value
+  roleChangeTo.value = newRole
+  showRoleChangeConfirm.value = true
+}
+function confirmRoleChange() {
+  showRoleChangeConfirm.value = false
+  store.showToast('success', '角色变更', `已变更为${roleLabels[roleChangeTo.value]}`)
+}
+function cancelRoleChange() {
+  // Revert the role change
+  if (roleChangeMember.value) {
+    roleChangeMember.value.role = roleChangeFrom.value
+  }
+  showRoleChangeConfirm.value = false
 }
 
 const showAddMember = ref(false)
@@ -769,6 +1432,15 @@ function confirmRemoveMember() {
   showRemoveMember.value = false
 }
 
+// === Watchers ===
 watch(() => showAddMember.value, (v) => { if (v) { selectedNewMembers.value = []; memberSearch.value = '' } })
 watch(() => showDeleteWf.value, (v) => { if (v) deleteConfirmCode.value = '' })
+watch(() => showDeleteWs.value, (v) => { if (v) { deleteWsConfirm.value = ''; deleteWsStep.value = 1 } })
+watch(() => showTransferAdmin.value, (v) => { if (v) transferTargetId.value = null })
+watch(() => showExecuteWf.value, (v) => { if (v && executingWf.value) { executeInputs.value = {} } })
+watch(() => showPublishWf.value, (v) => { if (v) publishNote.value = '' })
+watch(() => showFolderDelete.value, (v) => { if (v) cascadeDeleteConfirm.value = '' })
+watch(() => showFolderMove.value, (v) => { if (v) folderMoveTargetId.value = null })
+watch(() => showBatchDelete.value, (v) => { if (v) batchDeleteConfirm.value = '' })
+watch(() => showBatchMove.value, (v) => { if (v) batchMoveTargetId.value = null })
 </script>
