@@ -1173,30 +1173,30 @@ function renderWsWorkflowsTab(ws) {
     <div class="content-list">
       ${showFolders ? sortedFolders.map(f => {
         const subF = getSubFolderCount(ws.id, f.id), subW = getSubWfCount(ws.id, f.id);
-        return `<div class="content-list-item" ondblclick="navigateIntoFolder(${f.id}, '${f.name.replace(/'/g, "\\'")}')">
-          <div class="content-item-main" style="flex:2.5"><div class="content-item-icon folder-icon">${icons.folder}</div><div><div class="content-item-name" onclick="navigateIntoFolder(${f.id}, '${f.name.replace(/'/g, "\\'")}')" style="cursor:pointer">${f.name}</div><div class="content-item-desc">${subW} 个工作流${subF > 0 ? `，${subF} 个子文件夹` : ''}</div></div></div>
+        return `<div class="content-list-item" onclick="navigateIntoFolder(${f.id}, '${f.name.replace(/'/g, "\\'")}')" style="cursor:pointer">
+          <div class="content-item-main" style="flex:2.5"><div class="content-item-icon folder-icon">${icons.folder}</div><div><div class="content-item-name">${f.name}</div><div class="content-item-desc">${subW} 个工作流${subF > 0 ? `，${subF} 个子文件夹` : ''}</div></div></div>
           <div style="flex:0.7"><span style="font-size:var(--font-size-xs);color:var(--md-outline)">—</span></div>
           <div style="flex:0.6"><span style="font-size:var(--font-size-xs);color:var(--md-outline)">—</span></div>
           <div style="flex:0.6"><span class="badge badge-type" style="font-size:11px">${icons.folder} 文件夹</span></div>
           <div style="flex:0.8;font-size:var(--font-size-sm);color:var(--md-on-surface-variant)">${f.creator}</div>
           <div style="flex:0.8"><span style="font-size:var(--font-size-xs);color:var(--md-outline)">—</span></div>
           <div style="flex:0.9;font-size:var(--font-size-sm);color:var(--md-outline)">${f.editedAt}</div>
-          <div class="content-item-actions" style="width:110px">
+          <div class="content-item-actions" style="width:110px" onclick="event.stopPropagation()">
             ${isMemberOrAbove ? `<button class="table-action-btn" title="编辑" onclick="showEditFolderModal(${f.id})">${icons.edit}</button><div class="more-menu-wrapper"><button class="table-action-btn" title="更多" onclick="event.stopPropagation();toggleMoreMenu(this)">${icons.chevronDown}</button><div class="more-menu-panel hidden"><div class="more-menu-item" onclick="showMoveFolderModal(${f.id})">${icons.move}<span>移动</span></div></div></div>` : ''}
           </div></div>`;
       }).join('') : ''}
       ${sortedWf.map(wf => {
         const canExec = wf.status === 'published';
         const wfOwnerNames = wf.owners.map(oid => { const u = ssoUsers.find(x => x.id === oid); return u ? u.name : ''; }).filter(Boolean).join(', ');
-        return `<div class="content-list-item">
-          <div class="content-item-main" style="flex:2.5"><div class="content-item-icon wf-icon">${icons.workflow}</div><div><div class="content-item-name" onclick="openDesigner(${ws.id}, ${wf.id})" style="cursor:pointer;color:var(--md-primary)">${wf.name}${isSearchMode ? `<span style="font-size:11px;color:var(--md-outline);margin-left:8px">${getFolderPath(ws.id, wf.folderId) || '根目录'}</span>` : ''}</div><div class="content-item-desc">${icons.hash} ${wf.code}${wf.desc ? ` · ${wf.desc}` : ''}</div></div></div>
+        return `<div class="content-list-item" onclick="openDesigner(${ws.id}, ${wf.id})" style="cursor:pointer">
+          <div class="content-item-main" style="flex:2.5"><div class="content-item-icon wf-icon">${icons.workflow}</div><div><div class="content-item-name" style="color:var(--md-primary)">${wf.name}${isSearchMode ? `<span style="font-size:11px;color:var(--md-outline);margin-left:8px">${getFolderPath(ws.id, wf.folderId) || '根目录'}</span>` : ''}</div><div class="content-item-desc">${icons.hash} ${wf.code}${wf.desc ? ` · ${wf.desc}` : ''}</div></div></div>
           <div style="flex:0.7"><span class="status-badge ${statusClass[wf.status]}">${statusLabel[wf.status]}</span></div>
           <div style="flex:0.6">${wf.version > 0 ? `<span class="version-badge">v${wf.version}</span>` : '<span style="color:var(--md-outline);font-size:var(--font-size-xs)">-</span>'}</div>
           <div style="flex:0.6"><span class="badge badge-type" style="font-size:11px">${typeLabel[wf.type]}</span></div>
           <div style="flex:0.8;font-size:var(--font-size-sm);color:var(--md-on-surface-variant)">${wf.creator}</div>
           <div style="flex:0.8;font-size:var(--font-size-sm);color:var(--md-on-surface-variant)">${wfOwnerNames || '-'}</div>
           <div style="flex:0.9;font-size:var(--font-size-sm);color:var(--md-outline)">${wf.editedAt}</div>
-          <div class="content-item-actions" style="width:110px">
+          <div class="content-item-actions" style="width:110px" onclick="event.stopPropagation()">
             ${isMemberOrAbove ? `<button class="table-action-btn" title="编辑流程" onclick="openDesigner(${ws.id}, ${wf.id})" style="color:var(--md-primary)">${icons.edit}</button>` : `<button class="table-action-btn" title="查看流程" onclick="openDesigner(${ws.id}, ${wf.id})">${icons.eye}</button>`}
             ${canExec ? `<button class="table-action-btn" title="执行" onclick="executeWf(${wf.id})" style="color:var(--md-tertiary)">${icons.play}</button>` : ''}
             <div class="more-menu-wrapper"><button class="table-action-btn" title="更多" onclick="event.stopPropagation();toggleMoreMenu(this)">${icons.chevronDown}</button><div class="more-menu-panel hidden">
@@ -1631,7 +1631,9 @@ function enableWf(wfId) {
 }
 function buildWfInputFormHtml(inputs) {
   const typeIcons = { String: '𝐓', Integer: '#', Double: '#.#', Boolean: '⊘', DateTime: '📅', Object: '{ }', File: '📎' };
-  return inputs.map((inp, idx) => {
+  const requiredInputs = inputs.filter(inp => inp.required);
+  const optionalInputs = inputs.filter(inp => !inp.required);
+  function buildField(inp, idx) {
     const reqMark = inp.required ? '<span class="required">*</span>' : '';
     const typeTag = `<span class="wf-input-type-tag">${typeIcons[inp.type] || ''} ${inp.type}</span>`;
     let control = '';
@@ -1655,7 +1657,19 @@ function buildWfInputFormHtml(inputs) {
       ${inp.desc ? `<div class="wf-input-desc">${inp.desc}</div>` : ''}
       ${control}
     </div>`;
-  }).join('');
+  }
+  let html = '';
+  if (requiredInputs.length > 0) {
+    html += `<div class="wf-input-section"><div class="wf-input-section-header"><span class="wf-input-section-title">必填参数</span><span class="wf-input-section-count">${requiredInputs.length} 项</span></div>`;
+    html += requiredInputs.map((inp, i) => buildField(inp, inputs.indexOf(inp))).join('');
+    html += '</div>';
+  }
+  if (optionalInputs.length > 0) {
+    html += `<div class="wf-input-section"><div class="wf-input-section-header" onclick="this.closest('.wf-input-section').classList.toggle('collapsed')" style="cursor:pointer"><span class="wf-input-section-title">选填参数</span><span class="wf-input-section-count">${optionalInputs.length} 项</span><span class="wf-input-section-toggle">${icons.chevronDown}</span></div><div class="wf-input-section-body">`;
+    html += optionalInputs.map((inp, i) => buildField(inp, inputs.indexOf(inp))).join('');
+    html += '</div></div>';
+  }
+  return html;
 }
 function validateWfInputs(inputs) {
   let hasError = false;
@@ -1683,12 +1697,20 @@ function executeWf(wfId) {
     ${runningWarn}
     </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="confirmExecuteWf(${wfId})">确认执行</button></div></div>`);
   } else {
-    showModal(`<div class="modal" style="max-width:520px"><div class="modal-header"><h2 class="modal-title">执行工作流 · ${wf.name}</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body" style="padding-bottom:0">
-    <div style="display:flex;align-items:center;gap:var(--space-2);margin-bottom:var(--space-4);padding:var(--space-2) var(--space-3);background:var(--md-surface-container-low);border-radius:var(--radius-sm);font-size:var(--font-size-xs);color:var(--md-on-surface-variant)">发布版本 v${wf.version} · 手动触发</div>
+    const reqCount = inputs.filter(i => i.required).length;
+    const optCount = inputs.length - reqCount;
+    showModal(`<div class="modal" style="max-width:560px"><div class="modal-header"><h2 class="modal-title">执行工作流</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body" style="padding-bottom:0">
+    <div class="exec-wf-info">
+      <div class="exec-wf-info-icon">${icons.workflow}</div>
+      <div class="exec-wf-info-details">
+        <div class="exec-wf-info-name">${wf.name}</div>
+        <div class="exec-wf-info-meta">${icons.hash} ${wf.code} · 发布版本 v${wf.version} · 手动触发</div>
+      </div>
+    </div>
     ${runningWarn ? runningWarn + '<div style="height:var(--space-3)"></div>' : ''}
+    <div class="exec-wf-params-header"><span class="exec-wf-params-title">${icons.settings} 输入参数</span><span class="exec-wf-params-count">${reqCount > 0 ? `${reqCount} 项必填` : ''}${reqCount > 0 && optCount > 0 ? '，' : ''}${optCount > 0 ? `${optCount} 项选填` : ''}</span></div>
     <div class="wf-input-form">${buildWfInputFormHtml(inputs)}</div>
-    <div class="wf-input-required-hint"><span class="required">*</span> 为必填参数</div>
-    </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="confirmExecuteWf(${wfId})">确认执行</button></div></div>`);
+    </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="confirmExecuteWf(${wfId})">${icons.play} 确认执行</button></div></div>`);
   }
 }
 function confirmExecuteWf(wfId) {
@@ -1890,7 +1912,7 @@ function renderWsExecutionsTab(ws) {
     </div>
     ${totalExecs === 0 ? (wsExecSearch ? renderEmptyState('execSearchNoResult') : renderEmptyState('executions')) : `
     <div class="table-wrapper"><table class="exec-table"><thead><tr><th>实例ID</th><th>工作流</th><th>发布版本</th><th>触发方式</th><th>状态</th><th>开始时间</th><th>结束时间</th><th>耗时</th><th>触发人</th><th>操作</th></tr></thead><tbody>
-    ${pagedExecs.map(e => `<tr${e.stale ? ' style="background:rgba(234,179,8,0.05)"' : ''}>
+    ${pagedExecs.map(e => `<tr onclick="viewExecDetail(${e.id})" style="cursor:pointer${e.stale ? ';background:rgba(234,179,8,0.05)' : ''}">
       <td><code style="font-size:var(--font-size-xs)">#${e.id}</code></td>
       <td style="font-weight:500">${e.wfName}</td>
       <td><span class="version-badge">v${e.version}</span></td>
@@ -1900,7 +1922,7 @@ function renderWsExecutionsTab(ws) {
       <td style="font-size:var(--font-size-xs)">${e.endTime}</td>
       <td>${e.duration}</td>
       <td>${e.triggerUser}</td>
-      <td><div class="table-actions">
+      <td onclick="event.stopPropagation()"><div class="table-actions">
         <button class="table-action-btn" title="查看详情" onclick="viewExecDetail(${e.id})">${icons.eye}</button>
         ${(e.status === 'running' || e.status === 'paused') && ws.myRole !== 'viewer' ? `<button class="table-action-btn danger" title="取消" onclick="showCancelExecModal(${e.id})">${icons.stop}</button>` : ''}
         ${e.status === 'running' && ws.myRole !== 'viewer' ? `<button class="table-action-btn" title="暂停" onclick="showPauseExecModal(${e.id})">${icons.pause}</button>` : ''}
