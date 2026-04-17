@@ -85,16 +85,28 @@ function openDesigner(wsId, wfId) {
   designerNodePanelExpanded = false;
   designerClipboard = [];
   designerContextMenu = null;
-  designerGridSnap = false;
+  designerGridSnap = true;
   designerMinimapVisible = true;
 
-  // Simulate edit lock: some workflows are "locked" by another user for demo
-  if (wfId === 7) {
-    designerReadonly = true;
-    designerReadonlyUser = '钱七';
-  } else {
-    designerReadonly = false;
-    designerReadonlyUser = '';
+  // Multi-person collaborative editing — no edit lock
+  designerReadonly = false;
+  designerReadonlyUser = '';
+
+  // Simulate online collaborators for demo
+  designerOnlineUsers = _getSimulatedOnlineUsers(wfId);
+
+  // Initialize draft snapshot metadata
+  if (!wf._draftSnapshots) wf._draftSnapshots = [];
+  if (!wf._baseVersion) wf._baseVersion = wf.version || 0;
+
+  // Simulate version conflict for demo: wfId=7 was v1 when we started, but 钱七 published v2
+  if (wfId === 7 && !wf._conflictSimulated) {
+    wf._baseVersion = 1; // We started editing based on v1
+    // But the current version is already v1, so simulate 钱七 publishing v2
+    wf.version = 2;
+    if (!wf.versions) wf.versions = [];
+    wf.versions.unshift({ v: 2, status: 'current', publishedAt: '2026-04-17 14:30', publisher: '钱七', note: '修复报表数据统计逻辑' });
+    wf._conflictSimulated = true;
   }
 
   // Initialize default nodes if empty
@@ -104,6 +116,14 @@ function openDesigner(wsId, wfId) {
   shell.classList.add('active');
   renderDesigner();
   startAutoSave();
+
+  // Multi-person awareness: check if someone else has unsaved draft
+  const otherDraft = _getOtherUserDraft(wfId);
+  if (otherDraft) {
+    setTimeout(() => {
+      _showCollabNotification(otherDraft.user, otherDraft.time);
+    }, 600);
+  }
 
   // Simulate abnormal exit recovery dialog for draft workflows
   if (wf.status === 'draft' && wf._hasUnsavedDraft) {
@@ -116,7 +136,7 @@ function openDesigner(wsId, wfId) {
           </div>
         </div>
       </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal();showToast('info','已放弃','将加载最新保存版本')">不恢复</button><button class="btn btn-primary" onclick="closeModal();showToast('success','已恢复','草稿已恢复到上次编辑状态')">恢复草稿</button></div></div>`);
-    }, 500);
+    }, 800);
   }
   wf._hasUnsavedDraft = true;
 }
@@ -217,6 +237,68 @@ function stopAutoSave() {
   if (designerAutoSaveTimer) { clearInterval(designerAutoSaveTimer); designerAutoSaveTimer = null; }
 }
 
+// --- Multi-person Collaboration ---
+let designerOnlineUsers = []; // Simulated online users
+
+function _getSimulatedOnlineUsers(wfId) {
+  // Simulate different online users for different workflows
+  const allUsers = [
+    { id: 101, name: 'Sukey Wu', avatar: 'W', color: '#6366f1', isMe: true },
+    { id: 102, name: 'Admin', avatar: 'A', color: '#0ea5e9' },
+    { id: 103, name: '张三', avatar: '张', color: '#f59e0b' },
+    { id: 104, name: '李四', avatar: '李', color: '#10b981' },
+    { id: 107, name: '钱七', avatar: '钱', color: '#ef4444' },
+  ];
+  const me = allUsers[0];
+  if (wfId === 1) return [me, allUsers[1], allUsers[2]]; // 3 users on 酒店搜索
+  if (wfId === 2) return [me, allUsers[4]]; // 2 users on 酒店预订确认
+  if (wfId === 7) return [me, allUsers[4], allUsers[3]]; // 3 users on 预订数据报表
+  return [me]; // Only me
+}
+
+function _getOtherUserDraft(wfId) {
+  // Simulate another user having an unsaved draft for certain workflows
+  if (wfId === 1) return { user: '张三', time: '16:42' };
+  if (wfId === 7) return { user: '钱七', time: '15:18' };
+  return null;
+}
+
+function _showCollabNotification(userName, time) {
+  // Non-blocking notification banner for other user's draft
+  const shell = document.getElementById('designerShell');
+  if (!shell) return;
+  const banner = document.createElement('div');
+  banner.className = 'collab-draft-notification';
+  banner.innerHTML = `
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    <span><strong>${userName}</strong> 有未保存的草稿，最后编辑于 ${time}</span>
+    <button onclick="this.parentElement.remove()" style="background:none;border:none;cursor:pointer;color:inherit;padding:2px;display:flex">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M18 6 6 18M6 6l12 12"/></svg>
+    </button>
+  `;
+  shell.appendChild(banner);
+  // Auto-dismiss after 8 seconds
+  setTimeout(() => { if (banner.parentElement) banner.remove(); }, 8000);
+}
+
+function _renderOnlineUsers() {
+  if (!designerOnlineUsers || designerOnlineUsers.length <= 1) return '';
+  const maxShow = 4;
+  const users = designerOnlineUsers;
+  const showUsers = users.slice(0, maxShow);
+  const overflow = users.length - maxShow;
+  return `<div class="collab-users" title="当前 ${users.length} 人在线编辑">
+    ${showUsers.map((u, i) => `<div class="collab-avatar${u.isMe ? ' is-me' : ''}" style="background:${u.color};z-index:${users.length - i}" title="${u.name}${u.isMe ? '（你）' : ''}">${u.avatar}</div>`).join('')}
+    ${overflow > 0 ? `<div class="collab-avatar collab-overflow" style="z-index:0">+${overflow}</div>` : ''}
+  </div>`;
+}
+
+function _getDraftSnapshotInfo() {
+  const wf = designerWf;
+  if (!wf || !wf._draftSnapshots || wf._draftSnapshots.length === 0) return null;
+  return wf._draftSnapshots[wf._draftSnapshots.length - 1];
+}
+
 // --- Main Render ---
 function renderDesigner() {
   const shell = document.getElementById('designerShell');
@@ -227,7 +309,6 @@ function renderDesigner() {
   const statusClass = { draft: 'status-draft', published: 'status-published', disabled: 'status-disabled' };
 
   shell.innerHTML = `
-    ${designerReadonly ? `<div class="readonly-banner">${icons.lock} <span>当前 ${designerReadonlyUser} 正在编辑，您处于只读模式</span> <button class="btn btn-sm" style="height:24px;padding:0 12px;background:rgba(217,119,6,0.15);color:var(--md-warning);border-radius:var(--radius-full);font-size:11px;margin-left:var(--space-2)" onclick="showToast('info','提示','刷新页面可重新尝试获取编辑权限')">刷新重试</button></div>` : ''}
     ${designerDebugMode ? `<div class="debug-mode-bar active">${icons.play} <span>调试模式 - 画布只读</span> <button class="btn btn-sm" style="height:24px;padding:0 12px;background:rgba(0,90,193,0.15);color:var(--md-info);border-radius:var(--radius-full);font-size:11px" onclick="exitDebugMode()">退出调试</button></div>` : ''}
     <div class="designer-toolbar">
       <div class="designer-toolbar-left">
@@ -256,11 +337,13 @@ function renderDesigner() {
         </button>
       </div>
       <div class="designer-toolbar-right">
-        <button class="btn btn-secondary btn-sm" onclick="enterDebugMode()" ${designerDebugMode || designerReadonly ? 'disabled style="opacity:0.5"' : ''} title="调试运行工作流 (模拟执行)">${icons.play}<span>调试</span></button>
-        <button class="btn btn-secondary btn-sm" onclick="designerSave()" ${designerReadonly ? 'disabled style="opacity:0.5"' : ''} title="手动保存草稿 (Ctrl+S)">${icons.check}<span>保存</span></button>
+        ${_renderOnlineUsers()}
+        ${designerOnlineUsers.length > 1 ? '<span class="toolbar-divider"></span>' : ''}
+        <button class="btn btn-secondary btn-sm" onclick="enterDebugMode()" ${designerDebugMode ? 'disabled style="opacity:0.5"' : ''} title="调试运行工作流 (模拟执行)">${icons.play}<span>调试</span></button>
+        <button class="btn btn-secondary btn-sm" onclick="designerSave()" title="手动保存草稿 (Ctrl+S)">${icons.check}<span>保存</span></button>
         <button class="btn btn-secondary btn-sm" onclick="showDesignerSettings()" title="工作流全局设置">${icons.settings}<span>设置</span></button>
         <button class="btn btn-secondary btn-sm" onclick="showDesignerVersions()" title="查看版本发布历史">${icons.history}<span>版本</span></button>
-        <button class="btn btn-primary btn-sm" onclick="showPublishDialog()" ${wf.status === 'disabled' || designerReadonly ? 'disabled style="opacity:0.5"' : ''} title="发布当前工作流版本">${icons.arrowUp || icons.check}<span>发布</span></button>
+        <button class="btn btn-primary btn-sm" onclick="showPublishDialog()" ${wf.status === 'disabled' ? 'disabled style="opacity:0.5"' : ''} title="发布当前工作流版本">${icons.arrowUp || icons.check}<span>发布</span></button>
       </div>
     </div>
 
@@ -1853,9 +1936,81 @@ function showPublishDialog() {
     return;
   }
 
+  // Version conflict detection: check if someone else published since we started editing
+  const baseVer = wf._baseVersion || 0;
+  const currentVer = wf.version || 0;
+  if (baseVer > 0 && currentVer > baseVer) {
+    // Another user has published a newer version while we were editing
+    _showVersionConflictDialog(baseVer, currentVer);
+    return;
+  }
+
+  _showPublishForm();
+}
+
+function _showVersionConflictDialog(baseVer, currentVer) {
+  const wf = designerWf;
+  const lastPublish = wf.versions && wf.versions.length > 0 ? wf.versions[0] : null;
+  const publisherName = lastPublish ? lastPublish.publisher : '其他用户';
+  const publishTime = lastPublish ? lastPublish.publishedAt : '未知';
+
+  showModal(`<div class="modal" style="max-width:520px"><div class="modal-header"><h2 class="modal-title" style="color:var(--md-warning)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20" style="vertical-align:-4px;margin-right:6px"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+    版本冲突</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div>
+    <div class="modal-body">
+      <div class="conflict-info-card">
+        <div class="conflict-info-row">
+          <span class="conflict-label">您的编辑基于</span>
+          <span class="conflict-version">v${baseVer}</span>
+        </div>
+        <div class="conflict-arrow">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--md-outline)" stroke-width="2" width="16" height="16"><path d="m6 9 6 6 6-6"/></svg>
+        </div>
+        <div class="conflict-info-row">
+          <span class="conflict-label">当前已发布版本</span>
+          <span class="conflict-version current">v${currentVer}</span>
+        </div>
+        <div class="conflict-detail">由 <strong>${publisherName}</strong> 于 ${publishTime} 发布</div>
+      </div>
+      <p style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant);line-height:1.6;margin-top:var(--space-4)">
+        在您编辑期间，其他成员已发布了新版本。请选择处理方式：
+      </p>
+    </div>
+    <div class="modal-footer" style="flex-direction:column;gap:var(--space-2);align-items:stretch">
+      <button class="btn btn-primary" onclick="closeModal();_forcePublish()" style="justify-content:center">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="m5 12 5 5L20 7"/></svg>
+        以我的版本覆盖发布
+      </button>
+      <button class="btn btn-secondary" onclick="closeModal();_rebaseAndPublish()" style="justify-content:center">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
+        基于最新版本重新编辑
+      </button>
+      <button class="btn btn-secondary" onclick="closeModal()" style="justify-content:center;color:var(--md-outline)">取消</button>
+    </div>
+  </div>`);
+}
+
+function _forcePublish() {
+  // User chose to override: proceed with normal publish flow
+  _showPublishForm();
+}
+
+function _rebaseAndPublish() {
+  // Simulate rebasing to the latest version
+  const wf = designerWf;
+  wf._baseVersion = wf.version || 0;
+  showToast('info', '已更新基准版本', `当前编辑已基于 v${wf._baseVersion}，请检查后重新发布`);
+  renderDesigner();
+}
+
+function _showPublishForm() {
+  const wf = designerWf;
   const newVersion = (wf.version || 0) + 1;
   const nodeCount = designerNodes.length;
   const connCount = designerConnections.length;
+  const lastSnapshot = _getDraftSnapshotInfo();
+  const snapshotInfo = lastSnapshot ? `<div class="publish-snapshot-info"><span>最后保存：${lastSnapshot.savedBy} · ${lastSnapshot.savedAt}</span><span>基于 v${lastSnapshot.baseVersion}</span></div>` : '';
+
   showModal(`<div class="modal" style="max-width:480px"><div class="modal-header"><h2 class="modal-title">发布工作流</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
     <div class="publish-summary">
       <div class="publish-version-badge">v${newVersion}</div>
@@ -1864,6 +2019,7 @@ function showPublishDialog() {
         <span class="publish-stats">${nodeCount} 个节点 / ${connCount} 条连线</span>
       </div>
     </div>
+    ${snapshotInfo}
     <div class="config-field" style="margin-top:var(--space-4)"><div class="config-field-label">版本说明 <span class="required">*</span></div><textarea class="form-textarea" id="publishNote" placeholder="请描述本次发布的变更内容..." maxlength="500" style="min-height:80px;width:100%;box-sizing:border-box;resize:vertical"></textarea><div class="form-error hidden" id="publishNoteError"></div></div>
   </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="executePublish(${newVersion})">确认发布</button></div></div>`);
 }
@@ -1889,6 +2045,8 @@ function executePublish(version) {
   wf.version = version;
   wf.status = 'published';
   wf.editedAt = ts;
+  // Update base version after publish
+  wf._baseVersion = version;
 
   closeModal();
   // Exit debug mode after publishing so canvas remains editable
@@ -2201,15 +2359,28 @@ function toggleMinimap() {
 }
 
 function designerSave() {
-  if (designerReadonly) return;
   const indicator = document.getElementById('designerSaveIndicator');
   if (indicator) {
     indicator.innerHTML = `<svg class="spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M21 12a9 9 0 11-6.219-8.56"/></svg> <span>保存中…</span>`;
   }
   setTimeout(() => {
+    // Record draft snapshot metadata
+    const wf = designerWf;
+    const now = new Date();
+    const ts = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+    if (wf) {
+      if (!wf._draftSnapshots) wf._draftSnapshots = [];
+      wf._draftSnapshots.push({
+        savedBy: 'Sukey Wu',
+        savedAt: ts,
+        baseVersion: wf._baseVersion || wf.version || 0,
+        nodeCount: designerNodes.length,
+        connCount: designerConnections.length
+      });
+    }
     const el = document.getElementById('designerSaveIndicator');
-    if (el) el.innerHTML = `${icons.check} <span>已保存</span>`;
-    showToast('success', '已保存', '草稿已手动保存');
+    if (el) el.innerHTML = `${icons.check} <span>Sukey Wu · ${ts.slice(11)}</span>`;
+    showToast('success', '已保存', `草稿已保存（基于 v${wf._baseVersion || wf.version || 0}）`);
   }, 600);
 }
 
