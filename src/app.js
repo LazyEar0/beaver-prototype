@@ -98,6 +98,7 @@ let listState = { search: '', authFilter: 'all', refFilter: 'all', creatorFilter
 let searchTimer = null;
 let itemSortField = null;
 let itemSortAsc = true;
+let itemSearchKeyword = '';
 let itemPage = 1;
 let itemPageSize = 10;
 let syncLogPage = 1;
@@ -347,7 +348,7 @@ function renderDatasourceModule(content, breadcrumb) {
     content.innerHTML = renderDsDetailPage(ds);
   }
 }
-function navigateTo(view, dsId) { currentView = view; currentDsId = dsId || null; if (view === 'detail') currentTab = 'items'; render(); }
+function navigateTo(view, dsId) { currentView = view; currentDsId = dsId || null; if (view === 'detail') { currentTab = 'items'; itemSearchKeyword = ''; itemPage = 1; } render(); }
 
 function renderDsListPage() {
   const filtered = getFilteredDataSources();
@@ -547,15 +548,20 @@ function renderDsDetailPage(ds) {
     <div class="detail-header-actions"><button class="btn btn-secondary" onclick="showEditDsModal(${ds.id})">${icons.edit}<span>编辑</span></button><button class="btn btn-danger" onclick="showDeleteDsModal(${ds.id})">${icons.trash}<span>删除</span></button></div></div>
     <div class="tabs-container"><div class="tabs-header">${tabItems.map(t => `<div class="tab-item ${currentTab === t.key ? 'active' : ''}" onclick="switchTab('${t.key}')">${t.label}${t.count !== '' ? ` <span class="badge badge-type">${t.count}</span>` : ''}</div>`).join('')}</div><div class="tab-content">${currentTab === 'items' ? renderDataItemsTab(ds) : currentTab === 'auth' ? renderAuthTab(ds) : renderSyncTab(ds)}</div></div>`;
 }
-function switchTab(tab) { currentTab = tab; syncLogPage = 1; itemPage = 1; render(); }
+function switchTab(tab) { currentTab = tab; syncLogPage = 1; itemPage = 1; itemSearchKeyword = ''; render(); }
 
 function renderDataItemsTab(ds) {
   if (ds.items.length === 0) return renderEmptyState('dataItems');
-  const sorted = [...ds.items];
+  let filtered = [...ds.items];
+  if (itemSearchKeyword) {
+    const kw = itemSearchKeyword.toLowerCase();
+    filtered = filtered.filter(item => item.key.toLowerCase().includes(kw) || String(item.value).toLowerCase().includes(kw));
+  }
+  const sorted = filtered;
   if (itemSortField) sorted.sort((a, b) => { const va = String(a[itemSortField]).toLowerCase(), vb = String(b[itemSortField]).toLowerCase(); return itemSortAsc ? va.localeCompare(vb) : vb.localeCompare(va); });
   else sorted.sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
   const total = sorted.length;
-  const totalPages = Math.ceil(total / itemPageSize);
+  const totalPages = Math.max(1, Math.ceil(total / itemPageSize));
   if (itemPage > totalPages) itemPage = totalPages;
   const start = (itemPage - 1) * itemPageSize;
   const paged = sorted.slice(start, start + itemPageSize);
@@ -564,12 +570,14 @@ function renderDataItemsTab(ds) {
   const addBtn = addBtnDisabled
     ? `<span title="已达数据项上限（500条），无法继续添加" style="cursor:not-allowed"><button class="btn btn-primary btn-sm" disabled style="opacity:0.5;cursor:not-allowed;pointer-events:none">${icons.plus}<span>添加数据项</span></button></span>`
     : `<button class="btn btn-primary btn-sm" onclick="showAddItemModal(${ds.id})">${icons.plus}<span>添加数据项</span></button>`;
-  return `<div class="tab-toolbar"><div class="tab-toolbar-left"><span class="item-count">共 <strong>${ds.items.length}</strong> 条</span></div><div class="tab-toolbar-right">${addBtn}</div></div>
-  <div class="table-wrapper"><table class="data-table"><thead><tr><th style="width:180px" class="sortable" onclick="toggleItemSort('key')">Key <span class="sort-icon">${si('key')}</span></th><th class="sortable" onclick="toggleItemSort('value')">Value <span class="sort-icon">${si('value')}</span></th><th style="width:90px">类型</th><th style="width:130px">更新时间</th><th style="width:90px">操作</th></tr></thead><tbody>
+  const searchHtml = `<div class="filter-search" style="width:240px;height:34px">${icons.search}<input type="text" placeholder="搜索 Key / Value ..." value="${escHtml(itemSearchKeyword)}" oninput="onItemSearch(this.value)" /></div>`;
+  return `<div class="tab-toolbar"><div class="tab-toolbar-left">${searchHtml}</div><div class="tab-toolbar-right">${addBtn}</div></div>
+  ${total === 0 && itemSearchKeyword ? `<div style="padding:var(--space-12) var(--space-8);text-align:center;color:var(--md-on-surface-variant)"><div style="font-size:var(--font-size-lg);margin-bottom:var(--space-2)">未找到匹配的数据项</div><div style="font-size:var(--font-size-sm)">尝试调整搜索关键词</div></div>` : `<div class="table-wrapper"><table class="data-table"><thead><tr><th style="width:180px" class="sortable" onclick="toggleItemSort('key')">Key <span class="sort-icon">${si('key')}</span></th><th class="sortable" onclick="toggleItemSort('value')">Value <span class="sort-icon">${si('value')}</span></th><th style="width:90px">类型</th><th style="width:130px">更新时间</th><th style="width:90px">操作</th></tr></thead><tbody>
   ${paged.map(item => `<tr><td style="width:180px"><code class="item-key">${item.key}</code></td><td><div style="max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(item.value)}">${item.value}</div></td><td><span class="badge badge-type">${item.type}</span></td><td style="font-size:var(--font-size-xs);color:var(--md-outline)">${item.updatedAt || '-'}</td><td><div class="table-actions"><button class="table-action-btn" title="编辑" onclick="showEditItemModal(${ds.id}, '${item.key}')">${icons.edit}</button><button class="table-action-btn danger" title="删除" onclick="deleteItem(${ds.id}, '${item.key}')">${icons.trash}</button></div></td></tr>`).join('')}
   </tbody></table></div>
-  ${totalPages > 1 ? `<div class="pagination"><div class="pagination-info"><span>共 ${total} 条记录</span><span class="pagination-size"><label>每页</label><select onchange="onItemPageSizeChange(this.value)">${[10,20,50].map(n => `<option value="${n}" ${itemPageSize === n ? 'selected' : ''}>${n}</option>`).join('')}</select><label>条</label></span></div><div class="pagination-controls"><button class="pagination-btn" ${itemPage <= 1 ? 'disabled' : ''} onclick="onItemPageChange(${itemPage - 1})">${icons.chevronLeft}</button>${Array.from({length: totalPages}, (_, i) => i + 1).map(p => `<button class="pagination-btn ${p === itemPage ? 'active' : ''}" onclick="onItemPageChange(${p})">${p}</button>`).join('')}<button class="pagination-btn" ${itemPage >= totalPages ? 'disabled' : ''} onclick="onItemPageChange(${itemPage + 1})">${icons.chevronRight}</button></div></div>` : ''}`;
+  ${totalPages > 1 ? `<div class="pagination"><div class="pagination-info"><span class="pagination-size"><label>每页</label><select onchange="onItemPageSizeChange(this.value)">${[10,20,50].map(n => `<option value="${n}" ${itemPageSize === n ? 'selected' : ''}>${n}</option>`).join('')}</select><label>条</label></span></div><div class="pagination-controls"><button class="pagination-btn" ${itemPage <= 1 ? 'disabled' : ''} onclick="onItemPageChange(${itemPage - 1})">${icons.chevronLeft}</button>${Array.from({length: totalPages}, (_, i) => i + 1).map(p => `<button class="pagination-btn ${p === itemPage ? 'active' : ''}" onclick="onItemPageChange(${p})">${p}</button>`).join('')}<button class="pagination-btn" ${itemPage >= totalPages ? 'disabled' : ''} onclick="onItemPageChange(${itemPage + 1})">${icons.chevronRight}</button></div></div>` : ''}`}`;
 }
+function onItemSearch(val) { itemSearchKeyword = val; itemPage = 1; render(); }
 function toggleItemSort(field) { if (itemSortField === field) itemSortAsc = !itemSortAsc; else { itemSortField = field; itemSortAsc = true; } render(); }
 
 function renderAuthTab(ds) {
@@ -1166,12 +1174,13 @@ function renderWsWorkflowsTab(ws) {
         const subF = getSubFolderCount(ws.id, f.id), subW = getSubWfCount(ws.id, f.id);
         return `<div class="content-list-item" ondblclick="navigateIntoFolder(${f.id}, '${f.name.replace(/'/g, "\\'")}')">
           <div class="content-item-main" style="flex:2.5"><div class="content-item-icon folder-icon">${icons.folder}</div><div><div class="content-item-name" onclick="navigateIntoFolder(${f.id}, '${f.name.replace(/'/g, "\\'")}')" style="cursor:pointer">${f.name}</div><div class="content-item-desc">${subW} 个工作流${subF > 0 ? `，${subF} 个子文件夹` : ''}</div></div></div>
-          <div style="flex:0.7"><span class="badge badge-type" style="font-size:11px">${icons.folder} 文件夹</span></div>
-          <div style="flex:0.6"></div><div style="flex:0.6"></div>
+          <div style="flex:0.7"><span style="font-size:var(--font-size-xs);color:var(--md-outline)">—</span></div>
+          <div style="flex:0.6"><span style="font-size:var(--font-size-xs);color:var(--md-outline)">—</span></div>
+          <div style="flex:0.6"><span class="badge badge-type" style="font-size:11px">${icons.folder} 文件夹</span></div>
           <div style="flex:0.8;font-size:var(--font-size-sm);color:var(--md-on-surface-variant)">${f.creator}</div>
-          <div style="flex:0.8"></div>
+          <div style="flex:0.8"><span style="font-size:var(--font-size-xs);color:var(--md-outline)">—</span></div>
           <div style="flex:0.9;font-size:var(--font-size-sm);color:var(--md-outline)">${f.editedAt}</div>
-          <div class="content-item-actions" style="width:80px">
+          <div class="content-item-actions" style="width:110px">
             ${isMemberOrAbove ? `<button class="table-action-btn" title="编辑" onclick="showEditFolderModal(${f.id})">${icons.edit}</button><div class="more-menu-wrapper"><button class="table-action-btn" title="更多" onclick="event.stopPropagation();toggleMoreMenu(this)">${icons.chevronDown}</button><div class="more-menu-panel hidden"><div class="more-menu-item" onclick="showMoveFolderModal(${f.id})">${icons.move}<span>移动</span></div></div></div>` : ''}
           </div></div>`;
       }).join('') : ''}
@@ -1372,6 +1381,97 @@ function moveFolder(folderId, targetParentId) {
   closeModal(); showToast('success', '移动成功', '文件夹已移动'); render();
 }
 
+// --- Person Picker (searchable, multi-select, company-wide) ---
+let _personPickerState = {};
+function buildPersonPickerHtml(pickerId, preSelectedIds, multi) {
+  _personPickerState[pickerId] = { selected: [...preSelectedIds], search: '', open: false, multi: !!multi };
+  const selectedUsers = preSelectedIds.map(id => ssoUsers.find(u => u.id === id)).filter(Boolean);
+  const tagsHtml = selectedUsers.map(u => `<span class="pp-tag">${u.avatar ? `<span class="pp-tag-avatar">${u.avatar}</span>` : ''}${u.name}<button class="pp-tag-remove" onclick="event.stopPropagation();personPickerRemove('${pickerId}',${u.id})">×</button></span>`).join('');
+  return `<div class="person-picker" id="pp_${pickerId}">
+    <div class="pp-trigger" onclick="personPickerToggle('${pickerId}')">
+      <div class="pp-tags-area">${tagsHtml || `<span class="pp-placeholder">搜索并选择负责人...</span>`}</div>
+      <span class="pp-arrow">${icons.chevronDown}</span>
+    </div>
+    <div class="pp-dropdown hidden" id="ppDrop_${pickerId}">
+      <div class="pp-search-box">${icons.search}<input type="text" class="pp-search-input" placeholder="搜索姓名或部门..." oninput="personPickerSearch('${pickerId}',this.value)" onclick="event.stopPropagation()" /></div>
+      <div class="pp-list" id="ppList_${pickerId}">${buildPersonPickerList(pickerId, '')}</div>
+    </div>
+  </div>`;
+}
+function buildPersonPickerList(pickerId, search) {
+  const st = _personPickerState[pickerId]; if (!st) return '';
+  const term = (search || '').toLowerCase();
+  const filtered = ssoUsers.filter(u => !term || u.name.toLowerCase().includes(term) || (u.dept && u.dept.toLowerCase().includes(term)));
+  if (filtered.length === 0) return '<div class="pp-empty">未找到匹配的人员</div>';
+  return filtered.map(u => {
+    const isSelected = st.selected.includes(u.id);
+    return `<div class="pp-item ${isSelected ? 'is-selected' : ''}" onclick="event.stopPropagation();personPickerSelect('${pickerId}',${u.id})">
+      <span class="pp-item-avatar">${u.avatar}</span>
+      <div class="pp-item-info"><span class="pp-item-name">${u.name}</span><span class="pp-item-dept">${u.dept || ''}</span></div>
+      ${isSelected ? `<span class="pp-item-check">${icons.check}</span>` : ''}
+    </div>`;
+  }).join('');
+}
+function personPickerToggle(pickerId) {
+  const drop = document.getElementById(`ppDrop_${pickerId}`);
+  if (!drop) return;
+  const isOpen = !drop.classList.contains('hidden');
+  // Close all other pickers
+  document.querySelectorAll('.pp-dropdown').forEach(d => d.classList.add('hidden'));
+  if (!isOpen) {
+    drop.classList.remove('hidden');
+    const inp = drop.querySelector('.pp-search-input');
+    if (inp) { inp.value = ''; setTimeout(() => inp.focus(), 50); }
+    const st = _personPickerState[pickerId];
+    if (st) { st.open = true; st.search = ''; }
+    document.getElementById(`ppList_${pickerId}`).innerHTML = buildPersonPickerList(pickerId, '');
+  }
+}
+function personPickerSearch(pickerId, val) {
+  const st = _personPickerState[pickerId]; if (!st) return;
+  st.search = val;
+  document.getElementById(`ppList_${pickerId}`).innerHTML = buildPersonPickerList(pickerId, val);
+}
+function personPickerSelect(pickerId, userId) {
+  const st = _personPickerState[pickerId]; if (!st) return;
+  if (st.multi) {
+    const idx = st.selected.indexOf(userId);
+    if (idx >= 0) st.selected.splice(idx, 1); else st.selected.push(userId);
+  } else {
+    st.selected = [userId];
+    document.getElementById(`ppDrop_${pickerId}`)?.classList.add('hidden');
+  }
+  // Update tags display
+  refreshPersonPickerTags(pickerId);
+  // Update list checkmarks
+  document.getElementById(`ppList_${pickerId}`).innerHTML = buildPersonPickerList(pickerId, st.search);
+}
+function personPickerRemove(pickerId, userId) {
+  const st = _personPickerState[pickerId]; if (!st) return;
+  st.selected = st.selected.filter(id => id !== userId);
+  refreshPersonPickerTags(pickerId);
+  const listEl = document.getElementById(`ppList_${pickerId}`);
+  if (listEl) listEl.innerHTML = buildPersonPickerList(pickerId, st.search);
+}
+function refreshPersonPickerTags(pickerId) {
+  const st = _personPickerState[pickerId]; if (!st) return;
+  const tagsArea = document.querySelector(`#pp_${pickerId} .pp-tags-area`);
+  if (!tagsArea) return;
+  const selectedUsers = st.selected.map(id => ssoUsers.find(u => u.id === id)).filter(Boolean);
+  tagsArea.innerHTML = selectedUsers.length > 0
+    ? selectedUsers.map(u => `<span class="pp-tag">${u.avatar ? `<span class="pp-tag-avatar">${u.avatar}</span>` : ''}${u.name}<button class="pp-tag-remove" onclick="event.stopPropagation();personPickerRemove('${pickerId}',${u.id})">×</button></span>`).join('')
+    : `<span class="pp-placeholder">搜索并选择负责人...</span>`;
+}
+function getPersonPickerSelectedIds(pickerId) {
+  const st = _personPickerState[pickerId]; return st ? [...st.selected] : [];
+}
+// Close person picker on outside click
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.person-picker')) {
+    document.querySelectorAll('.pp-dropdown').forEach(d => d.classList.add('hidden'));
+  }
+});
+
 // --- Workflow CRUD ---
 function showCreateWfModal() {
   const ws = workspaces.find(w => w.id === wsCurrentId);
@@ -1380,7 +1480,7 @@ function showCreateWfModal() {
   <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">工作流编号 <span class="required">*</span></label><input type="text" class="form-input" id="wfCode" placeholder="英文、数字、下划线、连字符" maxlength="30" oninput="this.classList.remove('error');document.getElementById('wfCodeError').classList.add('hidden')" onblur="validateRequiredOnBlur(this,'wfCodeError','请输入工作流编号')" /><div class="form-error hidden" id="wfCodeError"></div></div>
   <div style="display:flex;gap:var(--space-4);margin-bottom:var(--space-4)">
     <div class="form-group" style="flex:1"><label class="form-label">工作流类型 <span class="required">*</span></label><select class="form-input" id="wfType"><option value="app">应用流</option><option value="chat">对话流</option></select></div>
-    <div class="form-group" style="flex:1"><label class="form-label">流程负责人 <span class="required">*</span></label><select class="form-input" id="wfOwner">${ws.members.filter(m => m.role !== 'viewer').map(m => `<option value="${m.userId}">${m.name}</option>`).join('')}</select></div>
+    <div class="form-group" style="flex:1"><label class="form-label">流程负责人 <span class="required">*</span></label>${buildPersonPickerHtml('wfOwner', [101], true)}</div>
   </div>
   <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">描述</label><textarea class="form-textarea" id="wfDesc" placeholder="选填，500字以内" maxlength="500" rows="2"></textarea></div>
   <div class="form-group"><label class="form-label">允许被引用</label><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="wfAllowRef" /><span style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant)">开启后该流程可作为子流程被其他工作流引用</span></label></div>
@@ -1391,7 +1491,7 @@ function createWf() {
   const rawName = document.getElementById('wfName').value, rawCode = document.getElementById('wfCode').value;
   const name = rawName.trim(), code = rawCode.trim(), desc = document.getElementById('wfDesc').value.trim();
   const type = document.getElementById('wfType').value, allowRef = document.getElementById('wfAllowRef').checked;
-  const ownerId = parseInt(document.getElementById('wfOwner').value);
+  const ownerIds = getPersonPickerSelectedIds('wfOwner');
   let hasError = false;
   const ni = document.getElementById('wfName'), ne = document.getElementById('wfNameError'); ni.classList.remove('error'); ne.classList.add('hidden');
   const ci = document.getElementById('wfCode'), ce = document.getElementById('wfCodeError'); ci.classList.remove('error'); ce.classList.add('hidden');
@@ -1404,9 +1504,10 @@ function createWf() {
   else if (!/^[a-zA-Z0-9_-]+$/.test(code)) { ci.classList.add('error'); ce.textContent = '工作流编号仅支持英文、数字、下划线和连字符'; ce.classList.remove('hidden'); hasError = true; }
   else { const allCodes = Object.values(wsWorkflows).flat().map(wf => wf.code); if (allCodes.includes(code)) { ci.classList.add('error'); ce.textContent = '该编号已被使用，请更换其他编号'; ce.classList.remove('hidden'); hasError = true; } }
   if (hasError) return;
+  if (ownerIds.length === 0) { showToast('error', '校验失败', '请选择至少一位流程负责人'); return; }
   if (!wsWorkflows[wsCurrentId]) wsWorkflows[wsCurrentId] = [];
   const now = new Date().toISOString();
-  wsWorkflows[wsCurrentId].push({ id: wfNextId++, name, code, desc, type, allowRef, status: 'draft', version: 0, creator: 'Sukey Wu', owners: [ownerId], folderId: wsCurrentFolderId, wsId: wsCurrentId, createdAt: now.slice(0, 10), editedAt: now.slice(0, 16).replace('T', ' '), lastRun: null, runningCount: 0, execCount: 0, debugPassed: false, versions: [] });
+  wsWorkflows[wsCurrentId].push({ id: wfNextId++, name, code, desc, type, allowRef, status: 'draft', version: 0, creator: 'Sukey Wu', owners: ownerIds, folderId: wsCurrentFolderId, wsId: wsCurrentId, createdAt: now.slice(0, 10), editedAt: now.slice(0, 16).replace('T', ' '), lastRun: null, runningCount: 0, execCount: 0, debugPassed: false, versions: [] });
   closeModal(); showToast('success', '创建成功', `工作流「${name}」已创建，正在进入流程设计器...`); render(); setTimeout(() => openDesigner(wsCurrentId, wfNextId - 1), 500);
 }
 function showDeleteWfModal(wfId) {
@@ -1440,14 +1541,14 @@ function showCopyWfModal(wfId) {
   <div style="padding:var(--space-3);background:var(--md-surface);border-radius:var(--radius-lg);margin-bottom:var(--space-4);font-size:var(--font-size-sm);color:var(--md-on-surface-variant)">将基于「${wf.name}」创建副本，副本为草稿状态，不继承原负责人。</div>
   <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">副本名称 <span class="required">*</span></label><input type="text" class="form-input" id="copyWfName" value="${copyName}" maxlength="50" oninput="this.classList.remove('error');document.getElementById('copyWfNameError').classList.add('hidden')" /><div class="form-error hidden" id="copyWfNameError"></div></div>
   <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">副本编号 <span class="required">*</span></label><input type="text" class="form-input" id="copyWfCode" value="${copyCode}" maxlength="30" oninput="this.classList.remove('error');document.getElementById('copyWfCodeError').classList.add('hidden')" /><div class="form-error hidden" id="copyWfCodeError"></div></div>
-  <div class="form-group"><label class="form-label">流程负责人 <span class="required">*</span></label><select class="form-input" id="copyWfOwner">${ws.members.filter(m => m.role !== 'viewer').map(m => `<option value="${m.userId}">${m.name}</option>`).join('')}</select></div>
+  <div class="form-group"><label class="form-label">流程负责人 <span class="required">*</span></label>${buildPersonPickerHtml('copyWfOwner', [], true)}</div>
   </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="doCopyWf(${wfId})">确认复制</button></div></div>`);
 }
 function doCopyWf(wfId) {
   const wf = (wsWorkflows[wsCurrentId] || []).find(x => x.id === wfId); if (!wf) return;
   const rawName = document.getElementById('copyWfName').value, rawCode = document.getElementById('copyWfCode').value;
   const name = rawName.trim(), code = rawCode.trim();
-  const ownerId = parseInt(document.getElementById('copyWfOwner').value);
+  const ownerIds = getPersonPickerSelectedIds('copyWfOwner');
   let hasError = false;
   const ni = document.getElementById('copyWfName'), ne = document.getElementById('copyWfNameError'); ni.classList.remove('error'); ne.classList.add('hidden');
   const ci = document.getElementById('copyWfCode'), ce = document.getElementById('copyWfCodeError'); ci.classList.remove('error'); ce.classList.add('hidden');
@@ -1457,9 +1558,10 @@ function doCopyWf(wfId) {
   else if (!/^[a-zA-Z0-9_-]+$/.test(code)) { ci.classList.add('error'); ce.textContent = '编号仅支持英文、数字、下划线和连字符'; ce.classList.remove('hidden'); hasError = true; }
   else { const allCodes = Object.values(wsWorkflows).flat().map(x => x.code); if (allCodes.includes(code)) { ci.classList.add('error'); ce.textContent = '该编号已被使用'; ce.classList.remove('hidden'); hasError = true; } }
   if (hasError) return;
+  if (ownerIds.length === 0) { showToast('error', '校验失败', '请选择至少一位流程负责人'); return; }
   if (!wsWorkflows[wsCurrentId]) wsWorkflows[wsCurrentId] = [];
   const now = new Date().toISOString();
-  wsWorkflows[wsCurrentId].push({ ...wf, id: wfNextId++, name, code, status: 'draft', version: 0, creator: 'Sukey Wu', owners: [ownerId], execCount: 0, runningCount: 0, lastRun: null, debugPassed: false, versions: [], createdAt: now.slice(0, 10), editedAt: now.slice(0, 16).replace('T', ' ') });
+  wsWorkflows[wsCurrentId].push({ ...wf, id: wfNextId++, name, code, status: 'draft', version: 0, creator: 'Sukey Wu', owners: ownerIds, execCount: 0, runningCount: 0, lastRun: null, debugPassed: false, versions: [], createdAt: now.slice(0, 10), editedAt: now.slice(0, 16).replace('T', ' ') });
   closeModal(); showToast('success', '复制成功', `已创建副本「${name}」`); render();
 }
 function showMoveWfModal(wfId) {
