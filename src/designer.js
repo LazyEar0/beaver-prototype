@@ -31,6 +31,7 @@ let designerDraggingNodeType = null;
 let designerDraggingExistingNode = null;
 let designerDragOffset = { x: 0, y: 0 };
 let designerConnecting = null; // { fromNodeId, fromPort }
+let designerConnectingMouse = null; // { x, y } canvas coordinates for temp line
 let designerAutoSaveTimer = null;
 let designerReadonly = false; // Edit lock
 let designerReadonlyUser = ''; // Who holds the lock
@@ -1114,6 +1115,21 @@ function onCanvasMouseMove(e) {
     updateCanvasTransform();
   }
 
+  // Drag-to-connect: update temp line
+  if (designerConnecting) {
+    const rect = document.getElementById('canvasContainer').getBoundingClientRect();
+    designerConnectingMouse = {
+      x: (e.clientX - rect.left - designerPanX) / designerZoom,
+      y: (e.clientY - rect.top - designerPanY) / designerZoom,
+    };
+    drawTempConnection();
+    // Highlight port under cursor
+    document.querySelectorAll('.port-hover-target').forEach(p => p.classList.remove('port-hover-target'));
+    const hoverPort = e.target.closest('.canvas-node-port.port-connectable');
+    if (hoverPort) hoverPort.classList.add('port-hover-target');
+    return;
+  }
+
   if (designerDraggingExistingNode) {
     const node = designerNodes.find(n => n.id === designerDraggingExistingNode);
     if (node) {
@@ -1133,6 +1149,11 @@ function onCanvasMouseMove(e) {
 }
 
 function onCanvasMouseUp(e) {
+  // Finish drag-to-connect
+  if (designerConnecting) {
+    endConnection(e);
+    return;
+  }
   // Finish box selection
   if (designerIsBoxSelecting && designerBoxSelectRect) {
     const r = designerBoxSelectRect;
@@ -1213,10 +1234,12 @@ function onNodeMouseDown(e, nodeId) {
   const node = designerNodes.find(n => n.id === nodeId);
   if (!node) return;
 
-  // Check if clicking on a port
+  // Check if clicking on a port (start drag-to-connect)
   if (e.target.closest('.canvas-node-port')) {
-    const port = e.target.closest('.canvas-node-port').getAttribute('data-port');
-    startConnection(nodeId, port);
+    const portEl = e.target.closest('.canvas-node-port');
+    const port = portEl.getAttribute('data-port');
+    if (port === 'in') return; // Only allow dragging FROM output ports
+    startConnection(nodeId, port, e);
     return;
   }
 
@@ -1362,33 +1385,86 @@ function deleteSelectedNode() {
   showToast('success', '已删除', node.name);
 }
 
-// --- Connections ---
-function startConnection(fromNodeId, fromPort) {
-  // For simplicity in prototype, create a connection via modal
-  showModal(`<div class="modal" style="max-width:420px"><div class="modal-header"><h2 class="modal-title">创建连线</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
-    <div class="config-field"><div class="config-field-label">目标节点</div>
-    <select class="config-select" id="connTargetNode">
-      <option value="">选择目标节点...</option>
-      ${designerNodes.filter(n => n.id !== fromNodeId && n.type !== 'trigger').map(n => `<option value="${n.id}">${n.name} (${n.code})</option>`).join('')}
-    </select></div>
-  </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="createConnection(${fromNodeId}, '${fromPort}')">连接</button></div></div>`);
+// --- Connections (Drag-to-Connect) ---
+function startConnection(fromNodeId, fromPort, e) {
+  designerConnecting = { fromNodeId, fromPort };
+  const rect = document.getElementById('canvasContainer').getBoundingClientRect();
+  designerConnectingMouse = {
+    x: (e.clientX - rect.left - designerPanX) / designerZoom,
+    y: (e.clientY - rect.top - designerPanY) / designerZoom,
+  };
+  // Add connecting class to canvas for visual feedback
+  document.getElementById('canvasContainer').classList.add('is-connecting');
+  // Mark all valid target ports
+  document.querySelectorAll('.canvas-node-port.port-in').forEach(p => {
+    const nid = parseInt(p.getAttribute('data-node'));
+    if (nid !== fromNodeId) p.classList.add('port-connectable');
+  });
+  drawTempConnection();
 }
 
-function createConnection(fromNodeId, fromPort) {
-  const targetId = parseInt(document.getElementById('connTargetNode').value);
-  if (!targetId) { showToast('warning', '提示', '请选择目标节点'); return; }
+function drawTempConnection() {
+  if (!designerConnecting || !designerConnectingMouse) return;
+  const fromNode = designerNodes.find(n => n.id === designerConnecting.fromNodeId);
+  if (!fromNode) return;
+  const fromPos = getPortPosition(fromNode, designerConnecting.fromPort);
+  const toX = designerConnectingMouse.x;
+  const toY = designerConnectingMouse.y;
+  const dx = Math.abs(toX - fromPos.x);
+  const cp = Math.max(dx * 0.4, 50);
+  const path = `M${fromPos.x},${fromPos.y} C${fromPos.x + cp},${fromPos.y} ${toX - cp},${toY} ${toX},${toY}`;
+  let tempLine = document.getElementById('tempConnectionLine');
+  if (!tempLine) {
+    const svg = document.getElementById('canvasSvg');
+    const g = svg?.querySelector('g');
+    if (!g) return;
+    tempLine = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    tempLine.id = 'tempConnectionLine';
+    tempLine.setAttribute('fill', 'none');
+    tempLine.setAttribute('stroke', 'var(--md-primary)');
+    tempLine.setAttribute('stroke-width', '2');
+    tempLine.setAttribute('stroke-dasharray', '6 4');
+    tempLine.setAttribute('opacity', '0.7');
+    tempLine.setAttribute('marker-end', 'url(#arrowhead-active)');
+    g.appendChild(tempLine);
+  }
+  tempLine.setAttribute('d', path);
+}
+
+function endConnection(e) {
+  if (!designerConnecting) return;
+  // Check if we dropped on a valid target port
+  const targetPort = e.target.closest('.canvas-node-port.port-in');
+  if (targetPort) {
+    const targetNodeId = parseInt(targetPort.getAttribute('data-node'));
+    completeConnection(designerConnecting.fromNodeId, designerConnecting.fromPort, targetNodeId);
+  }
+  cancelConnection();
+}
+
+function cancelConnection() {
+  designerConnecting = null;
+  designerConnectingMouse = null;
+  const tempLine = document.getElementById('tempConnectionLine');
+  if (tempLine) tempLine.remove();
+  const container = document.getElementById('canvasContainer');
+  if (container) container.classList.remove('is-connecting');
+  document.querySelectorAll('.port-connectable').forEach(p => p.classList.remove('port-connectable'));
+  document.querySelectorAll('.port-hover-target').forEach(p => p.classList.remove('port-hover-target'));
+}
+
+function completeConnection(fromNodeId, fromPort, targetId) {
+  if (!targetId || fromNodeId === targetId) {
+    showToast('warning', '提示', '不允许节点连接到自身'); return;
+  }
 
   // Check for duplicate
   if (designerConnections.some(c => c.from === fromNodeId && c.to === targetId)) {
-    showToast('warning', '提示', '该连线已存在'); closeModal(); return;
-  }
-  // Check for self-connection
-  if (fromNodeId === targetId) {
-    showToast('warning', '提示', '不允许节点连接到自身'); closeModal(); return;
+    showToast('warning', '提示', '该连线已存在'); return;
   }
   // Cycle detection
   if (detectCycle(fromNodeId, targetId)) {
-    showToast('error', '检测到环', '该连线会形成循环依赖，不允许创建'); closeModal(); return;
+    showToast('error', '检测到环', '该连线会形成循环依赖，不允许创建'); return;
   }
 
   designerConnections.push({
@@ -1400,7 +1476,6 @@ function createConnection(fromNodeId, fromPort) {
     label: fromPort === 'true' ? 'TRUE' : fromPort === 'false' ? 'FALSE' : '',
   });
 
-  closeModal();
   renderDesigner();
   showToast('success', '连线已创建', '');
 }
@@ -1731,7 +1806,8 @@ function designerKeyHandler(e) {
     deleteSelectedNode();
   }
   if (e.key === 'Escape') {
-    if (designerContextMenu) { designerContextMenu = null; renderDesigner(); }
+    if (designerConnecting) { cancelConnection(); }
+    else if (designerContextMenu) { designerContextMenu = null; renderDesigner(); }
     else if (designerDebugMode) exitDebugMode();
     else deselectNode();
   }
