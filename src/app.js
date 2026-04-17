@@ -282,6 +282,7 @@ let wsExecutions = {
         { name: '供应商确认', type: 'HTTP请求', status: 'running', duration: '进行中', startTime: '13:45:01', inputData: { url: 'https://api.supplier.com/confirm', method: 'POST', body: { orderId: 'ORD-2025041300128' } }, outputData: null, variables: { traceId: 'tr-7b2e-d412', orderId: 'ORD-2025041300128', confirmAttempt: 1 } },
       ], alerts: [] },
     { id: 2003, wfId: 2, wfName: '酒店预订确认', wfCode: 'HTL_CONFIRM', version: 2, trigger: 'event', status: 'running', startTime: '2025-04-13 12:30:00', endTime: '-', duration: '1小时+', triggerUser: '系统', archived: false,
+      inputs: { orderId: { label: '订单编号', type: 'String', value: 'ORD-2025041300096' }, eventType: { label: '触发事件', type: 'String', value: 'order.created' } },
       nodes: [
         { name: '事件触发', type: '事件触发', status: 'success', duration: '0.1秒', startTime: '12:30:00', inputData: { eventType: 'order.created', eventId: 'evt-9c4d' }, outputData: { orderId: 'ORD-2025041300096' }, variables: { traceId: 'tr-5a1c-e003' } },
         { name: '供应商确认', type: 'HTTP请求', status: 'running', duration: '进行中', startTime: '12:30:01', inputData: { url: 'https://api.supplier.com/confirm', method: 'POST' }, outputData: null, variables: { traceId: 'tr-5a1c-e003' } },
@@ -297,9 +298,24 @@ let wsExecutions = {
         { time: '2025-04-12 16:22:15', type: '流程执行失败', level: '严重', pushStatus: 'success' },
         { time: '2025-04-12 16:22:12', type: '节点执行异常', level: '警告', pushStatus: 'failed' },
       ] },
-    { id: 2005, wfId: 1, wfName: '酒店搜索', wfCode: 'HTL_SEARCH', version: 3, trigger: 'scheduled', status: 'completed', startTime: '2025-04-12 08:00:00', endTime: '2025-04-12 08:01:45', duration: '1分45秒', triggerUser: '系统', archived: false, nodes: [], alerts: [] },
-    { id: 2006, wfId: 5, wfName: '智能客服对话', wfCode: 'HTL_CHAT', version: 2, trigger: 'manual', status: 'running', startTime: '2025-04-13 10:00:00', endTime: '-', duration: '4小时+', triggerUser: '张三', archived: false, nodes: [], alerts: [] },
+    { id: 2005, wfId: 1, wfName: '酒店搜索', wfCode: 'HTL_SEARCH', version: 3, trigger: 'scheduled', status: 'completed', startTime: '2025-04-12 08:00:00', endTime: '2025-04-12 08:01:45', duration: '1分45秒', triggerUser: '系统', archived: false,
+      inputs: { city: { label: '目标城市', type: 'String', value: '北京' }, checkInDate: { label: '入住日期', type: 'DateTime', value: '2025-04-18 14:00:00' }, checkOutDate: { label: '退房日期', type: 'DateTime', value: '2025-04-19 12:00:00' }, guestCount: { label: '入住人数', type: 'Integer', value: '1' } },
+      outputs: { hotelCount: { label: '搜索结果数', type: 'Integer', value: '15' }, searchTime: { label: '搜索耗时', type: 'Double', value: '1.52' } },
+      nodes: [
+        { name: '定时触发', type: '定时触发', status: 'success', duration: '0.1秒', startTime: '08:00:00', inputData: { schedule: '0 8 * * *', triggerType: 'cron' }, outputData: { timestamp: '2025-04-12T08:00:00Z' }, variables: { env: 'production', traceId: 'tr-4c7e-b100' } },
+        { name: '参数解析', type: '代码节点', status: 'success', duration: '0.2秒', startTime: '08:00:00', inputData: { city: '北京', checkInDate: '2025-04-18', checkOutDate: '2025-04-19', guestCount: 1 }, outputData: { parsedQuery: { city_code: 'BJS', nights: 1, guests: 1 } }, variables: { env: 'production', traceId: 'tr-4c7e-b100', city_code: 'BJS' } },
+        { name: '调用搜索API', type: 'HTTP请求', status: 'success', duration: '1分30秒', startTime: '08:00:01', inputData: { url: 'https://api.hotel-supplier.com/v2/search', method: 'POST', body: { city_code: 'BJS', checkin: '2025-04-18', checkout: '2025-04-19' } }, outputData: { statusCode: 200, resultCount: 15, responseSize: '8.3KB' }, variables: { env: 'production', traceId: 'tr-4c7e-b100', apiCallCount: 1 } },
+        { name: '返回结果', type: '结束节点', status: 'success', duration: '0.1秒', startTime: '08:01:44', inputData: { hotelCount: 15 }, outputData: { success: true }, variables: { env: 'production', traceId: 'tr-4c7e-b100' } },
+      ], alerts: [] },
+    { id: 2006, wfId: 5, wfName: '智能客服对话', wfCode: 'HTL_CHAT', version: 2, trigger: 'manual', status: 'running', startTime: '2025-04-13 10:00:00', endTime: '-', duration: '4小时+', triggerUser: '张三', archived: false,
+      inputs: { sessionId: { label: '会话ID', type: 'String', value: 'CHAT-2025041300045' }, guestQuery: { label: '客户问题', type: 'String', value: '请帮我查询三亚5月1日到5月3日的海景房' } },
+      nodes: [
+        { name: '触发节点', type: '手动触发', status: 'success', duration: '0.1秒', startTime: '10:00:00', inputData: { trigger: 'manual', user: '张三' }, outputData: { timestamp: '2025-04-13T10:00:00Z' }, variables: { traceId: 'tr-6d9a-c301' } },
+        { name: '意图识别', type: '代码节点', status: 'success', duration: '0.8秒', startTime: '10:00:00', inputData: { query: '请帮我查询三亚5月1日到5月3日的海景房', model: 'intent-v3' }, outputData: { intent: 'hotel_search', confidence: 0.96, entities: { city: '三亚', checkIn: '2025-05-01', checkOut: '2025-05-03', roomType: '海景房' } }, variables: { traceId: 'tr-6d9a-c301', intent: 'hotel_search' } },
+        { name: 'AI 对话生成', type: 'HTTP请求', status: 'running', duration: '进行中', startTime: '10:00:01', inputData: { url: 'https://api.ai-service.com/chat/completions', method: 'POST', body: { model: 'gpt-4', messages: [{ role: 'user', content: '查询三亚海景房' }] } }, outputData: null, variables: { traceId: 'tr-6d9a-c301', chatRound: 3 } },
+      ], alerts: [] },
     { id: 2007, wfId: 6, wfName: '供应商价格同步', wfCode: 'SUPPLIER_PRICE', version: 2, trigger: 'scheduled', status: 'completed', startTime: '2025-04-11 02:00:00', endTime: '2025-04-11 02:15:30', duration: '15分30秒', triggerUser: '系统', archived: false,
+      inputs: { suppliers: { label: '同步供应商', type: 'Object', value: '["expedia","booking"]' }, syncMode: { label: '同步模式', type: 'String', value: 'incremental' }, schedule: { label: '执行计划', type: 'String', value: '0 2 * * * (每日凌晨2点)' } },
       outputs: { syncedSuppliers: { label: '同步供应商数', type: 'Integer', value: '2' }, totalRecords: { label: '同步记录数', type: 'Integer', value: '1240' } },
       nodes: [
         { name: '定时触发', type: '定时触发', status: 'success', duration: '0.1秒', startTime: '02:00:00', inputData: { schedule: '0 2 * * *' }, outputData: { triggerTime: '2025-04-11T02:00:00Z' }, variables: { env: 'production' } },
@@ -308,14 +324,30 @@ let wsExecutions = {
         { name: '数据整合', type: '代码节点', status: 'success', duration: '20秒', startTime: '02:15:00', inputData: { sources: ['expedia', 'booking'] }, outputData: { mergedRecords: 1240, conflicts: 3, resolved: 3 }, variables: { env: 'production', totalRecords: 1240 } },
       ], alerts: [] },
     { id: 2008, wfId: 7, wfName: '预订数据报表', wfCode: 'HTL_REPORT', version: 1, trigger: 'scheduled', status: 'paused', startTime: '2025-04-05 06:00:00', endTime: '-', duration: '8天+', triggerUser: '系统', archived: false, stale: true,
+      inputs: { reportType: { label: '报表类型', type: 'String', value: 'daily_booking' }, dateRange: { label: '数据范围', type: 'String', value: '2025-04-04' }, schedule: { label: '执行计划', type: 'String', value: '0 6 * * * (每日早晨6点)' } },
       nodes: [
         { name: '定时触发', type: '定时触发', status: 'success', duration: '0.1秒', startTime: '06:00:00', inputData: { schedule: '0 6 * * *' }, outputData: { triggerTime: '2025-04-05T06:00:00Z' }, variables: { env: 'production' } },
         { name: '报表生成', type: '代码节点', status: 'paused', duration: '已暂停', startTime: '06:02:00', inputData: { reportType: 'daily_booking', dateRange: '2025-04-04' }, outputData: null, variables: { env: 'production', reportType: 'daily_booking' } },
       ], alerts: [
         { time: '2025-04-12 06:00:00', type: '执行异常滞留', level: '警告', pushStatus: 'success' },
       ] },
-    { id: 2009, wfId: 1, wfName: '酒店搜索', wfCode: 'HTL_SEARCH', version: 2, trigger: 'manual', status: 'cancelled', startTime: '2025-04-10 15:30:00', endTime: '2025-04-10 15:30:45', duration: '45秒', triggerUser: '李四', archived: false, nodes: [], alerts: [] },
-    { id: 2010, wfId: 1, wfName: '酒店搜索', wfCode: 'HTL_SEARCH', version: 2, trigger: 'manual', status: 'completed', startTime: '2025-01-15 10:00:00', endTime: '2025-01-15 10:01:30', duration: '1分30秒', triggerUser: 'Sukey Wu', archived: true, nodes: [], alerts: [] },
+    { id: 2009, wfId: 1, wfName: '酒店搜索', wfCode: 'HTL_SEARCH', version: 2, trigger: 'manual', status: 'cancelled', startTime: '2025-04-10 15:30:00', endTime: '2025-04-10 15:30:45', duration: '45秒', triggerUser: '李四', archived: false,
+      inputs: { city: { label: '目标城市', type: 'String', value: '广州' }, checkInDate: { label: '入住日期', type: 'DateTime', value: '2025-04-15 14:00:00' }, checkOutDate: { label: '退房日期', type: 'DateTime', value: '2025-04-16 12:00:00' }, guestCount: { label: '入住人数', type: 'Integer', value: '2' } },
+      nodes: [
+        { name: '触发节点', type: '手动触发', status: 'success', duration: '0.1秒', startTime: '15:30:00', inputData: { trigger: 'manual', user: '李四' }, outputData: { timestamp: '2025-04-10T15:30:00Z' }, variables: { env: 'production', traceId: 'tr-9e2f-d501' } },
+        { name: '参数解析', type: '代码节点', status: 'success', duration: '0.3秒', startTime: '15:30:00', inputData: { city: '广州', checkInDate: '2025-04-15', checkOutDate: '2025-04-16', guestCount: 2 }, outputData: { parsedQuery: { city_code: 'CAN', nights: 1, guests: 2 } }, variables: { env: 'production', traceId: 'tr-9e2f-d501', city_code: 'CAN' } },
+        { name: '调用搜索API', type: 'HTTP请求', status: 'cancelled', duration: '已取消', startTime: '15:30:01', inputData: { url: 'https://api.hotel-supplier.com/v2/search', method: 'POST', body: { city_code: 'CAN', checkin: '2025-04-15', checkout: '2025-04-16' } }, outputData: null, variables: { traceId: 'tr-9e2f-d501', cancelledBy: '李四' } },
+        { name: '返回结果', type: '结束节点', status: 'skipped', duration: '-', startTime: '-', inputData: null, outputData: null, variables: null },
+      ], alerts: [] },
+    { id: 2010, wfId: 1, wfName: '酒店搜索', wfCode: 'HTL_SEARCH', version: 2, trigger: 'manual', status: 'completed', startTime: '2025-01-15 10:00:00', endTime: '2025-01-15 10:01:30', duration: '1分30秒', triggerUser: 'Sukey Wu', archived: true,
+      inputs: { city: { label: '目标城市', type: 'String', value: '深圳' }, checkInDate: { label: '入住日期', type: 'DateTime', value: '2025-01-20 14:00:00' }, checkOutDate: { label: '退房日期', type: 'DateTime', value: '2025-01-21 12:00:00' }, guestCount: { label: '入住人数', type: 'Integer', value: '1' } },
+      outputs: { hotelCount: { label: '搜索结果数', type: 'Integer', value: '8' }, searchTime: { label: '搜索耗时', type: 'Double', value: '1.20' } },
+      nodes: [
+        { name: '触发节点', type: '手动触发', status: 'success', duration: '0.1秒', startTime: '10:00:00', inputData: { trigger: 'manual', user: 'Sukey Wu' }, outputData: { timestamp: '2025-01-15T10:00:00Z' }, variables: { env: 'production', traceId: 'tr-1a3b-0115' } },
+        { name: '参数解析', type: '代码节点', status: 'success', duration: '0.2秒', startTime: '10:00:00', inputData: { city: '深圳', checkInDate: '2025-01-20', checkOutDate: '2025-01-21', guestCount: 1 }, outputData: { parsedQuery: { city_code: 'SZX', nights: 1, guests: 1 } }, variables: { env: 'production', traceId: 'tr-1a3b-0115', city_code: 'SZX' } },
+        { name: '调用搜索API', type: 'HTTP请求', status: 'success', duration: '1分15秒', startTime: '10:00:01', inputData: { url: 'https://api.hotel-supplier.com/v2/search', method: 'POST', body: { city_code: 'SZX', checkin: '2025-01-20', checkout: '2025-01-21' } }, outputData: { statusCode: 200, resultCount: 8, responseSize: '5.1KB' }, variables: { env: 'production', traceId: 'tr-1a3b-0115', apiCallCount: 1 } },
+        { name: '返回结果', type: '结束节点', status: 'success', duration: '0.1秒', startTime: '10:01:29', inputData: { hotelCount: 8 }, outputData: { success: true }, variables: { env: 'production', traceId: 'tr-1a3b-0115' } },
+      ], alerts: [] },
     { id: 2011, wfId: 2, wfName: '酒店预订确认', wfCode: 'HTL_CONFIRM', version: 3, trigger: 'event', status: 'completed', startTime: '2025-04-14 09:00:00', endTime: '2025-04-14 09:08:45', duration: '8分45秒', triggerUser: '系统',  archived: false,
       inputs: { orderId: { label: '订单编号', type: 'String', value: 'ORD-2025041400201' }, guestName: { label: '入住人', type: 'String', value: 'Zhang Wei' }, hotelId: { label: '酒店ID', type: 'String', value: 'HTL-00582' }, roomType: { label: '房型', type: 'String', value: 'Deluxe King' }, checkIn: { label: '入住日期', type: 'DateTime', value: '2025-04-20 14:00:00' }, checkOut: { label: '退房日期', type: 'DateTime', value: '2025-04-23 12:00:00' }, totalAmount: { label: '总金额', type: 'Double', value: '3280.00' } },
       outputs: { confirmNo: { label: '确认号', type: 'String', value: 'CNF-20250414-00582-A' }, voucherUrl: { label: '确认函链接', type: 'String', value: 'https://docs.beaver.com/voucher/CNF-20250414-00582-A.pdf' }, notifyStatus: { label: '通知状态', type: 'String', value: '邮件+短信已发送' } },
@@ -337,7 +369,15 @@ let wsExecutions = {
         { name: '流程结束', type: '结束节点', status: 'success', duration: '0.1秒', startTime: '09:08:45', inputData: { confirmNo: 'CNF-20250414-00582-A' }, outputData: { success: true, totalDuration: '8分45秒' }, variables: { traceId: 'tr-e1b4-f201' } },
       ], alerts: [] },
   ],
-  2: [{ id: 2100, wfId: 20, wfName: '航班信息拉取', wfCode: 'FLT_PULL', version: 4, trigger: 'scheduled', status: 'completed', startTime: '2025-04-12 06:00:00', endTime: '2025-04-12 06:10:00', duration: '10分', triggerUser: '系统', archived: false, nodes: [], alerts: [] }],
+  2: [{ id: 2100, wfId: 20, wfName: '航班信息拉取', wfCode: 'FLT_PULL', version: 4, trigger: 'scheduled', status: 'completed', startTime: '2025-04-12 06:00:00', endTime: '2025-04-12 06:10:00', duration: '10分', triggerUser: '系统', archived: false,
+    inputs: { supplier: { label: '供应商', type: 'String', value: 'TravelSky' }, routes: { label: '航线范围', type: 'String', value: '国内全部' }, schedule: { label: '执行计划', type: 'String', value: '0 6 * * * (每日早晨6点)' } },
+    outputs: { flightCount: { label: '航班数', type: 'Integer', value: '3842' }, updatedRoutes: { label: '更新航线数', type: 'Integer', value: '156' }, dataSize: { label: '数据量', type: 'String', value: '24.5MB' } },
+    nodes: [
+      { name: '定时触发', type: '定时触发', status: 'success', duration: '0.1秒', startTime: '06:00:00', inputData: { schedule: '0 6 * * *' }, outputData: { triggerTime: '2025-04-12T06:00:00Z' }, variables: { env: 'production', traceId: 'tr-f2a1-2100' } },
+      { name: '拉取航班数据', type: 'HTTP请求', status: 'success', duration: '7分', startTime: '06:00:01', inputData: { url: 'https://api.travelsky.com/flights/bulk', method: 'POST', body: { region: 'domestic', date: '2025-04-12' } }, outputData: { statusCode: 200, flightCount: 3842, pages: 39 }, variables: { env: 'production', traceId: 'tr-f2a1-2100', supplier: 'TravelSky' } },
+      { name: '数据清洗与入库', type: '代码节点', status: 'success', duration: '2分50秒', startTime: '06:07:01', inputData: { rawRecords: 3842, targetDB: 'flight_inventory' }, outputData: { inserted: 3690, updated: 152, skipped: 0, errors: 0 }, variables: { env: 'production', traceId: 'tr-f2a1-2100', dbWriteOk: true } },
+      { name: '流程结束', type: '结束节点', status: 'success', duration: '0.1秒', startTime: '06:09:59', inputData: { summary: true }, outputData: { success: true, totalDuration: '10分' }, variables: { traceId: 'tr-f2a1-2100' } },
+    ], alerts: [] }],
   3: [], 4: [], 5: [], 6: [],
 };
 
@@ -2115,8 +2155,8 @@ function renderExecDetail(ws) {
   const statusLabel = { running: '运行中', paused: '已暂停', completed: '已完成', failed: '失败', cancelled: '已取消' };
   const statusClass = { running: 'exec-running', paused: 'exec-paused', completed: 'exec-completed', failed: 'exec-failed', cancelled: 'exec-cancelled' };
   const triggerLabel = { manual: '手动', scheduled: '定时', event: '事件触发', subflow: '子流程调用' };
-  const nodeStatusClass = { success: 'success', failed: 'failed', running: 'running', skipped: 'skipped', paused: 'running' };
-  const nodeStatusLabel = { success: '成功', failed: '失败', running: '运行中', skipped: '跳过', paused: '已暂停' };
+  const nodeStatusClass = { success: 'success', failed: 'failed', running: 'running', skipped: 'skipped', paused: 'running', cancelled: 'failed' };
+  const nodeStatusLabel = { success: '成功', failed: '失败', running: '运行中', skipped: '跳过', paused: '已暂停', cancelled: '已取消' };
   const hasPanel = wsExecSelectedNodeIdx !== null && exec.nodes && exec.nodes[wsExecSelectedNodeIdx];
   const selectedNode = hasPanel ? exec.nodes[wsExecSelectedNodeIdx] : null;
 
@@ -2175,14 +2215,14 @@ function renderExecDetail(ws) {
   if (exec.nodes && exec.nodes.length > 0) {
     // Node status summary for complex workflows
     const nSuccess = exec.nodes.filter(n => n.status === 'success').length;
-    const nFailed = exec.nodes.filter(n => n.status === 'failed').length;
+    const nFailed = exec.nodes.filter(n => n.status === 'failed' || n.status === 'cancelled').length;
     const nRunning = exec.nodes.filter(n => n.status === 'running').length;
     const nSkipped = exec.nodes.filter(n => n.status === 'skipped').length;
     const nPaused = exec.nodes.filter(n => n.status === 'paused').length;
     const showSummary = exec.nodes.length >= 6;
     const summaryHtml = showSummary ? `<div class="ed-node-summary">
       ${nSuccess ? `<span class="ed-node-summary-item success">${icons.checkCircle} ${nSuccess} 成功</span>` : ''}
-      ${nFailed ? `<span class="ed-node-summary-item failed">${icons.xCircle} ${nFailed} 失败</span>` : ''}
+      ${nFailed ? `<span class="ed-node-summary-item failed">${icons.xCircle} ${nFailed} 失败/取消</span>` : ''}
       ${nRunning ? `<span class="ed-node-summary-item running">${icons.sync} ${nRunning} 运行中</span>` : ''}
       ${nPaused ? `<span class="ed-node-summary-item running">${icons.pause} ${nPaused} 已暂停</span>` : ''}
       ${nSkipped ? `<span class="ed-node-summary-item skipped">${nSkipped} 跳过</span>` : ''}

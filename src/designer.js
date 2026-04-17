@@ -35,7 +35,8 @@ let designerConnectingMouse = null; // { x, y } canvas coordinates for temp line
 let designerAutoSaveTimer = null;
 let designerReadonly = false; // Edit lock
 let designerReadonlyUser = ''; // Who holds the lock
-let designerGridSnap = false; // Grid snap toggle
+let designerGridSnap = true; // Grid snap always on by default
+let designerNodePanelPinned = false; // Pin node panel open
 let designerMinimapVisible = true; // Minimap toggle
 let designerClipboard = []; // Copy/paste buffer
 let designerIsBoxSelecting = false; // Box selection
@@ -46,19 +47,19 @@ let designerBottomResizing = false; // Bottom panel resize
 
 // --- Node Type Definitions ---
 const nodeTypes = [
-  { type: 'trigger', name: '触发器', icon: '⚡', color: 'node-color-trigger', category: '流程控制', desc: '流程入口节点', code: 'trigger' },
-  { type: 'end', name: '结束', icon: '🏁', color: 'node-color-end', category: '流程控制', desc: '流程出口节点', code: 'end' },
-  { type: 'if', name: 'IF 条件', icon: '🔀', color: 'node-color-logic', category: '流程控制', desc: '条件判断分支', code: 'if' },
-  { type: 'switch', name: 'Switch', icon: '🔃', color: 'node-color-logic', category: '流程控制', desc: '多条件分支', code: 'switch' },
-  { type: 'loop', name: '循环', icon: '🔄', color: 'node-color-logic', category: '流程控制', desc: '循环执行', code: 'loop' },
-  { type: 'delay', name: '延迟', icon: '⏱️', color: 'node-color-logic', category: '流程控制', desc: '延时执行', code: 'delay' },
-  { type: 'assign', name: '赋值', icon: '📝', color: 'node-color-data', category: '数据处理', desc: '变量赋值', code: 'assign' },
-  { type: 'output', name: '输出', icon: '📤', color: 'node-color-data', category: '数据处理', desc: '日志输出', code: 'output' },
-  { type: 'code', name: '代码', icon: '💻', color: 'node-color-data', category: '数据处理', desc: '自定义代码', code: 'code' },
-  { type: 'http', name: 'HTTP 请求', icon: '🌐', color: 'node-color-integration', category: '集成', desc: 'HTTP接口调用', code: 'http' },
-  { type: 'mq', name: 'MQ 消息', icon: '📨', color: 'node-color-integration', category: '集成', desc: '消息队列', code: 'mq' },
-  { type: 'workflow', name: '子工作流', icon: '🔗', color: 'node-color-flow', category: '集成', desc: '调用子流程', code: 'wf' },
-  { type: 'placeholder', name: '占位节点', icon: '⬜', color: 'node-color-placeholder', category: '其他', desc: '待完善节点', code: 'placeholder' },
+  { type: 'trigger', name: '触发器', icon: '⚡', color: 'node-color-trigger', category: '流程控制', desc: '流程的起始入口，定义触发条件（手动/定时/事件/Webhook）', code: 'trigger', hidden: true },
+  { type: 'end', name: '结束', icon: '🏁', color: 'node-color-end', category: '流程控制', desc: '流程的终止节点，负责输出变量映射与流程结束处理', code: 'end', hidden: true },
+  { type: 'if', name: 'IF 条件', icon: '🔀', color: 'node-color-logic', category: '流程控制', desc: '根据条件表达式判断，将流程分为 TRUE / FALSE 两个分支', code: 'if' },
+  { type: 'switch', name: 'Switch', icon: '🔃', color: 'node-color-logic', category: '流程控制', desc: '多条件分支路由，支持首次匹配或全部匹配，含 Default 分支', code: 'switch' },
+  { type: 'loop', name: '循环', icon: '🔄', color: 'node-color-logic', category: '流程控制', desc: '循环执行，支持 ForEach 遍历、While 条件循环、Break 中断', code: 'loop' },
+  { type: 'delay', name: '延迟', icon: '⏱️', color: 'node-color-logic', category: '流程控制', desc: '延迟执行后续节点，支持固定时长或到达指定时间', code: 'delay' },
+  { type: 'assign', name: '赋值', icon: '📝', color: 'node-color-data', category: '数据处理', desc: '变量赋值操作，支持表达式计算和 ${变量名} 引用', code: 'assign' },
+  { type: 'output', name: '输出', icon: '📤', color: 'node-color-data', category: '数据处理', desc: '输出日志到调试面板，支持 INFO / WARNING / ERROR 级别', code: 'output' },
+  { type: 'code', name: '代码', icon: '💻', color: 'node-color-data', category: '数据处理', desc: '编写自定义脚本（JS / Python），实现复杂数据处理逻辑', code: 'code' },
+  { type: 'http', name: 'HTTP 请求', icon: '🌐', color: 'node-color-integration', category: '集成', desc: 'HTTP 请求调用，支持 GET/POST/PUT/DELETE，可配置请求头和请求体', code: 'http' },
+  { type: 'mq', name: 'MQ 消息', icon: '📨', color: 'node-color-integration', category: '集成', desc: '消息队列操作，支持发送和消费消息，需配置 Topic', code: 'mq' },
+  { type: 'workflow', name: '子工作流', icon: '🔗', color: 'node-color-flow', category: '集成', desc: '调用已发布且允许被引用的子工作流，支持参数映射', code: 'wf' },
+  { type: 'placeholder', name: '占位节点', icon: '⬜', color: 'node-color-placeholder', category: '其他', desc: '标记待完善的流程分支，可后续转换为具体节点类型', code: 'placeholder' },
 ];
 
 // --- Open / Close Designer ---
@@ -237,31 +238,29 @@ function renderDesigner() {
         <span class="designer-save-indicator" id="designerSaveIndicator">${icons.check} <span>已保存</span></span>
       </div>
       <div class="designer-toolbar-center">
-        <button class="toolbar-btn" onclick="designerUndo()" title="撤销 (Ctrl+Z)">${icons.arrowLeft} <span>撤销</span></button>
-        <button class="toolbar-btn" onclick="designerRedo()" title="重做 (Ctrl+Y)">${icons.redo} <span>重做</span></button>
+        <button class="toolbar-btn" onclick="designerUndo()" title="撤销上一步操作 (Ctrl+Z)">${icons.arrowLeft}</button>
+        <button class="toolbar-btn" onclick="designerRedo()" title="重做上一步操作 (Ctrl+Y)">${icons.redo}</button>
         <span class="toolbar-divider"></span>
-        <button class="toolbar-btn" onclick="autoLayout()" title="优化排列">${icons.workflow} <span>优化排列</span></button>
-        <button class="toolbar-btn ${designerGridSnap ? 'active' : ''}" onclick="toggleGridSnap()" title="网格吸附">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-          <span>吸附</span>
-        </button>
-        <span class="toolbar-divider"></span>
-        <button class="toolbar-btn ${designerMinimapVisible ? 'active' : ''}" onclick="toggleMinimap()" title="小地图">
+        <button class="toolbar-btn" onclick="autoLayout()" title="自动优化节点排列">${icons.workflow}</button>
+        <button class="toolbar-btn ${designerMinimapVisible ? 'active' : ''}" onclick="toggleMinimap()" title="${designerMinimapVisible ? '隐藏小地图' : '显示小地图'}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2"/><rect x="12" y="12" width="8" height="8" rx="1"/></svg>
-          <span>地图</span>
         </button>
         <span class="toolbar-divider"></span>
-        <button class="toolbar-btn ${designerBottomPanel === 'problems' ? 'active' : ''}" onclick="toggleDesignerBottom('problems')">
+        <button class="toolbar-btn ${designerBottomPanel === 'variables' ? 'active' : ''}" onclick="toggleDesignerBottom('variables')" title="查看和管理变量定义">
+          ${icons.hash} <span>变量</span>
+          <span class="toolbar-badge" style="background:var(--md-primary-container);color:var(--md-primary)">${designerVariables.length}</span>
+        </button>
+        <button class="toolbar-btn ${designerBottomPanel === 'problems' ? 'active' : ''}" onclick="toggleDesignerBottom('problems')" title="查看流程中的问题和警告">
           ${icons.alertTriangle} <span>问题</span>
           ${getProblems().length > 0 ? `<span class="toolbar-badge">${getProblems().length}</span>` : `<span class="toolbar-badge success">${icons.check}</span>`}
         </button>
       </div>
       <div class="designer-toolbar-right">
-        <button class="btn btn-secondary btn-sm" onclick="enterDebugMode()" ${designerDebugMode || designerReadonly ? 'disabled style="opacity:0.5"' : ''}>${icons.play}<span>调试</span></button>
-        <button class="btn btn-secondary btn-sm" onclick="designerSave()" ${designerReadonly ? 'disabled style="opacity:0.5"' : ''}>${icons.check}<span>保存</span></button>
-        <button class="btn btn-secondary btn-sm" onclick="showDesignerSettings()">${icons.settings}<span>设置</span></button>
-        <button class="btn btn-secondary btn-sm" onclick="showDesignerVersions()">${icons.history}<span>版本</span></button>
-        <button class="btn btn-primary btn-sm" onclick="showPublishDialog()" ${wf.status === 'disabled' || designerReadonly ? 'disabled style="opacity:0.5"' : ''}>${icons.arrowUp || icons.check}<span>发布</span></button>
+        <button class="btn btn-secondary btn-sm" onclick="enterDebugMode()" ${designerDebugMode || designerReadonly ? 'disabled style="opacity:0.5"' : ''} title="调试运行工作流 (模拟执行)">${icons.play}<span>调试</span></button>
+        <button class="btn btn-secondary btn-sm" onclick="designerSave()" ${designerReadonly ? 'disabled style="opacity:0.5"' : ''} title="手动保存草稿 (Ctrl+S)">${icons.check}<span>保存</span></button>
+        <button class="btn btn-secondary btn-sm" onclick="showDesignerSettings()" title="工作流全局设置">${icons.settings}<span>设置</span></button>
+        <button class="btn btn-secondary btn-sm" onclick="showDesignerVersions()" title="查看版本发布历史">${icons.history}<span>版本</span></button>
+        <button class="btn btn-primary btn-sm" onclick="showPublishDialog()" ${wf.status === 'disabled' || designerReadonly ? 'disabled style="opacity:0.5"' : ''} title="发布当前工作流版本">${icons.arrowUp || icons.check}<span>发布</span></button>
       </div>
     </div>
 
@@ -274,7 +273,7 @@ function renderDesigner() {
           <svg class="canvas-svg" id="canvasSvg">
             <defs>
               <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
-                <polygon points="0 0, 10 3.5, 0 7" fill="var(--md-outline)" />
+                <polygon points="0 0, 10 3.5, 0 7" fill="#94a3b8" />
               </marker>
               <marker id="arrowhead-active" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
                 <polygon points="0 0, 10 3.5, 0 7" fill="var(--md-primary)" />
@@ -289,11 +288,11 @@ function renderDesigner() {
           </div>
         </div>
         <div class="canvas-controls">
-          <button class="canvas-control-btn" onclick="designerZoomOut()" title="缩小">${icons.arrowDown}</button>
-          <span class="canvas-zoom-level" onclick="designerResetZoom()" title="点击重置">${Math.round(designerZoom * 100)}%</span>
-          <button class="canvas-control-btn" onclick="designerZoomIn()" title="放大">${icons.arrowUp}</button>
+          <button class="canvas-control-btn" onclick="designerZoomOut()" title="缩小视图">${icons.arrowDown}</button>
+          <span class="canvas-zoom-level" onclick="designerResetZoom()" title="点击重置为100%">${Math.round(designerZoom * 100)}%</span>
+          <button class="canvas-control-btn" onclick="designerZoomIn()" title="放大视图">${icons.arrowUp}</button>
           <span style="width:1px;height:16px;background:var(--md-outline-variant);margin:0 4px"></span>
-          <button class="canvas-control-btn" onclick="designerFitCanvas()" title="适应画布">${icons.workflow}</button>
+          <button class="canvas-control-btn" onclick="designerFitCanvas()" title="自适应画布大小">${icons.workflow}</button>
         </div>
         ${designerMinimapVisible ? renderMinimap() : ''}
       </div>
@@ -311,16 +310,19 @@ function renderDesigner() {
 // --- Node Panel ---
 function renderNodePanel() {
   const categories = {};
-  nodeTypes.forEach(nt => {
+  nodeTypes.filter(nt => !nt.hidden).forEach(nt => {
     if (!categories[nt.category]) categories[nt.category] = [];
     categories[nt.category].push(nt);
   });
 
-  return `<div class="node-panel ${designerNodePanelExpanded ? 'expanded' : ''}" id="nodePanel"
-    onmouseenter="expandNodePanel()" onmouseleave="collapseNodePanel()">
+  return `<div class="node-panel ${designerNodePanelExpanded ? 'expanded' : ''} ${designerNodePanelPinned ? 'pinned' : ''}" id="nodePanel"
+    ${!designerNodePanelPinned ? 'onmouseenter="expandNodePanel()" onmouseleave="collapseNodePanel()"' : ''}>
     <div class="node-panel-header">
-      <button class="node-panel-toggle" onclick="toggleNodePanel()">${designerNodePanelExpanded ? icons.chevronLeft : icons.chevronRight}</button>
+      <button class="node-panel-toggle" onclick="toggleNodePanel()" title="${designerNodePanelExpanded ? '收起节点库' : '展开节点库'}">${designerNodePanelExpanded ? icons.chevronLeft : icons.chevronRight}</button>
       <span class="node-panel-title">节点库</span>
+      <button class="node-panel-pin ${designerNodePanelPinned ? 'active' : ''}" onclick="togglePinNodePanel()" title="${designerNodePanelPinned ? '取消固定' : '固定面板'}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M12 17v5"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.89A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.89A2 2 0 0 0 5 15.24Z"/></svg>
+      </button>
     </div>
     <div class="node-panel-search">
       <input type="text" placeholder="搜索节点..." oninput="filterNodes(this.value)" />
@@ -341,12 +343,18 @@ function renderNodePanel() {
         </div>
       `).join('')}
     </div>
+    <div class="node-panel-hint">触发器和结束节点已自动创建</div>
   </div>`;
 }
 
-function expandNodePanel() { designerNodePanelExpanded = true; updateNodePanel(); }
-function collapseNodePanel() { designerNodePanelExpanded = false; updateNodePanel(); }
+function expandNodePanel() { if (!designerNodePanelPinned) { designerNodePanelExpanded = true; updateNodePanel(); } }
+function collapseNodePanel() { if (!designerNodePanelPinned) { designerNodePanelExpanded = false; updateNodePanel(); } }
 function toggleNodePanel() { designerNodePanelExpanded = !designerNodePanelExpanded; updateNodePanel(); }
+function togglePinNodePanel() {
+  designerNodePanelPinned = !designerNodePanelPinned;
+  if (designerNodePanelPinned) designerNodePanelExpanded = true;
+  renderDesigner();
+}
 
 function updateNodePanel() {
   const panel = document.getElementById('nodePanel');
@@ -436,8 +444,8 @@ function renderConnections() {
 
     const isActive = designerDebugMode && conn._debugActive;
 
-    return `<path d="${path}" fill="none" stroke="${isActive ? 'var(--md-info)' : 'var(--md-outline-variant)'}" stroke-width="${isActive ? 2.5 : 2}" marker-end="url(#${isActive ? 'arrowhead-active' : 'arrowhead'})" ${isActive ? 'class="connection-flow"' : ''} onclick="onConnectionClick(event, ${conn.id})" />
-    ${conn.label ? `<text x="${(fromPos.x + toPos.x) / 2}" y="${(fromPos.y + toPos.y) / 2 - 8}" text-anchor="middle" font-size="10" fill="var(--md-on-surface-variant)" font-weight="600" font-family="Roboto, sans-serif">${conn.label}</text>` : ''}`;
+    return `<path d="${path}" fill="none" stroke="${isActive ? 'var(--md-primary)' : '#94a3b8'}" stroke-width="${isActive ? 3 : 2.5}" marker-end="url(#${isActive ? 'arrowhead-active' : 'arrowhead'})" ${isActive ? 'class="connection-flow"' : ''} onclick="onConnectionClick(event, ${conn.id})" style="filter:drop-shadow(0 1px 2px rgba(0,0,0,0.1))" />
+    ${conn.label ? `<text x="${(fromPos.x + toPos.x) / 2}" y="${(fromPos.y + toPos.y) / 2 - 10}" text-anchor="middle" font-size="11" fill="${conn.label === 'TRUE' ? '#16a34a' : conn.label === 'FALSE' ? '#dc2626' : '#64748b'}" font-weight="700" font-family="Roboto, sans-serif" paint-order="stroke" stroke="#fff" stroke-width="3">${conn.label}</text>` : ''}`;
   }).join('');
 }
 
@@ -588,13 +596,30 @@ function renderNodeConfigFields(node, nt) {
       break;
   }
 
-  // Four-dimensional description
-  html += `<div class="config-section" style="margin-top:var(--space-4);padding-top:var(--space-3);border-top:1px solid var(--md-surface-container-high)">
+  // Node description with richer content from PRD
+  const nodeHelpMap = {
+    trigger: { scene: '作为每个工作流的起始节点，定义流程何时被触发执行', rules: '每个工作流只能有一个触发器；触发方式和输入参数是必配项' },
+    end: { scene: '作为工作流的终止节点，汇总输出结果', rules: '每个工作流只能有一个结束节点；应映射需要输出的变量' },
+    'if': { scene: '根据数据判断走不同的业务分支，例如「订单金额 > 1000 走审批流」', rules: '必须配置条件表达式；TRUE 和 FALSE 分支都应连接后续节点' },
+    'switch': { scene: '当有多个业务分支时使用，例如「根据订单来源渠道分发到不同处理流程」', rules: '至少配置 2 个分支条件；建议配置 Default 分支兜底' },
+    loop: { scene: '需要重复处理列表数据或轮询等待时使用', rules: 'ForEach 模式必须指定列表变量；建议设置最大循环次数防止死循环' },
+    delay: { scene: '需要等待一段时间后再继续执行，例如「等待审批结果」或「定时重试」', rules: '固定时长模式需设置具体时长；到指定时间模式需设置目标时刻' },
+    assign: { scene: '对变量进行计算或转换，例如「将接口返回数据映射到业务变量」', rules: '目标变量名不能为空；支持 ${变量名} 引用其他变量' },
+    output: { scene: '记录流程执行日志，便于调试和问题排查', rules: 'INFO 级别用于常规记录，ERROR 级别会触发告警' },
+    code: { scene: '标准节点无法满足的复杂数据处理逻辑', rules: '代码中可通过 input 获取输入数据，通过 return 返回处理结果' },
+    http: { scene: '调用外部 REST API 接口，例如「查询订单状态」「推送通知」', rules: '请求 URL 为必填项；建议配置超时和重试策略' },
+    mq: { scene: '与消息队列系统交互，例如「发布订单创建事件」「消费支付回调消息」', rules: 'Topic 为必填项；消费模式需关注消息幂等处理' },
+    workflow: { scene: '复用已有流程能力，例如「调用通用的审批子流程」', rules: '只能调用已发布且开启了「允许被引用」的工作流' },
+    placeholder: { scene: '规划流程时的临时占位，标记待实现的部分', rules: '发布前需转换为具体节点类型或删除' },
+  };
+  const help = nodeHelpMap[node.type] || {};
+
+  html += `<div class="config-section node-help-section">
     <div class="config-section-title" style="cursor:pointer" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">节点说明 ${icons.arrowDown}</div>
-    <div style="display:none;font-size:var(--font-size-xs);color:var(--md-on-surface-variant);line-height:1.6">
-      <div style="margin-bottom:8px"><strong style="color:var(--md-on-surface)">定义：</strong>${nt.desc || '-'}</div>
-      <div style="margin-bottom:8px"><strong style="color:var(--md-on-surface)">适用场景：</strong>根据业务需求配置</div>
-      <div><strong style="color:var(--md-on-surface)">使用规则：</strong>请确保必填项已配置</div>
+    <div style="display:none;font-size:var(--font-size-xs);color:var(--md-on-surface-variant);line-height:1.7">
+      <div style="margin-bottom:8px"><strong style="color:var(--md-on-surface)">定义</strong><br/>${nt.desc || '-'}</div>
+      <div style="margin-bottom:8px"><strong style="color:var(--md-on-surface)">适用场景</strong><br/>${help.scene || '根据业务需求配置'}</div>
+      <div><strong style="color:var(--md-on-surface)">使用规则</strong><br/>${help.rules || '请确保必填项已配置'}</div>
     </div>
   </div>`;
 
@@ -603,6 +628,7 @@ function renderNodeConfigFields(node, nt) {
 
 function renderTriggerConfig(node) {
   const tt = node.config?.triggerType || 'manual';
+  const inputParams = node.config?.inputParams || [];
   return `<div class="config-section">
     <div class="config-section-title">触发方式</div>
     <div class="config-field">
@@ -637,7 +663,49 @@ function renderTriggerConfig(node) {
           <button class="btn btn-secondary btn-sm" style="flex-shrink:0" onclick="showToast('success','已复制','Webhook URL已复制到剪贴板')">${icons.copy}</button>
         </div>
       </div>` : ''}
+  </div>
+  <div class="config-section">
+    <div class="config-section-title" style="display:flex;align-items:center;justify-content:space-between">输入参数 <button class="btn btn-ghost btn-sm" style="height:24px;font-size:11px" onclick="addTriggerParam(${node.id})">${icons.plus} 添加</button></div>
+    <div class="config-field-help" style="margin-bottom:var(--space-2)">定义触发流程时需要传入的参数，可在后续节点中通过 \${参数名} 引用</div>
+    ${inputParams.length === 0 ? '<div style="text-align:center;padding:var(--space-3);color:var(--md-outline);font-size:var(--font-size-xs)">暂无输入参数，点击上方按钮添加</div>' :
+    inputParams.map((p, i) => `
+      <div class="trigger-param-card">
+        <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
+          <input class="config-input" value="${p.name}" placeholder="参数名" style="flex:1;font-family:var(--font-family-mono);font-size:11px" />
+          <select class="config-select" style="width:90px;font-size:11px">
+            <option ${p.type === 'String' ? 'selected' : ''}>String</option>
+            <option ${p.type === 'Integer' ? 'selected' : ''}>Integer</option>
+            <option ${p.type === 'Double' ? 'selected' : ''}>Double</option>
+            <option ${p.type === 'Boolean' ? 'selected' : ''}>Boolean</option>
+            <option ${p.type === 'DateTime' ? 'selected' : ''}>DateTime</option>
+            <option ${p.type === 'Object' ? 'selected' : ''}>Object</option>
+            <option ${p.type === 'File' ? 'selected' : ''}>File</option>
+          </select>
+          <label style="display:flex;align-items:center;gap:2px;font-size:10px;color:var(--md-on-surface-variant);white-space:nowrap"><input type="checkbox" ${p.required ? 'checked' : ''} style="accent-color:var(--md-primary);width:12px;height:12px">必填</label>
+          <button class="table-action-btn danger" style="width:20px;height:20px;flex-shrink:0" onclick="removeTriggerParam(${node.id},${i})">${icons.close}</button>
+        </div>
+        <input class="config-input" value="${p.desc || ''}" placeholder="参数说明" style="font-size:11px" />
+      </div>
+    `).join('')}
   </div>`;
+}
+
+function addTriggerParam(nodeId) {
+  const node = designerNodes.find(n => n.id === nodeId);
+  if (!node) return;
+  if (!node.config) node.config = {};
+  if (!node.config.inputParams) node.config.inputParams = [];
+  const idx = node.config.inputParams.length + 1;
+  node.config.inputParams.push({ name: 'param_' + idx, type: 'String', required: false, desc: '' });
+  renderDesigner();
+}
+
+function removeTriggerParam(nodeId, index) {
+  const node = designerNodes.find(n => n.id === nodeId);
+  if (!node?.config?.inputParams) return;
+  node.config.inputParams.splice(index, 1);
+  renderDesigner();
+}
 }
 
 function renderIfConfig(node) {
@@ -774,20 +842,67 @@ function renderOutputConfig(node) {
 }
 
 function renderLoopConfig(node) {
+  const mode = node.config?.loopMode || 'forEach';
   return `<div class="config-section">
     <div class="config-section-title">循环配置</div>
     <div class="config-field">
-      <div class="config-field-label">循环模式</div>
-      <select class="config-select"><option>ForEach (遍历列表)</option><option>While (条件循环)</option></select>
+      <div class="config-field-label">循环模式 <span class="required">*</span></div>
+      <div class="loop-mode-cards">
+        <div class="loop-mode-card ${mode === 'forEach' ? 'active' : ''}" onclick="updateNodeConfig(${node.id}, 'loopMode', 'forEach'); renderDesigner()">
+          <div class="loop-mode-card-icon">🔄</div>
+          <div class="loop-mode-card-info">
+            <div class="loop-mode-card-title">ForEach</div>
+            <div class="loop-mode-card-desc">遍历列表中的每个元素</div>
+          </div>
+        </div>
+        <div class="loop-mode-card ${mode === 'while' ? 'active' : ''}" onclick="updateNodeConfig(${node.id}, 'loopMode', 'while'); renderDesigner()">
+          <div class="loop-mode-card-icon">🔁</div>
+          <div class="loop-mode-card-info">
+            <div class="loop-mode-card-title">While</div>
+            <div class="loop-mode-card-desc">满足条件时持续执行</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    ${mode === 'forEach' ? `
+      <div class="config-field">
+        <div class="config-field-label">遍历列表变量 <span class="required">*</span></div>
+        <input class="config-input" value="${node.config?.listVar || ''}" placeholder="\${data.items}" style="font-family:var(--font-family-mono)" onchange="updateNodeConfig(${node.id}, 'listVar', this.value)" />
+        <div class="config-field-help">引用一个数组类型的变量，循环将遍历其中每个元素</div>
+      </div>
+      <div class="config-field">
+        <div class="config-field-label">当前元素变量名</div>
+        <input class="config-input" value="${node.config?.itemVar || 'item'}" style="font-family:var(--font-family-mono)" onchange="updateNodeConfig(${node.id}, 'itemVar', this.value)" />
+        <div class="config-field-help">每次循环中，当前元素会被赋值到此变量</div>
+      </div>
+      <div class="config-field">
+        <div class="config-field-label">索引变量名</div>
+        <input class="config-input" value="${node.config?.indexVar || 'index'}" style="font-family:var(--font-family-mono)" onchange="updateNodeConfig(${node.id}, 'indexVar', this.value)" />
+      </div>
+    ` : `
+      <div class="config-field">
+        <div class="config-field-label">循环条件 <span class="required">*</span></div>
+        <textarea class="expr-editor" style="min-height:40px" placeholder="retryCount < 3 && !success" onchange="updateNodeConfig(${node.id}, 'whileCondition', this.value)">${node.config?.whileCondition || ''}</textarea>
+        <div class="config-field-help">条件为 true 时继续执行循环体</div>
+      </div>
+    `}
+    <div class="config-field">
+      <div class="config-field-label">最大循环次数</div>
+      <input class="config-input" type="number" value="${node.config?.maxIterations || 1000}" min="1" max="100000" onchange="updateNodeConfig(${node.id}, 'maxIterations', parseInt(this.value))" />
+      <div class="config-field-help">防止无限循环的安全限制</div>
     </div>
     <div class="config-field">
-      <div class="config-field-label">遍历列表变量</div>
-      <input class="config-input" placeholder="data.items" style="font-family:var(--font-family-mono)" />
+      <div style="display:flex;align-items:center;gap:10px">
+        <label class="toggle-sm"><input type="checkbox" ${node.config?.allowBreak !== false ? 'checked' : ''} onchange="updateNodeConfig(${node.id}, 'allowBreak', this.checked)" /><span class="toggle-sm-slider"></span></label>
+        <span style="font-size:var(--font-size-xs);color:var(--md-on-surface-variant)">允许 Break 中断（满足条件时提前跳出循环）</span>
+      </div>
     </div>
-    <div class="config-field">
-      <div class="config-field-label">当前元素变量名</div>
-      <input class="config-input" value="item" style="font-family:var(--font-family-mono)" />
-    </div>
+    ${node.config?.allowBreak !== false ? `
+      <div class="config-field">
+        <div class="config-field-label">Break 条件</div>
+        <textarea class="expr-editor" style="min-height:36px;font-size:11px" placeholder="errorCount > 5" onchange="updateNodeConfig(${node.id}, 'breakCondition', this.value)">${node.config?.breakCondition || ''}</textarea>
+      </div>
+    ` : ''}
   </div>`;
 }
 
@@ -846,77 +961,99 @@ function renderDesignerSettingsPanel() {
     <div class="right-panel-body">
       <div class="settings-section">
         <div class="settings-section-title">${icons.info} 基本信息</div>
-        <div class="config-field"><div class="config-field-label">名称</div><input class="config-input" value="${wf.name}" /></div>
-        <div class="config-field"><div class="config-field-label">编号</div><input class="config-input" value="${wf.code}" style="font-family:var(--font-family-mono);color:var(--md-outline)" readonly /></div>
-        <div class="config-field"><div class="config-field-label">描述</div><textarea class="config-textarea" style="min-height:50px">${wf.desc || ''}</textarea></div>
-        <div class="config-field"><div class="config-field-label">流程负责人</div>${buildPersonPickerHtml('designerOwner', wf.owners || [], true)}</div>
-        <div class="config-field"><div class="config-field-label">类型</div><div style="font-size:var(--font-size-sm);color:var(--md-outline)">${wf.type === 'app' ? '应用流' : '对话流'} (不可修改)</div></div>
-        <div class="config-field"><div class="config-field-label">所属文件夹</div><div style="font-size:var(--font-size-sm);color:var(--md-outline)">${getFolderPath(wf.wsId, wf.folderId) || '根目录'} (不可修改)</div></div>
+        <div class="settings-hint">带 <span class="required">*</span> 标记的为必填项</div>
+        <div class="config-field"><div class="config-field-label">名称 <span class="required">*</span></div><input class="config-input" value="${wf.name}" placeholder="输入工作流名称" /></div>
+        <div class="config-field"><div class="config-field-label">编号</div><input class="config-input" value="${wf.code}" style="font-family:var(--font-family-mono);color:var(--md-outline)" readonly /><div class="config-field-help">系统自动生成，不可修改</div></div>
+        <div class="config-field"><div class="config-field-label">描述</div><textarea class="config-textarea" style="min-height:50px" placeholder="描述工作流的用途和业务场景">${wf.desc || ''}</textarea></div>
+        <div class="config-field"><div class="config-field-label">流程负责人 <span class="required">*</span></div>${buildPersonPickerHtml('designerOwner', wf.owners || [], true)}<div class="config-field-help">负责流程的维护和问题处理</div></div>
+        <div class="config-field"><div class="config-field-label">类型</div><div class="config-readonly-value">${wf.type === 'app' ? '应用流' : '对话流'}</div><div class="config-field-help">创建后不可修改</div></div>
+        <div class="config-field"><div class="config-field-label">所属空间</div><div class="config-readonly-value">${getFolderPath(wf.wsId, wf.folderId) || '根目录'}</div></div>
         <div class="config-field">
           <div class="config-field-label">允许被引用</div>
-          <div style="display:flex;align-items:center;gap:10px"><label class="toggle-sm"><input type="checkbox" ${wf.allowRef ? 'checked' : ''} /><span class="toggle-sm-slider"></span></label><span style="font-size:var(--font-size-xs);color:var(--md-on-surface-variant)">开启后该流程可作为子流程被其他工作流引用</span></div>
+          <div style="display:flex;align-items:center;gap:10px"><label class="toggle-sm"><input type="checkbox" ${wf.allowRef ? 'checked' : ''} /><span class="toggle-sm-slider"></span></label><span style="font-size:var(--font-size-xs);color:var(--md-on-surface-variant)">开启后可被其他工作流作为子流程调用</span></div>
         </div>
       </div>
 
-      <div class="settings-section">
-        <div class="settings-section-title">${icons.alertTriangle} 异常处理策略</div>
-        <div class="config-field">
-          <div class="config-field-label">默认异常策略</div>
-          <select class="config-select">
-            <option>终止流程</option><option>忽略并继续</option><option>重试</option><option>转人工处理</option><option>挂起等待回调</option>
-          </select>
-        </div>
-        <div class="config-field">
-          <div class="config-field-label">重试次数</div>
-          <input class="config-input" type="number" value="3" min="1" max="10" />
-        </div>
-        <div class="config-field">
-          <div class="config-field-label">重试间隔(秒)</div>
-          <input class="config-input" type="number" value="5" min="1" />
-        </div>
-      </div>
-
-      <div class="settings-section">
-        <div class="settings-section-title">${icons.clock} 超时配置</div>
-        <div class="config-field"><div class="config-field-label">工作流整体超时(分钟)</div><input class="config-input" type="number" value="60" /></div>
-        <div class="config-field"><div class="config-field-label">节点默认超时(秒)</div><input class="config-input" type="number" value="30" /></div>
-        <div class="config-field"><div class="config-field-label">挂起等待超时(小时)</div><input class="config-input" type="number" value="24" /></div>
-      </div>
-
-      <div class="settings-section">
-        <div class="settings-section-title">${icons.sync} 并发控制</div>
-        <div class="config-field"><div class="config-field-label">最大并发数</div><input class="config-input" type="number" value="10" min="1" /></div>
-        <div class="config-field">
-          <div class="config-field-label">排队策略</div>
-          <select class="config-select"><option>排队等待</option><option>直接拒绝</option></select>
-        </div>
-      </div>
-
-      <div class="settings-section">
-        <div class="settings-section-title">${icons.alertTriangle} 告警配置</div>
-        <div class="config-field">
-          <div class="config-field-label" style="display:flex;justify-content:space-between;align-items:center">启用告警 <label class="toggle-sm"><input type="checkbox" checked /><span class="toggle-sm-slider"></span></label></div>
-        </div>
-        <div class="config-field">
-          <div class="config-field-label">触发条件</div>
-          <div style="display:flex;flex-direction:column;gap:6px;font-size:var(--font-size-xs)">
-            <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" checked style="accent-color:var(--md-primary)"> 流程执行失败</label>
-            <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" checked style="accent-color:var(--md-primary)"> 流程执行超时</label>
-            <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" style="accent-color:var(--md-primary)"> 节点执行异常</label>
-            <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" style="accent-color:var(--md-primary)"> 节点转人工处理</label>
+      <div class="settings-section settings-collapsible">
+        <div class="settings-section-title" onclick="toggleSettingsSection(this)" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between">${icons.alertTriangle} 异常处理策略 <span class="settings-toggle-icon">${icons.chevronDown || icons.arrowDown}</span></div>
+        <div class="settings-section-body">
+          <div class="config-field">
+            <div class="config-field-label">默认异常策略 <span class="required">*</span></div>
+            <select class="config-select">
+              <option>终止流程</option><option>忽略并继续</option><option>重试</option><option>转人工处理</option><option>挂起等待回调</option>
+            </select>
+            <div class="config-field-help">当节点执行出错时的默认处理方式</div>
+          </div>
+          <div style="display:flex;gap:var(--space-2)">
+            <div class="config-field" style="flex:1"><div class="config-field-label">重试次数</div><input class="config-input" type="number" value="3" min="1" max="10" /></div>
+            <div class="config-field" style="flex:1"><div class="config-field-label">重试间隔(秒)</div><input class="config-input" type="number" value="5" min="1" /></div>
           </div>
         </div>
-        <div class="config-field"><div class="config-field-label">静默期(分钟)</div><input class="config-input" type="number" value="5" min="1" /></div>
       </div>
 
-      <div class="settings-section">
-        <div class="settings-section-title">${icons.archive} 执行记录</div>
-        <div class="config-field"><div class="config-field-label">保留天数</div><input class="config-input" type="number" value="90" /></div>
-        <div class="config-field">
-          <div class="config-field-label" style="display:flex;justify-content:space-between;align-items:center">记录节点详情 <label class="toggle-sm"><input type="checkbox" checked /><span class="toggle-sm-slider"></span></label></div>
+      <div class="settings-section settings-collapsible">
+        <div class="settings-section-title" onclick="toggleSettingsSection(this)" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between">${icons.clock} 超时配置 <span class="settings-toggle-icon">${icons.chevronDown || icons.arrowDown}</span></div>
+        <div class="settings-section-body">
+          <div style="display:flex;gap:var(--space-2)">
+            <div class="config-field" style="flex:1"><div class="config-field-label">流程超时(分)</div><input class="config-input" type="number" value="60" /></div>
+            <div class="config-field" style="flex:1"><div class="config-field-label">节点超时(秒)</div><input class="config-input" type="number" value="30" /></div>
+          </div>
+          <div class="config-field"><div class="config-field-label">挂起等待超时(小时)</div><input class="config-input" type="number" value="24" /></div>
+        </div>
+      </div>
+
+      <div class="settings-section settings-collapsible">
+        <div class="settings-section-title" onclick="toggleSettingsSection(this)" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between">${icons.sync} 并发控制 <span class="settings-toggle-icon">${icons.chevronDown || icons.arrowDown}</span></div>
+        <div class="settings-section-body">
+          <div style="display:flex;gap:var(--space-2)">
+            <div class="config-field" style="flex:1"><div class="config-field-label">最大并发数</div><input class="config-input" type="number" value="10" min="1" /></div>
+            <div class="config-field" style="flex:1">
+              <div class="config-field-label">排队策略</div>
+              <select class="config-select"><option>排队等待</option><option>直接拒绝</option></select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-section settings-collapsible">
+        <div class="settings-section-title" onclick="toggleSettingsSection(this)" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between">${icons.alertTriangle} 告警配置 <span class="settings-toggle-icon">${icons.chevronDown || icons.arrowDown}</span></div>
+        <div class="settings-section-body">
+          <div class="config-field">
+            <div class="config-field-label" style="display:flex;justify-content:space-between;align-items:center">启用告警 <label class="toggle-sm"><input type="checkbox" checked /><span class="toggle-sm-slider"></span></label></div>
+          </div>
+          <div class="config-field">
+            <div class="config-field-label">触发条件</div>
+            <div style="display:flex;flex-direction:column;gap:6px;font-size:var(--font-size-xs)">
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" checked style="accent-color:var(--md-primary)"> 流程执行失败</label>
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" checked style="accent-color:var(--md-primary)"> 流程执行超时</label>
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" style="accent-color:var(--md-primary)"> 节点执行异常</label>
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" style="accent-color:var(--md-primary)"> 节点转人工处理</label>
+            </div>
+          </div>
+          <div class="config-field"><div class="config-field-label">静默期(分钟)</div><input class="config-input" type="number" value="5" min="1" /></div>
+        </div>
+      </div>
+
+      <div class="settings-section settings-collapsible">
+        <div class="settings-section-title" onclick="toggleSettingsSection(this)" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between">${icons.archive} 执行记录 <span class="settings-toggle-icon">${icons.chevronDown || icons.arrowDown}</span></div>
+        <div class="settings-section-body">
+          <div class="config-field"><div class="config-field-label">保留天数</div><input class="config-input" type="number" value="90" /></div>
+          <div class="config-field">
+            <div class="config-field-label" style="display:flex;justify-content:space-between;align-items:center">记录节点详情 <label class="toggle-sm"><input type="checkbox" checked /><span class="toggle-sm-slider"></span></label></div>
+          </div>
         </div>
       </div>
     </div>`;
+}
+
+function toggleSettingsSection(titleEl) {
+  const body = titleEl.nextElementSibling;
+  const icon = titleEl.querySelector('.settings-toggle-icon');
+  if (body) {
+    const isHidden = body.style.display === 'none';
+    body.style.display = isHidden ? 'block' : 'none';
+    if (icon) icon.style.transform = isHidden ? '' : 'rotate(-90deg)';
+  }
 }
 
 // --- Version Panel ---
@@ -1656,9 +1793,17 @@ function showPublishDialog() {
   }
 
   const newVersion = (wf.version || 0) + 1;
-  showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">发布工作流</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
-    <div style="text-align:center;margin-bottom:var(--space-4)"><span class="publish-version-badge">v${newVersion}</span></div>
-    <div class="config-field"><div class="config-field-label">版本说明 <span class="required">*</span></div><textarea class="form-textarea" id="publishNote" placeholder="请输入版本说明..." maxlength="500" style="min-height:80px"></textarea><div class="form-error hidden" id="publishNoteError"></div></div>
+  const nodeCount = designerNodes.length;
+  const connCount = designerConnections.length;
+  showModal(`<div class="modal" style="max-width:480px"><div class="modal-header"><h2 class="modal-title">发布工作流</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
+    <div class="publish-summary">
+      <div class="publish-version-badge">v${newVersion}</div>
+      <div class="publish-meta">
+        <span>${wf.name}</span>
+        <span class="publish-stats">${nodeCount} 个节点 / ${connCount} 条连线</span>
+      </div>
+    </div>
+    <div class="config-field" style="margin-top:var(--space-4)"><div class="config-field-label">版本说明 <span class="required">*</span></div><textarea class="form-textarea" id="publishNote" placeholder="请描述本次发布的变更内容..." maxlength="500" style="min-height:80px;width:100%;box-sizing:border-box;resize:vertical"></textarea><div class="form-error hidden" id="publishNoteError"></div></div>
   </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="executePublish(${newVersion})">确认发布</button></div></div>`);
 }
 
@@ -1685,6 +1830,8 @@ function executePublish(version) {
   wf.editedAt = ts;
 
   closeModal();
+  // Exit debug mode after publishing so canvas remains editable
+  if (designerDebugMode) exitDebugMode();
   renderDesigner();
   showToast('success', '发布成功', `v${version} 已发布`);
 }
@@ -1708,11 +1855,12 @@ function showQuickNodeSearch(e) {
   const rect = document.getElementById('canvasContainer').getBoundingClientRect();
   const dropX = (e.clientX - rect.left - designerPanX) / designerZoom;
   const dropY = (e.clientY - rect.top - designerPanY) / designerZoom;
+  const filteredTypes = nodeTypes.filter(nt => !nt.hidden);
 
   showModal(`<div class="modal" style="max-width:400px"><div class="modal-header"><h2 class="modal-title">快速添加节点</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
     <input type="text" class="form-input" placeholder="搜索节点类型..." oninput="filterQuickSearch(this.value)" style="margin-bottom:var(--space-3)" />
     <div id="quickSearchResults" style="max-height:300px;overflow-y:auto">
-      ${nodeTypes.map(nt => `<div class="quick-search-item" onclick="closeModal();addNodeToCanvas('${nt.type}', ${Math.round(dropX)}, ${Math.round(dropY)})">
+      ${filteredTypes.map(nt => `<div class="quick-search-item" data-name="${nt.name}" onclick="closeModal();addNodeToCanvas('${nt.type}', ${Math.round(dropX)}, ${Math.round(dropY)})">
         <div class="quick-search-item-icon ${nt.color}">${nt.icon}</div>
         <div><div style="font-size:var(--font-size-sm);font-weight:500">${nt.name}</div><div style="font-size:11px;color:var(--md-outline)">${nt.desc}</div></div>
       </div>`).join('')}
@@ -1722,9 +1870,9 @@ function showQuickNodeSearch(e) {
 
 function filterQuickSearch(query) {
   const q = query.toLowerCase();
-  document.querySelectorAll('#quickSearchResults .quick-search-item').forEach((item, i) => {
-    const nt = nodeTypes[i];
-    item.style.display = (nt && nt.name.toLowerCase().includes(q)) ? 'flex' : 'none';
+  document.querySelectorAll('#quickSearchResults .quick-search-item').forEach((item) => {
+    const name = (item.getAttribute('data-name') || '').toLowerCase();
+    item.style.display = name.includes(q) ? 'flex' : 'none';
   });
 }
 
@@ -1769,6 +1917,11 @@ function deleteVariable(varName) {
 }
 
 // --- Minimap ---
+let _minimapDragging = false;
+let _minimapScale = 1;
+let _minimapMinX = 0;
+let _minimapMinY = 0;
+
 function renderMinimap() {
   if (designerNodes.length === 0) return '';
   const minX = Math.min(...designerNodes.map(n => n.x));
@@ -1778,15 +1931,50 @@ function renderMinimap() {
   const w = maxX - minX || 1;
   const h = maxY - minY || 1;
   const scale = Math.min(160 / w, 100 / h);
+  _minimapScale = scale;
+  _minimapMinX = minX;
+  _minimapMinY = minY;
 
-  return `<div class="canvas-minimap">
+  return `<div class="canvas-minimap" onmousedown="onMinimapMouseDown(event)">
     ${designerNodes.map(n => {
       const nx = (n.x - minX) * scale + 10;
       const ny = (n.y - minY) * scale + 10;
       return `<div class="minimap-node" style="left:${nx}px;top:${ny}px;width:${20 * scale}px;height:${8 * scale}px"></div>`;
     }).join('')}
-    <div class="minimap-viewport" style="left:${10 - designerPanX * scale / designerZoom / 10}px;top:${10 - designerPanY * scale / designerZoom / 10}px;width:60px;height:40px"></div>
+    <div class="minimap-viewport" id="minimapViewport" style="left:${10 - designerPanX * scale / designerZoom / 10}px;top:${10 - designerPanY * scale / designerZoom / 10}px;width:60px;height:40px;cursor:grab"></div>
   </div>`;
+}
+
+function onMinimapMouseDown(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  _minimapDragging = true;
+  const minimapRect = e.currentTarget.getBoundingClientRect();
+  onMinimapDrag(e, minimapRect);
+
+  const onMove = (ev) => { onMinimapDrag(ev, minimapRect); };
+  const onUp = () => {
+    _minimapDragging = false;
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+  };
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', onUp);
+}
+
+function onMinimapDrag(e, minimapRect) {
+  const mx = e.clientX - minimapRect.left - 10;
+  const my = e.clientY - minimapRect.top - 10;
+  // Convert minimap coords to canvas coords
+  const canvasX = mx / _minimapScale + _minimapMinX;
+  const canvasY = my / _minimapScale + _minimapMinY;
+  // Center the viewport on the clicked point
+  const containerEl = document.getElementById('canvasContainer');
+  if (!containerEl) return;
+  const cRect = containerEl.getBoundingClientRect();
+  designerPanX = -(canvasX * designerZoom - cRect.width / 2);
+  designerPanY = -(canvasY * designerZoom - cRect.height / 2);
+  updateCanvasTransform();
 }
 
 // --- Keyboard Shortcuts ---

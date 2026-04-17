@@ -345,9 +345,11 @@
 .node-type-desc {
   font-size: 11px;
   color: var(--md-outline);
-  white-space: nowrap;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 /* Node type colors */
@@ -388,6 +390,7 @@
   width: 100%;
   height: 100%;
   pointer-events: none;
+  z-index: 1;
 }
 
 .canvas-svg path {
@@ -396,13 +399,15 @@
 }
 
 .canvas-svg path:hover {
-  stroke-width: 3;
+  stroke-width: 3.5;
+  filter: drop-shadow(0 0 3px rgba(103, 80, 164, 0.4));
 }
 
 .canvas-nodes {
   position: absolute;
   inset: 0;
   transform-origin: 0 0;
+  z-index: 2;
 }
 
 /* --- Canvas Node --- */
@@ -1386,14 +1391,40 @@
 
 /* --- Publish Dialog --- */
 .publish-version-badge {
-  font-size: var(--font-size-lg);
-  font-weight: 600;
+  font-size: 20px;
+  font-weight: 700;
   color: var(--md-primary);
   background: var(--md-primary-container);
-  padding: 4px 12px;
+  padding: 6px 16px;
   border-radius: var(--radius-sm);
   display: inline-block;
-  margin-bottom: var(--space-3);
+  font-family: var(--font-family-mono);
+  letter-spacing: 0.02em;
+}
+
+.publish-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--md-surface-container);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--md-outline-variant);
+}
+
+.publish-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--md-on-surface);
+}
+
+.publish-stats {
+  font-size: var(--font-size-xs);
+  color: var(--md-outline);
+  font-weight: 400;
 }
 
 /* --- Read-only Mode Banner --- */
@@ -1727,4 +1758,245 @@
   color: var(--md-on-surface-variant);
   font-family: var(--font-family-mono);
   font-weight: 500;
+}
+
+/* ========== New Feature Styles (Phase 7) ========== */
+
+/* --- Node Panel Pin Button --- */
+.node-panel-pin {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--md-on-surface-variant);
+  cursor: pointer;
+  transition: var(--transition-fast);
+  margin-left: auto;
+  flex-shrink: 0;
+  opacity: 0;
+}
+
+.node-panel.expanded .node-panel-pin {
+  opacity: 1;
+}
+
+.node-panel-pin:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--md-on-surface);
+}
+
+.node-panel-pin.active {
+  background: var(--md-primary-container);
+  color: var(--md-primary);
+  transform: rotate(45deg);
+}
+
+.node-panel-pin svg {
+  width: 14px;
+  height: 14px;
+}
+
+.node-panel.pinned {
+  width: 240px;
+}
+
+/* Node panel hint at bottom */
+.node-panel-hint {
+  padding: var(--space-2) var(--space-3);
+  font-size: 10px;
+  color: var(--md-outline);
+  border-top: 1px solid var(--md-outline-variant);
+  text-align: center;
+  flex-shrink: 0;
+  display: none;
+}
+
+.node-panel.expanded .node-panel-hint {
+  display: block;
+}
+
+/* --- Settings Panel Enhancements --- */
+.settings-hint {
+  font-size: var(--font-size-xs);
+  color: var(--md-outline);
+  margin-bottom: var(--space-3);
+  padding: 6px 10px;
+  background: var(--md-surface-container);
+  border-radius: var(--radius-sm);
+}
+
+.config-field-help {
+  font-size: 11px;
+  color: var(--md-outline);
+  margin-top: 2px;
+  line-height: 1.4;
+}
+
+.config-readonly-value {
+  font-size: var(--font-size-sm);
+  color: var(--md-outline);
+  padding: 6px 0;
+}
+
+.settings-collapsible .settings-section-body {
+  transition: none;
+}
+
+.settings-toggle-icon {
+  transition: transform 0.2s;
+  display: flex;
+  align-items: center;
+}
+
+.settings-toggle-icon svg {
+  width: 14px;
+  height: 14px;
+  color: var(--md-outline);
+}
+
+/* --- Trigger Input Parameter Card --- */
+.trigger-param-card {
+  padding: 8px 10px;
+  background: var(--md-surface-container);
+  border-radius: var(--radius-sm);
+  margin-bottom: var(--space-2);
+  border-left: 3px solid var(--md-primary-container);
+  transition: border-color 0.15s;
+}
+
+.trigger-param-card:hover {
+  border-left-color: var(--md-primary);
+}
+
+.trigger-param-card .config-input,
+.trigger-param-card .config-select {
+  height: 28px;
+  font-size: 11px;
+}
+
+/* --- Loop Mode Selection Cards --- */
+.loop-mode-cards {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.loop-mode-card {
+  flex: 1;
+  padding: 10px;
+  border: 2px solid var(--md-outline-variant);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: var(--transition-fast);
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.loop-mode-card:hover {
+  border-color: var(--md-primary);
+  background: rgba(103, 80, 164, 0.03);
+}
+
+.loop-mode-card.active {
+  border-color: var(--md-primary);
+  background: var(--md-primary-container);
+}
+
+.loop-mode-card-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.loop-mode-card-info {
+  min-width: 0;
+}
+
+.loop-mode-card-title {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--md-on-surface);
+}
+
+.loop-mode-card-desc {
+  font-size: 10px;
+  color: var(--md-outline);
+  margin-top: 2px;
+  line-height: 1.3;
+}
+
+/* --- Node Help Section --- */
+.node-help-section {
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--md-surface-container-high);
+}
+
+/* --- Minimap Draggable Cursor --- */
+.canvas-minimap {
+  cursor: pointer;
+}
+
+.minimap-viewport {
+  cursor: grab;
+}
+
+.minimap-viewport:active {
+  cursor: grabbing;
+}
+
+/* --- Quick Search item in modal --- */
+.quick-search-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 10px var(--space-3);
+  cursor: pointer;
+  transition: background 0.15s;
+  border-radius: var(--radius-sm);
+}
+
+.quick-search-item:hover {
+  background: rgba(103, 80, 164, 0.06);
+}
+
+.quick-search-item-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+/* --- Toolbar button tooltip styles --- */
+.toolbar-btn[title],
+.canvas-control-btn[title],
+.designer-back-btn[title],
+.btn[title] {
+  position: relative;
+}
+
+/* Debug mode bar */
+.debug-mode-bar {
+  height: 32px;
+  background: var(--md-info-container, #E3F2FD);
+  color: var(--md-info, #1565C0);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.debug-mode-bar svg {
+  width: 16px;
+  height: 16px;
 }
