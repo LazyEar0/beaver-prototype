@@ -789,14 +789,52 @@ function confirmDeleteItem(dsId, key) {
   closeModal(); showToast('success', '删除成功', '数据项已删除'); render();
 }
 
+let _selectedSpaces = [];
 function showAddSpaceModal(dsId) {
   const ds = dataSources.find(d => d.id === dsId); if (!ds) return;
   const available = allSpaces.filter(s => !ds.authorizedSpaces.includes(s));
   if (available.length === 0) { showToast('info', '提示', '所有空间均已授权'); return; }
+  _selectedSpaces = [];
   showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">添加授权空间</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
   <div style="margin-bottom:var(--space-3)"><div class="filter-search" style="width:100%">${icons.search}<input type="text" id="spaceSearchInput" placeholder="搜索空间名称..." oninput="filterSpaceList(${dsId})" /></div></div>
-  <div style="max-height:320px;overflow-y:auto"><div class="auth-space-list" id="spaceListContainer">${available.map(space => `<div class="clickable-list-item" data-space-name="${space}" onclick="addSpace(${dsId}, '${space}')"><div class="auth-space-info"><div class="auth-space-icon ${spaceColors[allSpaces.indexOf(space) % spaceColors.length]}">${space.charAt(0)}</div><div><div class="auth-space-name">${space}</div></div></div>${icons.plus}</div>`).join('')}</div></div>
-  </div></div>`);
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-2);padding:0 var(--space-1)">
+    <label style="display:flex;align-items:center;gap:var(--space-2);cursor:pointer;font-size:var(--font-size-sm);color:var(--md-on-surface-variant);user-select:none"><input type="checkbox" id="selectAllSpaces" onchange="toggleSelectAllSpaces(${dsId})" style="width:16px;height:16px;cursor:pointer;accent-color:var(--md-primary)" /> 全选</label>
+    <span id="spaceSelectionCount" style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant)">已选 0 / ${available.length} 个空间</span>
+  </div>
+  <div style="max-height:320px;overflow-y:auto"><div class="auth-space-list" id="spaceListContainer">${available.map(space => `<div class="clickable-list-item" data-space-name="${space}" onclick="toggleSpaceSelection(${dsId}, '${space}', this)" style="cursor:pointer"><label style="display:flex;align-items:center;gap:var(--space-3);width:100%;cursor:pointer"><input type="checkbox" class="space-checkbox" data-space="${space}" style="width:16px;height:16px;cursor:pointer;accent-color:var(--md-primary);flex-shrink:0" onclick="event.stopPropagation();toggleSpaceSelection(${dsId}, '${space}', this.closest('.clickable-list-item'))" /><div class="auth-space-info" style="pointer-events:none"><div class="auth-space-icon ${spaceColors[allSpaces.indexOf(space) % spaceColors.length]}">${space.charAt(0)}</div><div><div class="auth-space-name">${space}</div></div></div></label></div>`).join('')}</div></div>
+  </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" id="confirmAddSpacesBtn" onclick="confirmAddSpaces(${dsId})" disabled>确认添加</button></div></div>`);
+}
+function toggleSpaceSelection(dsId, space, itemEl) {
+  const cb = itemEl.querySelector('.space-checkbox');
+  if (document.activeElement !== cb) cb.checked = !cb.checked;
+  if (cb.checked) { if (!_selectedSpaces.includes(space)) _selectedSpaces.push(space); }
+  else { _selectedSpaces = _selectedSpaces.filter(s => s !== space); }
+  updateSpaceSelectionCount(dsId);
+}
+function toggleSelectAllSpaces(dsId) {
+  const selectAll = document.getElementById('selectAllSpaces');
+  const visibleItems = Array.from(document.querySelectorAll('#spaceListContainer .clickable-list-item')).filter(el => el.style.display !== 'none');
+  visibleItems.forEach(item => {
+    const cb = item.querySelector('.space-checkbox');
+    const space = item.getAttribute('data-space-name');
+    cb.checked = selectAll.checked;
+    if (selectAll.checked) { if (!_selectedSpaces.includes(space)) _selectedSpaces.push(space); }
+    else { _selectedSpaces = _selectedSpaces.filter(s => s !== space); }
+  });
+  updateSpaceSelectionCount(dsId);
+}
+function updateSpaceSelectionCount(dsId) {
+  const ds = dataSources.find(d => d.id === dsId); if (!ds) return;
+  const total = allSpaces.filter(s => !ds.authorizedSpaces.includes(s)).length;
+  const countEl = document.getElementById('spaceSelectionCount');
+  const btn = document.getElementById('confirmAddSpacesBtn');
+  if (countEl) countEl.textContent = `已选 ${_selectedSpaces.length} / ${total} 个空间`;
+  if (btn) { btn.disabled = _selectedSpaces.length === 0; btn.textContent = _selectedSpaces.length > 0 ? `确认添加 (${_selectedSpaces.length})` : '确认添加'; }
+  const allCbs = document.querySelectorAll('#spaceListContainer .space-checkbox');
+  const visibleCbs = Array.from(allCbs).filter(cb => cb.closest('.clickable-list-item').style.display !== 'none');
+  const allChecked = visibleCbs.length > 0 && visibleCbs.every(cb => cb.checked);
+  const selectAllCb = document.getElementById('selectAllSpaces');
+  if (selectAllCb) { selectAllCb.checked = allChecked; selectAllCb.indeterminate = !allChecked && visibleCbs.some(cb => cb.checked); }
 }
 function filterSpaceList(dsId) {
   const keyword = document.getElementById('spaceSearchInput').value.trim().toLowerCase();
@@ -805,6 +843,13 @@ function filterSpaceList(dsId) {
     const name = item.getAttribute('data-space-name').toLowerCase();
     item.style.display = name.includes(keyword) ? '' : 'none';
   });
+  updateSpaceSelectionCount(dsId);
+}
+function confirmAddSpaces(dsId) {
+  const ds = dataSources.find(d => d.id === dsId); if (!ds || _selectedSpaces.length === 0) return;
+  _selectedSpaces.forEach(space => { if (!ds.authorizedSpaces.includes(space)) ds.authorizedSpaces.push(space); });
+  const count = _selectedSpaces.length; _selectedSpaces = [];
+  closeModal(); showToast('success', '授权成功', `已授权 ${count} 个空间`); render();
 }
 function addSpace(dsId, space) { const ds = dataSources.find(d => d.id === dsId); if (!ds) return; ds.authorizedSpaces.push(space); closeModal(); showToast('success', '授权成功', `已授权「${space}」`); render(); }
 function removeSpace(dsId, space) {
@@ -1193,7 +1238,7 @@ function navigateToWsFolderByIndex(idx) { if (idx < 0 || idx >= wsFolderPath.len
 
 // --- Folder CRUD ---
 function showCreateFolderModal() {
-  showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">新建文件夹</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body"><div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">文件夹名称 <span class="required">*</span></label><input type="text" class="form-input" id="folderName" placeholder="请输入文件夹名称" maxlength="50" oninput="this.classList.remove('error');document.getElementById('folderNameError').classList.add('hidden')" /><div class="form-error hidden" id="folderNameError"></div></div><div class="form-group"><label class="form-label">描述</label><textarea class="form-textarea" id="folderDesc" placeholder="选填" maxlength="500"></textarea></div></div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="createFolder()">保存</button></div></div>`);
+  showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">新建文件夹</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body"><div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">文件夹名称 <span class="required">*</span></label><input type="text" class="form-input" id="folderName" placeholder="请输入文件夹名称" maxlength="50" oninput="this.classList.remove('error');document.getElementById('folderNameError').classList.add('hidden')" onblur="validateRequiredOnBlur(this,'folderNameError','请输入文件夹名称')" /><div class="form-error hidden" id="folderNameError"></div></div><div class="form-group"><label class="form-label">描述</label><textarea class="form-textarea" id="folderDesc" placeholder="选填" maxlength="500"></textarea></div></div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="createFolder()">保存</button></div></div>`);
   setTimeout(() => document.getElementById('folderName')?.focus(), 300);
 }
 function createFolder() {
@@ -1211,7 +1256,7 @@ function createFolder() {
 }
 function showEditFolderModal(folderId) {
   const f = (wsFolders[wsCurrentId] || []).find(x => x.id === folderId); if (!f) return;
-  showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">编辑文件夹</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body"><div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">文件夹名称 <span class="required">*</span></label><input type="text" class="form-input" id="folderName" value="${f.name}" maxlength="50" oninput="this.classList.remove('error');document.getElementById('folderNameError').classList.add('hidden')" /><div class="form-error hidden" id="folderNameError"></div></div><div class="form-group"><label class="form-label">描述</label><textarea class="form-textarea" id="folderDesc" maxlength="500">${f.desc || ''}</textarea></div></div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="updateFolder(${folderId})">保存</button></div></div>`);
+  showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">编辑文件夹</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body"><div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">文件夹名称 <span class="required">*</span></label><input type="text" class="form-input" id="folderName" value="${f.name}" maxlength="50" oninput="this.classList.remove('error');document.getElementById('folderNameError').classList.add('hidden')" onblur="validateRequiredOnBlur(this,'folderNameError','请输入文件夹名称')" /><div class="form-error hidden" id="folderNameError"></div></div><div class="form-group"><label class="form-label">描述</label><textarea class="form-textarea" id="folderDesc" maxlength="500">${f.desc || ''}</textarea></div></div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="updateFolder(${folderId})">保存</button></div></div>`);
 }
 function updateFolder(folderId) {
   const f = (wsFolders[wsCurrentId] || []).find(x => x.id === folderId); if (!f) return;
@@ -1331,8 +1376,8 @@ function moveFolder(folderId, targetParentId) {
 function showCreateWfModal() {
   const ws = workspaces.find(w => w.id === wsCurrentId);
   showModal(`<div class="modal" style="max-width:520px"><div class="modal-header"><h2 class="modal-title">新建工作流</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
-  <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">工作流名称 <span class="required">*</span></label><input type="text" class="form-input" id="wfName" placeholder="请输入工作流名称" maxlength="50" oninput="this.classList.remove('error');document.getElementById('wfNameError').classList.add('hidden')" /><div class="form-error hidden" id="wfNameError"></div></div>
-  <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">工作流编号 <span class="required">*</span></label><input type="text" class="form-input" id="wfCode" placeholder="英文、数字、下划线、连字符" maxlength="30" oninput="this.classList.remove('error');document.getElementById('wfCodeError').classList.add('hidden')" /><div class="form-error hidden" id="wfCodeError"></div></div>
+  <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">工作流名称 <span class="required">*</span></label><input type="text" class="form-input" id="wfName" placeholder="请输入工作流名称" maxlength="50" oninput="this.classList.remove('error');document.getElementById('wfNameError').classList.add('hidden')" onblur="validateRequiredOnBlur(this,'wfNameError','请输入工作流名称')" /><div class="form-error hidden" id="wfNameError"></div></div>
+  <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">工作流编号 <span class="required">*</span></label><input type="text" class="form-input" id="wfCode" placeholder="英文、数字、下划线、连字符" maxlength="30" oninput="this.classList.remove('error');document.getElementById('wfCodeError').classList.add('hidden')" onblur="validateRequiredOnBlur(this,'wfCodeError','请输入工作流编号')" /><div class="form-error hidden" id="wfCodeError"></div></div>
   <div style="display:flex;gap:var(--space-4);margin-bottom:var(--space-4)">
     <div class="form-group" style="flex:1"><label class="form-label">工作流类型 <span class="required">*</span></label><select class="form-input" id="wfType"><option value="app">应用流</option><option value="chat">对话流</option></select></div>
     <div class="form-group" style="flex:1"><label class="form-label">流程负责人 <span class="required">*</span></label><select class="form-input" id="wfOwner">${ws.members.filter(m => m.role !== 'viewer').map(m => `<option value="${m.userId}">${m.name}</option>`).join('')}</select></div>
@@ -2208,22 +2253,22 @@ function initClickSpark() {
     const btn = e.target.closest('.btn-primary, .btn-danger');
     if (!btn) return;
 
-    const count = 12;
+    const count = 14;
     const sparks = [];
     for (let i = 0; i < count; i++) {
       const spark = document.createElement('div');
       spark.className = 'click-spark';
       const angle = (360 / count) * i + (Math.random() * 20 - 10);
-      const distance = 28 + Math.random() * 30;
+      const distance = 35 + Math.random() * 40;
       spark.style.left = `${e.clientX}px`;
       spark.style.top = `${e.clientY}px`;
       spark.style.setProperty('--spark-rotation', `rotate(${angle}deg)`);
       spark.style.setProperty('--spark-distance', `-${distance}px`);
-      spark.style.animationDuration = `${0.4 + Math.random() * 0.3}s`;
+      spark.style.animationDuration = `${0.5 + Math.random() * 0.4}s`;
       sparkContainer.appendChild(spark);
       sparks.push(spark);
     }
-    setTimeout(() => sparks.forEach(s => s.remove()), 800);
+    setTimeout(() => sparks.forEach(s => s.remove()), 1200);
   });
 }
 
