@@ -385,7 +385,7 @@ function renderDsListPage() {
       const sel = listState.creatorFilter.includes(c);
       return `<div class="creator-dropdown-item ${sel ? 'selected' : ''}" onclick="toggleCreatorSelection('${c}')"><span class="creator-avatar-sm">${c.charAt(0)}</span><span>${c}</span><span class="check-icon">${icons.check}</span></div>`;
     }).join('')}</div>
-    <div class="creator-dropdown-footer">${listState.creatorFilter.length > 0 ? `<button class="creator-dropdown-clear" onclick="event.stopPropagation();clearDsCreatorFilter()">清空</button>` : ''}<button class="creator-dropdown-done" onclick="event.stopPropagation();toggleCreatorDropdown()">确定</button></div></div>` : '';
+    <div class="creator-dropdown-footer">${listState.creatorFilter.length > 0 ? `<button class="creator-dropdown-clear" onclick="event.stopPropagation();clearDsCreatorFilter()">清空</button>` : ''}</div></div>` : '';
 
   return `
     <div class="page-header"><div class="page-title-section"><h1 class="page-title shiny-text">数据源管理</h1><p class="page-subtitle">管理和维护系统数据字典及配置数据</p></div><button class="btn btn-primary magnet-btn" onclick="showCreateDsModal()">${icons.plus}<span>新建数据源</span></button></div>
@@ -397,7 +397,7 @@ function renderDsListPage() {
         ${hasFilters ? `<button class="filter-reset-btn" onclick="clearAllFilters()" style="margin-left:auto">${icons.close}<span>清除</span></button>` : ''}
       </div>
       <div class="filter-panel ${listState.filterPanelOpen ? '' : 'collapsed'}">
-        <div class="filter-group"><span class="filter-label">授权方式</span><div class="filter-chips">
+        <div class="filter-group"><span class="filter-label">可见范围</span><div class="filter-chips">
           <span class="filter-chip ${listState.authFilter === 'all' ? 'active' : ''}" onclick="onFilterAuth('all')">全部</span>
           <span class="filter-chip ${listState.authFilter === 'public' ? 'active' : ''}" onclick="onFilterAuth('public')">公开</span>
           <span class="filter-chip ${listState.authFilter === 'private' ? 'active' : ''}" onclick="onFilterAuth('private')">指定空间</span>
@@ -502,6 +502,17 @@ function validateDsNameRealtime(input) {
   if (val && !/^[\u4e00-\u9fa5a-zA-Z0-9_-]*$/.test(val)) { input.classList.add('error'); if (ne) { ne.textContent = '仅支持中文、英文、数字、下划线和连字符'; ne.classList.remove('hidden'); } }
   else { input.classList.remove('error'); if (ne) ne.classList.add('hidden'); }
 }
+function validateDsNameOnBlur(input) {
+  const val = input.value.trim(), ne = document.getElementById('nameError');
+  if (!val) { input.classList.add('error'); if (ne) { ne.textContent = '数据源名称不能为空'; ne.classList.remove('hidden'); } }
+  else if (!/^[\u4e00-\u9fa5a-zA-Z0-9_-]*$/.test(val)) { input.classList.add('error'); if (ne) { ne.textContent = '仅支持中文、英文、数字、下划线和连字符'; ne.classList.remove('hidden'); } }
+  else { input.classList.remove('error'); if (ne) ne.classList.add('hidden'); }
+}
+function validateRequiredOnBlur(input, errorId, msg) {
+  const val = input.value.trim(), ne = document.getElementById(errorId);
+  if (!val) { input.classList.add('error'); if (ne) { ne.textContent = msg; ne.classList.remove('hidden'); } }
+  else { input.classList.remove('error'); if (ne) ne.classList.add('hidden'); }
+}
 function onItemPageChange(page) { itemPage = page; render(); }
 function onItemPageSizeChange(size) { itemPageSize = parseInt(size); itemPage = 1; render(); }
 function renderPagination(current, total) {
@@ -554,8 +565,8 @@ function renderDataItemsTab(ds) {
     ? `<span title="已达数据项上限（500条），无法继续添加" style="cursor:not-allowed"><button class="btn btn-primary btn-sm" disabled style="opacity:0.5;cursor:not-allowed;pointer-events:none">${icons.plus}<span>添加数据项</span></button></span>`
     : `<button class="btn btn-primary btn-sm" onclick="showAddItemModal(${ds.id})">${icons.plus}<span>添加数据项</span></button>`;
   return `<div class="tab-toolbar"><div class="tab-toolbar-left"><span class="item-count">共 <strong>${ds.items.length}</strong> 条</span></div><div class="tab-toolbar-right">${addBtn}</div></div>
-  <div class="table-wrapper"><table class="data-table"><thead><tr><th class="sortable" onclick="toggleItemSort('key')">Key <span class="sort-icon">${si('key')}</span></th><th class="sortable" onclick="toggleItemSort('value')">Value <span class="sort-icon">${si('value')}</span></th><th style="width:90px">类型</th><th style="width:130px">更新时间</th><th style="width:90px">操作</th></tr></thead><tbody>
-  ${paged.map(item => `<tr><td><code class="item-key">${item.key}</code></td><td>${item.value}</td><td><span class="badge badge-type">${item.type}</span></td><td style="font-size:var(--font-size-xs);color:var(--md-outline)">${item.updatedAt || '-'}</td><td><div class="table-actions"><button class="table-action-btn" title="编辑" onclick="showEditItemModal(${ds.id}, '${item.key}')">${icons.edit}</button><button class="table-action-btn danger" title="删除" onclick="deleteItem(${ds.id}, '${item.key}')">${icons.trash}</button></div></td></tr>`).join('')}
+  <div class="table-wrapper"><table class="data-table"><thead><tr><th style="width:180px" class="sortable" onclick="toggleItemSort('key')">Key <span class="sort-icon">${si('key')}</span></th><th class="sortable" onclick="toggleItemSort('value')">Value <span class="sort-icon">${si('value')}</span></th><th style="width:90px">类型</th><th style="width:130px">更新时间</th><th style="width:90px">操作</th></tr></thead><tbody>
+  ${paged.map(item => `<tr><td style="width:180px"><code class="item-key">${item.key}</code></td><td><div style="max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(item.value)}">${item.value}</div></td><td><span class="badge badge-type">${item.type}</span></td><td style="font-size:var(--font-size-xs);color:var(--md-outline)">${item.updatedAt || '-'}</td><td><div class="table-actions"><button class="table-action-btn" title="编辑" onclick="showEditItemModal(${ds.id}, '${item.key}')">${icons.edit}</button><button class="table-action-btn danger" title="删除" onclick="deleteItem(${ds.id}, '${item.key}')">${icons.trash}</button></div></td></tr>`).join('')}
   </tbody></table></div>
   ${totalPages > 1 ? `<div class="pagination"><div class="pagination-info"><span>共 ${total} 条记录</span><span class="pagination-size"><label>每页</label><select onchange="onItemPageSizeChange(this.value)">${[10,20,50].map(n => `<option value="${n}" ${itemPageSize === n ? 'selected' : ''}>${n}</option>`).join('')}</select><label>条</label></span></div><div class="pagination-controls"><button class="pagination-btn" ${itemPage <= 1 ? 'disabled' : ''} onclick="onItemPageChange(${itemPage - 1})">${icons.chevronLeft}</button>${Array.from({length: totalPages}, (_, i) => i + 1).map(p => `<button class="pagination-btn ${p === itemPage ? 'active' : ''}" onclick="onItemPageChange(${p})">${p}</button>`).join('')}<button class="pagination-btn" ${itemPage >= totalPages ? 'disabled' : ''} onclick="onItemPageChange(${itemPage + 1})">${icons.chevronRight}</button></div></div>` : ''}`;
 }
@@ -563,7 +574,7 @@ function toggleItemSort(field) { if (itemSortField === field) itemSortAsc = !ite
 
 function renderAuthTab(ds) {
   const authToggle = `<div style="display:flex;align-items:center;gap:var(--space-4);margin-bottom:var(--space-5)">
-    <span style="font-size:var(--font-size-sm);font-weight:500;color:var(--md-on-surface-variant);white-space:nowrap">授权方式</span>
+    <span style="font-size:var(--font-size-sm);font-weight:500;color:var(--md-on-surface-variant);white-space:nowrap">可见范围</span>
     <div class="segmented-control" style="flex:1;max-width:360px">
       <button class="segmented-control-btn ${ds.isPublic ? 'active' : ''}" onclick="switchAuthType(${ds.id}, true)">${icons.globe}<span>公开</span></button>
       <button class="segmented-control-btn ${!ds.isPublic ? 'active' : ''}" onclick="switchAuthType(${ds.id}, false)">${icons.lock}<span>指定空间</span></button>
@@ -626,7 +637,7 @@ function closeModal() { const o = document.getElementById('modalContainer'); o.c
 
 // --- DS CRUD ---
 function showCreateDsModal() {
-  showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">新建数据源</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body"><div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">数据源名称 <span class="required">*</span></label><input type="text" class="form-input" id="dsName" placeholder="请输入数据源名称" maxlength="50" oninput="validateDsNameRealtime(this)" /><div class="form-error hidden" id="nameError"></div></div><div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">描述</label><textarea class="form-textarea" id="dsDesc" placeholder="请输入描述（选填）" maxlength="200"></textarea></div><div class="form-group"><label class="form-label">授权方式</label><div class="radio-group"><label class="radio-item"><input type="radio" name="dsAuth" value="public" checked /> ${icons.globe} 公开</label><label class="radio-item"><input type="radio" name="dsAuth" value="private" /> ${icons.lock} 指定空间</label></div></div></div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="createDataSource()">保存</button></div></div>`);
+  showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">新建数据源</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body"><div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">数据源名称 <span class="required">*</span></label><input type="text" class="form-input" id="dsName" placeholder="请输入数据源名称" maxlength="50" oninput="validateDsNameRealtime(this)" onblur="validateDsNameOnBlur(this)" /><div class="form-error hidden" id="nameError"></div></div><div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">描述</label><textarea class="form-textarea" id="dsDesc" placeholder="请输入描述（选填）" maxlength="200"></textarea></div><div class="form-group"><label class="form-label">可见范围</label><div class="radio-group"><label class="radio-item"><input type="radio" name="dsAuth" value="public" checked /> ${icons.globe} 公开</label><label class="radio-item"><input type="radio" name="dsAuth" value="private" /> ${icons.lock} 指定空间</label></div></div></div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="createDataSource()">保存</button></div></div>`);
   setTimeout(() => document.getElementById('dsName')?.focus(), 300);
 }
 function createDataSource() {
@@ -644,7 +655,7 @@ function createDataSource() {
 function showEditDsModal(id) {
   const ds = dataSources.find(d => d.id === id); if (!ds) return;
   showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">编辑数据源</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
-  <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">数据源名称 <span class="required">*</span></label><input type="text" class="form-input" id="dsName" value="${ds.name}" maxlength="50" oninput="validateDsNameRealtime(this)" /><div class="form-error hidden" id="nameError"></div></div>
+  <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">数据源名称 <span class="required">*</span></label><input type="text" class="form-input" id="dsName" value="${ds.name}" maxlength="50" oninput="validateDsNameRealtime(this)" onblur="validateDsNameOnBlur(this)" /><div class="form-error hidden" id="nameError"></div></div>
   <div class="form-group"><label class="form-label">描述</label><textarea class="form-textarea" id="dsDesc" maxlength="200">${ds.desc}</textarea></div>
   </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="updateDataSource(${id})">保存</button></div></div>`);
 }
@@ -708,7 +719,7 @@ const dsItemTypes = ['String', 'Integer', 'Double', 'Boolean', 'DateTime'];
 
 function showAddItemModal(dsId) {
   showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">添加数据项</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
-  <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">Key <span class="required">*</span></label><input type="text" class="form-input" id="itemKey" placeholder="英文、数字、下划线、连字符" maxlength="100" oninput="validateKeyRealtime(this)" /><div class="form-error hidden" id="keyError"></div></div>
+  <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">Key <span class="required">*</span></label><input type="text" class="form-input" id="itemKey" placeholder="英文、数字、下划线、连字符" maxlength="100" oninput="validateKeyRealtime(this)" onblur="validateRequiredOnBlur(this,'keyError','请输入 Key')" /><div class="form-error hidden" id="keyError"></div></div>
   <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">类型 <span class="required">*</span></label><select class="form-input" id="itemType" onchange="onAddItemTypeChange(${dsId})">${dsItemTypes.map(t => `<option value="${t}">${t}</option>`).join('')}</select></div>
   <div class="form-group" id="valueGroup"><label class="form-label">Value <span class="required">*</span></label>${getValueInputHtml('String', '', 'itemValue')}</div>
   </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="addItem(${dsId})">保存</button></div></div>`);
@@ -1055,7 +1066,7 @@ function renderWsWorkflowsTab(ws) {
       const sel = wsContentOwnerFilter.includes(c);
       return `<div class="creator-dropdown-item ${sel ? 'selected' : ''}" onclick="toggleWsOwnerSelection('${c}')"><span class="creator-avatar-sm">${c.charAt(0)}</span><span>${c}</span><span class="check-icon">${icons.check}</span></div>`;
     }).join('')}</div>
-    <div class="creator-dropdown-footer">${wsContentOwnerFilter.length > 0 ? `<button class="creator-dropdown-clear" onclick="event.stopPropagation();clearWsOwnerFilter()">清空</button>` : ''}<button class="creator-dropdown-done" onclick="event.stopPropagation();toggleWsOwnerDropdown()">确定</button></div></div>` : '';
+    <div class="creator-dropdown-footer">${wsContentOwnerFilter.length > 0 ? `<button class="creator-dropdown-clear" onclick="event.stopPropagation();clearWsOwnerFilter()">清空</button>` : ''}</div></div>` : '';
 
   // Build active filter count & tags (reuse DS pattern)
   const wsHasFilters = wsContentSearch || wsContentStatusFilter !== 'all' || wsContentCreatorFilter.length > 0 || wsContentOwnerFilter.length > 0 || wsContentTypeFilter !== 'all';
@@ -1879,8 +1890,8 @@ function switchMemberTab(tab) { wsMemberTab = tab; render(); }
 // --- Workspace CRUD ---
 function showCreateWsModal() {
   showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">新建空间</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
-  <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">空间名称 <span class="required">*</span></label><input type="text" class="form-input" id="wsName" placeholder="请输入空间名称" maxlength="50" oninput="this.classList.remove('error');document.getElementById('wsNameError').classList.add('hidden')" /><div class="form-error hidden" id="wsNameError"></div></div>
-  <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">空间编号 <span class="required">*</span></label><input type="text" class="form-input" id="wsCode" placeholder="英文、数字、下划线、连字符" maxlength="30" oninput="this.classList.remove('error');document.getElementById('wsCodeError').classList.add('hidden')" /><div class="form-error hidden" id="wsCodeError"></div></div>
+  <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">空间名称 <span class="required">*</span></label><input type="text" class="form-input" id="wsName" placeholder="请输入空间名称" maxlength="50" oninput="this.classList.remove('error');document.getElementById('wsNameError').classList.add('hidden')" onblur="validateRequiredOnBlur(this,'wsNameError','请输入空间名称')" /><div class="form-error hidden" id="wsNameError"></div></div>
+  <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">空间编号 <span class="required">*</span></label><input type="text" class="form-input" id="wsCode" placeholder="英文、数字、下划线、连字符" maxlength="30" oninput="this.classList.remove('error');document.getElementById('wsCodeError').classList.add('hidden')" onblur="validateRequiredOnBlur(this,'wsCodeError','请输入空间编号')" /><div class="form-error hidden" id="wsCodeError"></div></div>
   <div class="form-group"><label class="form-label">空间描述</label><textarea class="form-textarea" id="wsDesc" placeholder="选填，200字以内" maxlength="200"></textarea></div>
   </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="createWorkspace()">保存</button></div></div>`);
   setTimeout(() => document.getElementById('wsName')?.focus(), 300);
@@ -1908,7 +1919,7 @@ function createWorkspace() {
 function showEditWsModal(id) {
   const ws = workspaces.find(w => w.id === id); if (!ws) return;
   showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">编辑空间</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
-  <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">空间名称 <span class="required">*</span></label><input type="text" class="form-input" id="wsName" value="${ws.name}" maxlength="50" oninput="this.classList.remove('error');document.getElementById('wsNameError').classList.add('hidden')" /><div class="form-error hidden" id="wsNameError"></div></div>
+  <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">空间名称 <span class="required">*</span></label><input type="text" class="form-input" id="wsName" value="${ws.name}" maxlength="50" oninput="this.classList.remove('error');document.getElementById('wsNameError').classList.add('hidden')" onblur="validateRequiredOnBlur(this,'wsNameError','请输入空间名称')" /><div class="form-error hidden" id="wsNameError"></div></div>
   <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">空间编号 <span style="font-size:var(--font-size-xs);color:var(--md-outline);font-weight:400">创建后不可修改</span></label><input type="text" class="form-input" id="wsCode" value="${ws.code}" disabled style="background:var(--md-surface);color:var(--md-outline);cursor:not-allowed" /></div>
   <div class="form-group"><label class="form-label">空间描述</label><textarea class="form-textarea" id="wsDesc" maxlength="200">${ws.desc}</textarea></div>
   </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="updateWorkspace(${id})">保存</button></div></div>`);
@@ -2197,13 +2208,13 @@ function initClickSpark() {
     const btn = e.target.closest('.btn-primary, .btn-danger');
     if (!btn) return;
 
-    const count = 8;
+    const count = 12;
     const sparks = [];
     for (let i = 0; i < count; i++) {
       const spark = document.createElement('div');
       spark.className = 'click-spark';
       const angle = (360 / count) * i + (Math.random() * 20 - 10);
-      const distance = 20 + Math.random() * 20;
+      const distance = 28 + Math.random() * 30;
       spark.style.left = `${e.clientX}px`;
       spark.style.top = `${e.clientY}px`;
       spark.style.setProperty('--spark-rotation', `rotate(${angle}deg)`);
