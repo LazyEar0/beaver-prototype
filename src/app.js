@@ -7,6 +7,10 @@
 function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 let isComposing = false;
 let searchFocused = false;
+let wsListSearchFocused = false;
+let wsContentSearchFocused = false;
+let wsListSearchTimer = null;
+let wsContentSearchTimer = null;
 const icons = {
   plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/><path d="M12 5v14"/></svg>',
   search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>',
@@ -1050,7 +1054,7 @@ function renderWsListPage() {
   return `
     <div class="page-header"><div class="page-title-section"><h1 class="page-title shiny-text">空间管理</h1></div><button class="btn btn-primary magnet-btn" onclick="showCreateWsModal()">${icons.plus}<span>新建空间</span></button></div>
     <div class="filter-bar">
-      <div class="filter-search">${icons.search}<input type="text" id="wsListSearchInput" placeholder="搜索空间名称或编号..." value="${wsListState.search}" oninput="onWsSearchInput(this.value)" />${wsListState.search ? `<button class="search-clear-btn" onclick="event.stopPropagation();clearSearchInput('wsList')" title="清空">×</button>` : ''}</div>
+      <div class="filter-search">${icons.search}<input type="text" id="wsListSearchInput" placeholder="搜索空间名称或编号..." value="${escHtml(wsListState.search)}" oninput="onWsSearchInput(this.value)" onfocus="wsListSearchFocused=true" onblur="wsListSearchFocused=false" oncompositionstart="isComposing=true" oncompositionend="isComposing=false;onWsSearchInput(this.value)" />${wsListState.search ? `<button class="search-clear-btn" onclick="event.stopPropagation();clearSearchInput('wsList')" title="清空">×</button>` : ''}</div>
       <div class="filter-chips">
         <span class="filter-chip ${wsListState.roleFilter === 'all' ? 'active' : ''}" onclick="onWsRoleFilter('all')">全部</span>
         <span class="filter-chip ${wsListState.roleFilter === 'admin' ? 'active' : ''}" onclick="onWsRoleFilter('admin')">我管理的</span>
@@ -1073,7 +1077,15 @@ function getFilteredWorkspaces() {
   result.sort((a, b) => { const f = wsListState.sortField; const va = f === 'lastActiveAt' ? a.lastActiveAt : a.createdAt, vb = f === 'lastActiveAt' ? b.lastActiveAt : b.createdAt; return wsListState.sortAsc ? va.localeCompare(vb) : vb.localeCompare(va); });
   return result;
 }
-function onWsSearchInput(val) { wsListState.search = val; wsListState.page = 1; render(); }
+function onWsSearchInput(val) {
+  if (isComposing) return;
+  wsListState.search = val;
+  clearTimeout(wsListSearchTimer);
+  wsListSearchTimer = setTimeout(() => {
+    wsListState.page = 1;
+    render();
+  }, 300);
+}
 function onWsRoleFilter(val) { wsListState.roleFilter = val; wsListState.page = 1; render(); }
 function onWsSortChange(val) { wsListState.sortField = val; render(); }
 function toggleWsSortOrder() { wsListState.sortAsc = !wsListState.sortAsc; render(); }
@@ -1241,7 +1253,7 @@ function renderWsWorkflowsTab(ws) {
     ${breadcrumb}
     <div class="filter-container" style="margin-top:var(--space-3)">
       <div class="filter-toolbar">
-        <div class="filter-search">${icons.search}<input type="text" id="wsSearchInput" placeholder="搜索名称或编号..." value="${wsContentSearch}" oninput="onWsContentSearch(this.value)" /></div>
+        <div class="filter-search">${icons.search}<input type="text" id="wsSearchInput" placeholder="搜索名称或编号..." value="${escHtml(wsContentSearch)}" oninput="onWsContentSearch(this.value)" onfocus="wsContentSearchFocused=true" onblur="wsContentSearchFocused=false" oncompositionstart="isComposing=true" oncompositionend="isComposing=false;onWsContentSearch(this.value)" /></div>
         <button class="filter-toggle-btn ${wsFilterPanelOpen ? 'active' : ''}" onclick="toggleWsFilterPanel()">${icons.filter}<span>筛选</span>${wsActiveFilterCount > 0 ? `<span class="filter-badge">${wsActiveFilterCount}</span>` : ''}</button>
         ${wsFilterTagsHtml}
         ${wsHasFilters ? `<button class="filter-reset-btn" onclick="clearAllWsFilters()">${icons.close}<span>清除</span></button>` : ''}
@@ -1308,7 +1320,14 @@ function renderWsWorkflowsTab(ws) {
     </tbody></table></div></div>`}</div>`;
 }
 
-function onWsContentSearch(val) { wsContentSearch = val; render(); }
+function onWsContentSearch(val) {
+  if (isComposing) return;
+  wsContentSearch = val;
+  clearTimeout(wsContentSearchTimer);
+  wsContentSearchTimer = setTimeout(() => {
+    render();
+  }, 300);
+}
 function onWsStatusFilter(val) { wsContentStatusFilter = val; render(); }
 function onWsCreatorFilter(val) { wsContentCreatorFilter = val; render(); }
 function onWsContentSort(field) { if (wsContentSortField === field) { wsContentSortAsc = !wsContentSortAsc; } else { wsContentSortField = field; wsContentSortAsc = true; } render(); }

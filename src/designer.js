@@ -49,6 +49,7 @@ let designerSpaceDown = false; // Space key held for pan mode
 let designerUndoStack = []; // Undo state stack (max 50)
 let designerRedoStack = []; // Redo state stack
 let designerMoreMenuOpen = false; // "More" dropdown menu state
+let designerDirty = false; // Track unsaved changes
 
 // --- Node Type Definitions ---
 const nodeTypes = [
@@ -130,28 +131,32 @@ function openDesigner(wsId, wfId) {
     }, 600);
   }
 
-  // Simulate abnormal exit recovery dialog for draft workflows
-  if (wf.status === 'draft' && wf._hasUnsavedDraft) {
-    setTimeout(() => {
-      showModal(`<div class="modal" style="max-width:440px"><div class="modal-header"><h2 class="modal-title">${icons.alertTriangle} 检测到未保存的草稿</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
-        <p style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant);line-height:1.6">检测到您上次编辑的未保存草稿，是否恢复？</p>
-        <div style="margin-top:var(--space-3);padding:var(--space-3);background:var(--md-surface-container);border-radius:var(--radius-sm)">
-          <div style="font-size:var(--font-size-xs);color:var(--md-outline);display:flex;gap:var(--space-3)">
-            <span>上次编辑：2026-04-16 14:35</span><span>节点数：${designerNodes.length + 2}</span>
-          </div>
-        </div>
-      </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal();showToast('info','已放弃','将加载最新保存版本')">不恢复</button><button class="btn btn-primary" onclick="closeModal();showToast('success','已恢复','草稿已恢复到上次编辑状态')">恢复草稿</button></div></div>`);
-    }, 800);
-  }
-  wf._hasUnsavedDraft = true;
+  designerDirty = false; // Fresh open — no unsaved changes
 }
 
 function closeDesigner() {
+  // If there are unsaved changes, show confirmation dialog
+  if (designerDirty) {
+    showModal(`<div class="modal" style="max-width:440px"><div class="modal-header"><h2 class="modal-title">${icons.alertTriangle} 存在未保存的修改</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
+      <p style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant);line-height:1.6">当前流程设计存在尚未保存的修改，离开后这些修改将丢失。</p>
+      <div style="margin-top:var(--space-3);padding:var(--space-3);background:var(--md-surface-container);border-radius:var(--radius-sm)">
+        <div style="font-size:var(--font-size-xs);color:var(--md-outline);display:flex;gap:var(--space-3)">
+          <span>节点数：${designerNodes.length}</span><span>连线数：${designerConnections.length}</span>
+        </div>
+      </div>
+    </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">继续编辑</button><button class="btn btn-secondary" style="color:var(--md-error)" onclick="closeModal();forceCloseDesigner()">不保存，直接离开</button><button class="btn btn-primary" onclick="designerSave();closeModal();setTimeout(forceCloseDesigner,700)">保存并离开</button></div></div>`);
+    return;
+  }
+  forceCloseDesigner();
+}
+
+function forceCloseDesigner() {
   designerActive = false;
   designerSpaceDown = false;
   designerMoreMenuOpen = false;
   designerUndoStack = [];
   designerRedoStack = [];
+  designerDirty = false;
   designerFullscreen = false;
   // Exit fullscreen if active
   if (document.fullscreenElement) {
@@ -871,24 +876,29 @@ function renderIfConfig(node) {
 }
 
 function renderSwitchConfig(node) {
-  const branches = node.config?.branches || [{ name: '分支1', condition: '' }, { name: '分支2', condition: '' }];
+  if (!node.config) node.config = {};
+  if (!node.config.branches) node.config.branches = [{ name: '分支1', condition: '' }, { name: '分支2', condition: '' }];
+  const branches = node.config.branches;
   return `<div class="config-section">
     <div class="config-section-title">分支配置 <span style="font-size:10px;color:var(--md-outline);font-weight:400">(${branches.length}/50)</span></div>
     <div class="config-field">
       <div class="config-field-label">匹配模式</div>
-      <select class="config-select"><option>首次匹配</option><option>所有匹配</option></select>
+      <select class="config-select" onchange="updateNodeConfig(${node.id}, 'matchMode', this.value)">
+        <option value="first" ${node.config.matchMode === 'first' ? 'selected' : ''}>首次匹配</option>
+        <option value="all" ${node.config.matchMode === 'all' ? 'selected' : ''}>所有匹配</option>
+      </select>
     </div>
     ${branches.map((b, i) => `
       <div class="branch-card" style="border-left-color:hsl(${i * 60}, 60%, 50%)">
         <div class="branch-card-header">
-          <span class="branch-card-title">${b.name}</span>
-          <button class="table-action-btn" style="width:24px;height:24px" onclick="showToast('info','提示','删除分支')">${icons.close}</button>
+          <input class="config-input" style="flex:1;height:28px;font-size:12px;font-weight:500" value="${b.name}" onchange="updateSwitchBranchName(${node.id}, ${i}, this.value)" />
+          <button class="table-action-btn" style="width:24px;height:24px" onclick="removeSwitchBranch(${node.id}, ${i})" title="删除分支">${icons.close}</button>
         </div>
-        <textarea class="expr-editor" style="min-height:36px;font-size:11px" placeholder="输入分支条件...">${b.condition}</textarea>
+        <textarea class="expr-editor" style="min-height:36px;font-size:11px" placeholder="输入分支条件表达式..." onchange="updateSwitchBranchCondition(${node.id}, ${i}, this.value)">${b.condition}</textarea>
       </div>
     `).join('')}
-    <button class="btn btn-ghost btn-sm" onclick="showToast('info','提示','添加分支')" style="width:100%;justify-content:center;margin-top:var(--space-2)">${icons.plus} 添加分支</button>
-    <div style="margin-top:var(--space-3);padding:8px;background:var(--md-surface-container);border-radius:6px;text-align:center"><div style="font-size:10px;color:var(--md-outline);font-weight:500">Default 分支</div></div>
+    <button class="btn btn-ghost btn-sm" onclick="addSwitchBranch(${node.id})" style="width:100%;justify-content:center;margin-top:var(--space-2)">${icons.plus} 添加分支</button>
+    <div style="margin-top:var(--space-3);padding:8px;background:var(--md-surface-container);border-radius:6px;text-align:center"><div style="font-size:10px;color:var(--md-outline);font-weight:500">Default 分支（兜底）</div></div>
   </div>`;
 }
 
@@ -1534,6 +1544,7 @@ function onCanvasMouseUp(e) {
   }
 
   designerIsPanning = false;
+  if (designerDraggingExistingNode) designerDirty = true; // Node was moved
   designerDraggingExistingNode = null;
   document.getElementById('canvasContainer').style.cursor = '';
 }
@@ -1691,6 +1702,7 @@ function addNodeToCanvas(type, x, y) {
   };
 
   designerNodes.push(newNode);
+  designerDirty = true;
   designerSelectedNodeId = newNode.id;
   designerRightPanel = 'node';
   renderDesigner();
@@ -1700,6 +1712,7 @@ function addNodeToCanvas(type, x, y) {
 function deleteSelectedNode() {
   if (designerDebugMode || designerReadonly) return;
   pushUndoState();
+  designerDirty = true;
 
   // Multi-select delete
   if (designerSelectedNodeIds.length > 1) {
@@ -1843,7 +1856,7 @@ function completeConnection(fromNodeId, fromPort, targetId) {
     toPort: 'in',
     label: connLabel,
   });
-
+  designerDirty = true;
   renderDesigner();
   showToast('success', '连线已创建', '');
 }
@@ -1854,6 +1867,7 @@ function onConnectionClick(e, connId) {
   if (confirm('删除此连线？')) {
     pushUndoState();
     designerConnections = designerConnections.filter(c => c.id !== connId);
+    designerDirty = true;
     syncDesignerState();
     renderDesigner();
     showToast('success', '连线已删除', '');
@@ -1883,12 +1897,69 @@ document.addEventListener('DOMContentLoaded', () => {
 // --- Node Property Updates ---
 function updateNodeProp(nodeId, prop, value) {
   const node = designerNodes.find(n => n.id === nodeId);
-  if (node) { node[prop] = value; }
+  if (node) { node[prop] = value; designerDirty = true; }
 }
 
 function updateNodeConfig(nodeId, key, value) {
   const node = designerNodes.find(n => n.id === nodeId);
-  if (node) { if (!node.config) node.config = {}; node.config[key] = value; }
+  if (node) { if (!node.config) node.config = {}; node.config[key] = value; designerDirty = true; }
+}
+
+// --- Switch Branch Operations ---
+function addSwitchBranch(nodeId) {
+  const node = designerNodes.find(n => n.id === nodeId);
+  if (!node) return;
+  pushUndoState();
+  if (!node.config) node.config = {};
+  if (!node.config.branches) node.config.branches = [{ name: '分支1', condition: '' }, { name: '分支2', condition: '' }];
+  if (node.config.branches.length >= 50) { showToast('warning', '限制', '最多支持50个分支'); return; }
+  const count = node.config.branches.length + 1;
+  node.config.branches.push({ name: `分支${count}`, condition: '' });
+  designerDirty = true;
+  syncDesignerState();
+  renderDesigner();
+  showToast('success', '已添加', `分支${count}`);
+}
+
+function removeSwitchBranch(nodeId, branchIdx) {
+  const node = designerNodes.find(n => n.id === nodeId);
+  if (!node || !node.config || !node.config.branches) return;
+  if (node.config.branches.length <= 1) { showToast('warning', '提示', '至少保留一个分支'); return; }
+  pushUndoState();
+  const removed = node.config.branches.splice(branchIdx, 1);
+  // Also remove connections from this branch port
+  designerConnections = designerConnections.filter(c => !(c.from === nodeId && c.fromPort === `case${branchIdx}`));
+  // Re-index connections for higher branches
+  designerConnections.forEach(c => {
+    if (c.from === nodeId && c.fromPort.startsWith('case')) {
+      const idx = parseInt(c.fromPort.replace('case', ''));
+      if (idx > branchIdx) c.fromPort = `case${idx - 1}`;
+    }
+  });
+  designerDirty = true;
+  syncDesignerState();
+  renderDesigner();
+  showToast('success', '已删除', removed[0]?.name || '分支');
+}
+
+function updateSwitchBranchName(nodeId, branchIdx, newName) {
+  const node = designerNodes.find(n => n.id === nodeId);
+  if (!node || !node.config || !node.config.branches) return;
+  node.config.branches[branchIdx].name = newName;
+  // Update connection labels too
+  designerConnections.forEach(c => {
+    if (c.from === nodeId && c.fromPort === `case${branchIdx}`) c.label = newName;
+  });
+  designerDirty = true;
+  syncDesignerState();
+  renderDesigner();
+}
+
+function updateSwitchBranchCondition(nodeId, branchIdx, newCondition) {
+  const node = designerNodes.find(n => n.id === nodeId);
+  if (!node || !node.config || !node.config.branches) return;
+  node.config.branches[branchIdx].condition = newCondition;
+  designerDirty = true;
 }
 
 // --- Zoom Controls ---
@@ -1959,6 +2030,7 @@ function designerUndo() {
   // Restore previous state
   const prevState = designerUndoStack.pop();
   _restoreDesignerState(prevState);
+  designerDirty = true;
   renderDesigner();
   showToast('info', '撤销', `已撤销（剩余 ${designerUndoStack.length} 步）`);
 }
@@ -1973,6 +2045,7 @@ function designerRedo() {
   // Restore next state
   const nextState = designerRedoStack.pop();
   _restoreDesignerState(nextState);
+  designerDirty = true;
   renderDesigner();
   showToast('info', '重做', `已重做（剩余 ${designerRedoStack.length} 步）`);
 }
@@ -2555,6 +2628,7 @@ function deleteNodeById(nodeId) {
   }
   designerNodes = designerNodes.filter(n => n.id !== nodeId);
   designerConnections = designerConnections.filter(c => c.from !== nodeId && c.to !== nodeId);
+  designerDirty = true;
   syncDesignerState();
   if (designerSelectedNodeId === nodeId) {
     designerSelectedNodeId = null;
@@ -2580,6 +2654,7 @@ function duplicateNode(nodeId) {
     y: node.y + 40,
   };
   designerNodes.push(newNode);
+  designerDirty = true;
   renderDesigner();
   showToast('success', '已复制副本', newNode.name);
 }
@@ -2601,6 +2676,7 @@ function convertNodeTo(nodeId, newType) {
   node.name = nt.name;
   node.code = nt.code + '_' + nodeId;
   node.config = {};
+  designerDirty = true;
   closeModal();
   renderDesigner();
   showToast('success', '节点已转换', `${node.name}`);
@@ -2640,6 +2716,7 @@ function designerSave() {
     }
     const el = document.getElementById('designerSaveIndicator');
     if (el) el.innerHTML = `${icons.check} <span>Sukey Wu · ${ts.slice(11)}</span>`;
+    designerDirty = false;
     showToast('success', '已保存', `草稿已保存（基于 v${wf._baseVersion || wf.version || 0}）`);
   }, 600);
 }
@@ -2734,6 +2811,7 @@ function setMergeStrategy(nodeId, strategy) {
   if (node) {
     if (!node.config) node.config = {};
     node.config._mergeStrategy = strategy;
+    designerDirty = true;
     showToast('success', '汇合策略已更新', strategy === 'all' ? '等待全部' : '任一完成');
   }
 }
@@ -2772,6 +2850,7 @@ function designerPasteNodes() {
     newIds.push(newNode.id);
   });
   syncDesignerState();
+  designerDirty = true;
   designerSelectedNodeIds = newIds;
   designerSelectedNodeId = newIds[newIds.length - 1];
   renderDesigner();
