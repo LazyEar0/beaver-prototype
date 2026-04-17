@@ -848,6 +848,7 @@ function renderDesignerSettingsPanel() {
         <div class="config-field"><div class="config-field-label">名称</div><input class="config-input" value="${wf.name}" /></div>
         <div class="config-field"><div class="config-field-label">编号</div><input class="config-input" value="${wf.code}" style="font-family:var(--font-family-mono);color:var(--md-outline)" readonly /></div>
         <div class="config-field"><div class="config-field-label">描述</div><textarea class="config-textarea" style="min-height:50px">${wf.desc || ''}</textarea></div>
+        <div class="config-field"><div class="config-field-label">流程负责人</div>${buildPersonPickerHtml('designerOwner', wf.owners || [], true)}</div>
         <div class="config-field"><div class="config-field-label">类型</div><div style="font-size:var(--font-size-sm);color:var(--md-outline)">${wf.type === 'app' ? '应用流' : '对话流'} (不可修改)</div></div>
         <div class="config-field"><div class="config-field-label">所属文件夹</div><div style="font-size:var(--font-size-sm);color:var(--md-outline)">${getFolderPath(wf.wsId, wf.folderId) || '根目录'} (不可修改)</div></div>
         <div class="config-field">

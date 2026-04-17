@@ -194,6 +194,7 @@ let wsExecStatusFilter = 'all';
 let wsExecTriggerFilter = 'all';
 let wsExecTimeRange = 'all';
 let wsExecDetailId = null;
+let wsExecSelectedNodeIdx = null; // right panel: selected node index
 let wfNextId = 100;
 let folderNextId = 200;
 
@@ -264,43 +265,59 @@ let wsWorkflows = {
 // Execution records per workspace
 let wsExecutions = {
   1: [
-    { id: 2001, wfId: 1, wfName: '酒店搜索', wfCode: 'HTL_SEARCH', version: 3, trigger: 'manual', status: 'completed', startTime: '2025-04-13 14:00:15', endTime: '2025-04-13 14:02:30', duration: '2分15秒', triggerUser: 'Sukey Wu', archived: false, nodes: [
-      { name: '触发节点', type: '手动触发', status: 'success', duration: '0.1秒', startTime: '14:00:15' },
-      { name: '参数解析', type: '代码节点', status: 'success', duration: '0.3秒', startTime: '14:00:15' },
-      { name: '调用搜索API', type: 'HTTP请求', status: 'success', duration: '1分50秒', startTime: '14:00:16' },
-      { name: '返回结果', type: '结束节点', status: 'success', duration: '0.1秒', startTime: '14:02:29' },
-    ] },
-    { id: 2002, wfId: 2, wfName: '酒店预订确认', wfCode: 'HTL_CONFIRM', version: 2, trigger: 'manual', status: 'running', startTime: '2025-04-13 13:45:00', endTime: '-', duration: '20分+', triggerUser: 'Admin', archived: false, nodes: [
-      { name: '触发节点', type: '手动触发', status: 'success', duration: '0.1秒', startTime: '13:45:00' },
-      { name: '订单校验', type: '代码节点', status: 'success', duration: '1.2秒', startTime: '13:45:00' },
-      { name: '供应商确认', type: 'HTTP请求', status: 'running', duration: '进行中', startTime: '13:45:01' },
-    ] },
-    { id: 2003, wfId: 2, wfName: '酒店预订确认', wfCode: 'HTL_CONFIRM', version: 2, trigger: 'event', status: 'running', startTime: '2025-04-13 12:30:00', endTime: '-', duration: '1小时+', triggerUser: '系统', archived: false, nodes: [
-      { name: '事件触发', type: '事件触发', status: 'success', duration: '0.1秒', startTime: '12:30:00' },
-      { name: '供应商确认', type: 'HTTP请求', status: 'running', duration: '进行中', startTime: '12:30:01' },
-    ] },
-    { id: 2004, wfId: 3, wfName: '订单取消处理', wfCode: 'HTL_CANCEL', version: 1, trigger: 'manual', status: 'failed', startTime: '2025-04-12 16:20:00', endTime: '2025-04-12 16:22:15', duration: '2分15秒', triggerUser: 'Sukey Wu', archived: false, nodes: [
-      { name: '触发节点', type: '手动触发', status: 'success', duration: '0.1秒', startTime: '16:20:00' },
-      { name: '订单查询', type: 'HTTP请求', status: 'success', duration: '1.5秒', startTime: '16:20:00' },
-      { name: '取消请求', type: 'HTTP请求', status: 'failed', duration: '2分10秒', startTime: '16:20:02', error: '供应商API返回500错误' },
-      { name: '通知客户', type: '消息通知', status: 'skipped', duration: '-', startTime: '-' },
-    ] },
-    { id: 2005, wfId: 1, wfName: '酒店搜索', wfCode: 'HTL_SEARCH', version: 3, trigger: 'scheduled', status: 'completed', startTime: '2025-04-12 08:00:00', endTime: '2025-04-12 08:01:45', duration: '1分45秒', triggerUser: '系统', archived: false, nodes: [] },
-    { id: 2006, wfId: 5, wfName: '智能客服对话', wfCode: 'HTL_CHAT', version: 2, trigger: 'manual', status: 'running', startTime: '2025-04-13 10:00:00', endTime: '-', duration: '4小时+', triggerUser: '张三', archived: false, nodes: [] },
-    { id: 2007, wfId: 6, wfName: '供应商价格同步', wfCode: 'SUPPLIER_PRICE', version: 2, trigger: 'scheduled', status: 'completed', startTime: '2025-04-11 02:00:00', endTime: '2025-04-11 02:15:30', duration: '15分30秒', triggerUser: '系统', archived: false, nodes: [
-      { name: '定时触发', type: '定时触发', status: 'success', duration: '0.1秒', startTime: '02:00:00' },
-      { name: 'Expedia同步', type: 'HTTP请求', status: 'success', duration: '5分', startTime: '02:00:00' },
-      { name: 'Booking同步', type: 'HTTP请求', status: 'success', duration: '6分', startTime: '02:05:00' },
-      { name: '数据整合', type: '代码节点', status: 'success', duration: '20秒', startTime: '02:15:00' },
-    ] },
-    { id: 2008, wfId: 7, wfName: '预订数据报表', wfCode: 'HTL_REPORT', version: 1, trigger: 'scheduled', status: 'paused', startTime: '2025-04-05 06:00:00', endTime: '-', duration: '8天+', triggerUser: '系统', archived: false, stale: true, nodes: [
-      { name: '定时触发', type: '定时触发', status: 'success', duration: '0.1秒', startTime: '06:00:00' },
-      { name: '报表生成', type: '代码节点', status: 'paused', duration: '已暂停', startTime: '06:02:00' },
-    ] },
-    { id: 2009, wfId: 1, wfName: '酒店搜索', wfCode: 'HTL_SEARCH', version: 2, trigger: 'manual', status: 'cancelled', startTime: '2025-04-10 15:30:00', endTime: '2025-04-10 15:30:45', duration: '45秒', triggerUser: '李四', archived: false, nodes: [] },
-    { id: 2010, wfId: 1, wfName: '酒店搜索', wfCode: 'HTL_SEARCH', version: 2, trigger: 'manual', status: 'completed', startTime: '2025-01-15 10:00:00', endTime: '2025-01-15 10:01:30', duration: '1分30秒', triggerUser: 'Sukey Wu', archived: true, nodes: [] },
+    { id: 2001, wfId: 1, wfName: '酒店搜索', wfCode: 'HTL_SEARCH', version: 3, trigger: 'manual', status: 'completed', startTime: '2025-04-13 14:00:15', endTime: '2025-04-13 14:02:30', duration: '2分15秒', triggerUser: 'Sukey Wu', archived: false,
+      inputs: { city: { label: '目标城市', type: 'String', value: '上海' }, checkInDate: { label: '入住日期', type: 'DateTime', value: '2025-04-20 14:00:00' }, checkOutDate: { label: '退房日期', type: 'DateTime', value: '2025-04-22 12:00:00' }, guestCount: { label: '入住人数', type: 'Integer', value: '2' }, maxPrice: { label: '最高价格', type: 'Double', value: '800.00' }, includeFullBooked: { label: '包含满房酒店', type: 'Boolean', value: 'false' } },
+      outputs: { hotelCount: { label: '搜索结果数', type: 'Integer', value: '23' }, hotels: { label: '酒店列表', type: 'Object', value: '[\n  {"name":"上海外滩华尔道夫","star":5,"price":688},\n  {"name":"上海浦东丽思卡尔顿","star":5,"price":720},\n  {"name":"上海静安香格里拉","star":5,"price":650}\n]' }, searchTime: { label: '搜索耗时', type: 'Double', value: '1.85' } },
+      nodes: [
+        { name: '触发节点', type: '手动触发', status: 'success', duration: '0.1秒', startTime: '14:00:15', inputData: { trigger: 'manual', user: 'Sukey Wu' }, outputData: { timestamp: '2025-04-13T14:00:15Z' }, variables: { env: 'production', traceId: 'tr-8a3f-c901' } },
+        { name: '参数解析', type: '代码节点', status: 'success', duration: '0.3秒', startTime: '14:00:15', inputData: { city: '上海', checkInDate: '2025-04-20', checkOutDate: '2025-04-22', guestCount: 2, maxPrice: 800 }, outputData: { parsedQuery: { city_code: 'SHA', nights: 2, guests: 2, budget: 800 } }, variables: { env: 'production', traceId: 'tr-8a3f-c901', city_code: 'SHA' } },
+        { name: '调用搜索API', type: 'HTTP请求', status: 'success', duration: '1分50秒', startTime: '14:00:16', inputData: { url: 'https://api.hotel-supplier.com/v2/search', method: 'POST', body: { city_code: 'SHA', checkin: '2025-04-20', checkout: '2025-04-22' } }, outputData: { statusCode: 200, resultCount: 23, responseSize: '12.5KB' }, variables: { env: 'production', traceId: 'tr-8a3f-c901', city_code: 'SHA', apiCallCount: 1 } },
+        { name: '返回结果', type: '结束节点', status: 'success', duration: '0.1秒', startTime: '14:02:29', inputData: { hotelCount: 23 }, outputData: { success: true }, variables: { env: 'production', traceId: 'tr-8a3f-c901' } },
+      ], alerts: [] },
+    { id: 2002, wfId: 2, wfName: '酒店预订确认', wfCode: 'HTL_CONFIRM', version: 2, trigger: 'manual', status: 'running', startTime: '2025-04-13 13:45:00', endTime: '-', duration: '20分+', triggerUser: 'Admin', archived: false,
+      inputs: { orderId: { label: '订单编号', type: 'String', value: 'ORD-2025041300128' }, notifyGuest: { label: '通知客人', type: 'Boolean', value: 'true' } },
+      nodes: [
+        { name: '触发节点', type: '手动触发', status: 'success', duration: '0.1秒', startTime: '13:45:00', inputData: { trigger: 'manual', user: 'Admin' }, outputData: { timestamp: '2025-04-13T13:45:00Z' }, variables: { traceId: 'tr-7b2e-d412' } },
+        { name: '订单校验', type: '代码节点', status: 'success', duration: '1.2秒', startTime: '13:45:00', inputData: { orderId: 'ORD-2025041300128' }, outputData: { valid: true, orderStatus: 'pending', amount: 1376 }, variables: { traceId: 'tr-7b2e-d412', orderId: 'ORD-2025041300128' } },
+        { name: '供应商确认', type: 'HTTP请求', status: 'running', duration: '进行中', startTime: '13:45:01', inputData: { url: 'https://api.supplier.com/confirm', method: 'POST', body: { orderId: 'ORD-2025041300128' } }, outputData: null, variables: { traceId: 'tr-7b2e-d412', orderId: 'ORD-2025041300128', confirmAttempt: 1 } },
+      ], alerts: [] },
+    { id: 2003, wfId: 2, wfName: '酒店预订确认', wfCode: 'HTL_CONFIRM', version: 2, trigger: 'event', status: 'running', startTime: '2025-04-13 12:30:00', endTime: '-', duration: '1小时+', triggerUser: '系统', archived: false,
+      nodes: [
+        { name: '事件触发', type: '事件触发', status: 'success', duration: '0.1秒', startTime: '12:30:00', inputData: { eventType: 'order.created', eventId: 'evt-9c4d' }, outputData: { orderId: 'ORD-2025041300096' }, variables: { traceId: 'tr-5a1c-e003' } },
+        { name: '供应商确认', type: 'HTTP请求', status: 'running', duration: '进行中', startTime: '12:30:01', inputData: { url: 'https://api.supplier.com/confirm', method: 'POST' }, outputData: null, variables: { traceId: 'tr-5a1c-e003' } },
+      ], alerts: [] },
+    { id: 2004, wfId: 3, wfName: '订单取消处理', wfCode: 'HTL_CANCEL', version: 1, trigger: 'manual', status: 'failed', startTime: '2025-04-12 16:20:00', endTime: '2025-04-12 16:22:15', duration: '2分15秒', triggerUser: 'Sukey Wu', archived: false,
+      inputs: { orderId: { label: '订单编号', type: 'String', value: 'ORD-2025041200087' }, reason: { label: '取消原因', type: 'String', value: '客户行程变更，需取消预订' }, refundConfig: { label: '退款配置', type: 'Object', value: '{"ratio":0.8,"method":"original"}' } },
+      nodes: [
+        { name: '触发节点', type: '手动触发', status: 'success', duration: '0.1秒', startTime: '16:20:00', inputData: { trigger: 'manual', user: 'Sukey Wu' }, outputData: { timestamp: '2025-04-12T16:20:00Z' }, variables: { traceId: 'tr-2d8f-a756' } },
+        { name: '订单查询', type: 'HTTP请求', status: 'success', duration: '1.5秒', startTime: '16:20:00', inputData: { url: 'https://api.internal.com/orders/ORD-2025041200087', method: 'GET' }, outputData: { orderId: 'ORD-2025041200087', status: 'confirmed', amount: 2750, hotelName: '上海外滩华尔道夫' }, variables: { traceId: 'tr-2d8f-a756', orderId: 'ORD-2025041200087' } },
+        { name: '取消请求', type: 'HTTP请求', status: 'failed', duration: '2分10秒', startTime: '16:20:02', inputData: { url: 'https://api.supplier.com/cancel', method: 'POST', body: { orderId: 'ORD-2025041200087', reason: 'customer_request' } }, outputData: null, variables: { traceId: 'tr-2d8f-a756', orderId: 'ORD-2025041200087', cancelAttempt: 3 }, error: '供应商API返回500错误', errorDetail: 'HTTP 500 Internal Server Error\n\nResponse Body:\n{\n  "error": "INTERNAL_ERROR",\n  "message": "Supplier system is temporarily unavailable.",\n  "requestId": "req-7f3a-b928"\n}\n\n已重试3次，间隔5秒，均失败。异常策略：终止流程' },
+        { name: '通知客户', type: '消息通知', status: 'skipped', duration: '-', startTime: '-', inputData: null, outputData: null, variables: null },
+      ], alerts: [
+        { time: '2025-04-12 16:22:15', type: '流程执行失败', level: '严重', pushStatus: 'success' },
+        { time: '2025-04-12 16:22:12', type: '节点执行异常', level: '警告', pushStatus: 'failed' },
+      ] },
+    { id: 2005, wfId: 1, wfName: '酒店搜索', wfCode: 'HTL_SEARCH', version: 3, trigger: 'scheduled', status: 'completed', startTime: '2025-04-12 08:00:00', endTime: '2025-04-12 08:01:45', duration: '1分45秒', triggerUser: '系统', archived: false, nodes: [], alerts: [] },
+    { id: 2006, wfId: 5, wfName: '智能客服对话', wfCode: 'HTL_CHAT', version: 2, trigger: 'manual', status: 'running', startTime: '2025-04-13 10:00:00', endTime: '-', duration: '4小时+', triggerUser: '张三', archived: false, nodes: [], alerts: [] },
+    { id: 2007, wfId: 6, wfName: '供应商价格同步', wfCode: 'SUPPLIER_PRICE', version: 2, trigger: 'scheduled', status: 'completed', startTime: '2025-04-11 02:00:00', endTime: '2025-04-11 02:15:30', duration: '15分30秒', triggerUser: '系统', archived: false,
+      outputs: { syncedSuppliers: { label: '同步供应商数', type: 'Integer', value: '2' }, totalRecords: { label: '同步记录数', type: 'Integer', value: '1240' } },
+      nodes: [
+        { name: '定时触发', type: '定时触发', status: 'success', duration: '0.1秒', startTime: '02:00:00', inputData: { schedule: '0 2 * * *' }, outputData: { triggerTime: '2025-04-11T02:00:00Z' }, variables: { env: 'production' } },
+        { name: 'Expedia同步', type: 'HTTP请求', status: 'success', duration: '5分', startTime: '02:00:00', inputData: { url: 'https://api.expedia.com/prices', method: 'GET' }, outputData: { records: 680, updated: 45 }, variables: { env: 'production', supplier: 'expedia' } },
+        { name: 'Booking同步', type: 'HTTP请求', status: 'success', duration: '6分', startTime: '02:05:00', inputData: { url: 'https://api.booking.com/prices', method: 'GET' }, outputData: { records: 560, updated: 32 }, variables: { env: 'production', supplier: 'booking' } },
+        { name: '数据整合', type: '代码节点', status: 'success', duration: '20秒', startTime: '02:15:00', inputData: { sources: ['expedia', 'booking'] }, outputData: { mergedRecords: 1240, conflicts: 3, resolved: 3 }, variables: { env: 'production', totalRecords: 1240 } },
+      ], alerts: [] },
+    { id: 2008, wfId: 7, wfName: '预订数据报表', wfCode: 'HTL_REPORT', version: 1, trigger: 'scheduled', status: 'paused', startTime: '2025-04-05 06:00:00', endTime: '-', duration: '8天+', triggerUser: '系统', archived: false, stale: true,
+      nodes: [
+        { name: '定时触发', type: '定时触发', status: 'success', duration: '0.1秒', startTime: '06:00:00', inputData: { schedule: '0 6 * * *' }, outputData: { triggerTime: '2025-04-05T06:00:00Z' }, variables: { env: 'production' } },
+        { name: '报表生成', type: '代码节点', status: 'paused', duration: '已暂停', startTime: '06:02:00', inputData: { reportType: 'daily_booking', dateRange: '2025-04-04' }, outputData: null, variables: { env: 'production', reportType: 'daily_booking' } },
+      ], alerts: [
+        { time: '2025-04-12 06:00:00', type: '执行异常滞留', level: '警告', pushStatus: 'success' },
+      ] },
+    { id: 2009, wfId: 1, wfName: '酒店搜索', wfCode: 'HTL_SEARCH', version: 2, trigger: 'manual', status: 'cancelled', startTime: '2025-04-10 15:30:00', endTime: '2025-04-10 15:30:45', duration: '45秒', triggerUser: '李四', archived: false, nodes: [], alerts: [] },
+    { id: 2010, wfId: 1, wfName: '酒店搜索', wfCode: 'HTL_SEARCH', version: 2, trigger: 'manual', status: 'completed', startTime: '2025-01-15 10:00:00', endTime: '2025-01-15 10:01:30', duration: '1分30秒', triggerUser: 'Sukey Wu', archived: true, nodes: [], alerts: [] },
   ],
-  2: [{ id: 2100, wfId: 20, wfName: '航班信息拉取', wfCode: 'FLT_PULL', version: 4, trigger: 'scheduled', status: 'completed', startTime: '2025-04-12 06:00:00', endTime: '2025-04-12 06:10:00', duration: '10分', triggerUser: '系统', archived: false, nodes: [] }],
+  2: [{ id: 2100, wfId: 20, wfName: '航班信息拉取', wfCode: 'FLT_PULL', version: 4, trigger: 'scheduled', status: 'completed', startTime: '2025-04-12 06:00:00', endTime: '2025-04-12 06:10:00', duration: '10分', triggerUser: '系统', archived: false, nodes: [], alerts: [] }],
   3: [], 4: [], 5: [], 6: [],
 };
 
@@ -952,7 +969,7 @@ function renderWorkspaceModule(content, breadcrumb) {
 }
 function wsNavigateTo(view, wsId) {
   wsCurrentView = view; wsCurrentId = wsId || null;
-  if (view === 'detail') { wsInternalTab = 'workflows'; wsMemberTab = 'admin'; wsCurrentFolderId = null; wsFolderPath = []; wsContentSearch = ''; wsContentStatusFilter = 'all'; wsContentCreatorFilter = []; wsCreatorDropdownOpen = false; wsCreatorSearch = ''; wsContentOwnerFilter = []; wsOwnerDropdownOpen = false; wsOwnerSearch = ''; wsContentTypeFilter = 'all'; wsFilterPanelOpen = false; wsContentSortField = 'editedAt'; wsContentSortAsc = false; wsExecSearch = ''; wsExecStatusFilter = 'all'; wsExecTriggerFilter = 'all'; wsExecTimeRange = 'all'; wsExecDetailId = null; wsExecPage = 1; }
+  if (view === 'detail') { wsInternalTab = 'workflows'; wsMemberTab = 'admin'; wsCurrentFolderId = null; wsFolderPath = []; wsContentSearch = ''; wsContentStatusFilter = 'all'; wsContentCreatorFilter = []; wsCreatorDropdownOpen = false; wsCreatorSearch = ''; wsContentOwnerFilter = []; wsOwnerDropdownOpen = false; wsOwnerSearch = ''; wsContentTypeFilter = 'all'; wsFilterPanelOpen = false; wsContentSortField = 'editedAt'; wsContentSortAsc = false; wsExecSearch = ''; wsExecStatusFilter = 'all'; wsExecTriggerFilter = 'all'; wsExecTimeRange = 'all'; wsExecDetailId = null; wsExecSelectedNodeIdx = null; wsExecPage = 1; }
   render();
 }
 
@@ -1025,7 +1042,7 @@ function renderWsDetailPage(ws) {
 function switchWsTab(tab) {
   wsInternalTab = tab;
   if (tab === 'workflows') { wsCurrentFolderId = null; wsFolderPath = []; wsContentSearch = ''; wsContentStatusFilter = 'all'; wsContentCreatorFilter = []; wsCreatorDropdownOpen = false; wsContentOwnerFilter = []; wsOwnerDropdownOpen = false; wsContentTypeFilter = 'all'; wsFilterPanelOpen = false; }
-  if (tab === 'executions') { wsExecDetailId = null; wsExecSearch = ''; wsExecStatusFilter = 'all'; wsExecTriggerFilter = 'all'; wsExecPage = 1; }
+  if (tab === 'executions') { wsExecDetailId = null; wsExecSelectedNodeIdx = null; wsExecSearch = ''; wsExecStatusFilter = 'all'; wsExecTriggerFilter = 'all'; wsExecPage = 1; }
   render();
 }
 
@@ -1422,16 +1439,29 @@ function showMoveFolderModal(folderId) {
   const allFolders = wsFolders[wsCurrentId] || [];
   function getDescIds(pid) { const ch = allFolders.filter(x => x.parentId === pid); let ids = ch.map(c => c.id); ch.forEach(c => { ids = ids.concat(getDescIds(c.id)); }); return ids; }
   const invalidIds = new Set([folderId, ...getDescIds(folderId)]);
-  const treeHtml = buildFolderTree(allFolders, null, invalidIds, f.parentId, `moveFolder(${folderId}, __ID__)`, 0);
+  _moveTargetFolderId = undefined;
+  const treeHtml = buildFolderTree(allFolders, null, invalidIds, f.parentId, `selectMoveFolderTarget(${folderId}, __ID__)`, 0);
   showModal(`<div class="modal" style="max-width:480px"><div class="modal-header"><h2 class="modal-title">移动文件夹</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
-  <div class="move-modal-info"><span class="move-modal-info-icon">${icons.folder}</span><div><div class="move-modal-info-name">${f.name}</div><div class="move-modal-info-hint">选择目标位置，点击文件夹即可完成移动</div></div></div>
+  <div class="move-modal-info"><span class="move-modal-info-icon">${icons.folder}</span><div><div class="move-modal-info-name">${f.name}</div><div class="move-modal-info-hint">选择目标位置后点击「确认移动」</div></div></div>
   <div class="move-modal-search">${icons.search}<input type="text" class="move-modal-search-input" placeholder="搜索文件夹..." oninput="filterMoveTree(this.value)" /></div>
   <div class="folder-tree" id="moveTreeContainer">
-    <div class="folder-tree-node ${f.parentId === null ? 'is-current' : ''}" onclick="${f.parentId === null ? '' : `moveFolder(${folderId}, null)`}" style="cursor:${f.parentId === null ? 'default' : 'pointer'}" data-folder-name="${ws.name}（根目录）">
+    <div class="folder-tree-node ${f.parentId === null ? 'is-current' : ''}" onclick="${f.parentId === null ? '' : `selectMoveFolderTarget(${folderId}, null)`}" style="cursor:${f.parentId === null ? 'default' : 'pointer'}" data-folder-name="${ws.name}（根目录）" data-folder-id="null">
       <span class="folder-tree-icon">${icons.folder}</span><span class="folder-tree-label">${ws.name}（根目录）</span>${f.parentId === null ? '<span class="folder-tree-badge">当前位置</span>' : ''}
     </div>
     ${treeHtml}
-  </div></div></div>`);
+  </div></div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" id="confirmMoveFolderBtn" disabled onclick="confirmMoveFolder(${folderId})">确认移动</button></div></div>`);
+}
+function selectMoveFolderTarget(folderId, targetId) {
+  _moveTargetFolderId = targetId;
+  document.querySelectorAll('#moveTreeContainer .folder-tree-node').forEach(n => n.classList.remove('is-selected'));
+  document.querySelectorAll('#moveTreeContainer .folder-tree-node').forEach(n => { if (n.getAttribute('data-folder-id') === String(targetId)) n.classList.add('is-selected'); });
+  const btn = document.getElementById('confirmMoveFolderBtn');
+  if (btn) btn.disabled = false;
+}
+function confirmMoveFolder(folderId) {
+  if (_moveTargetFolderId === undefined) return;
+  moveFolder(folderId, _moveTargetFolderId);
+  _moveTargetFolderId = undefined;
 }
 
 function buildFolderTree(allFolders, parentId, invalidIds, currentParentId, actionTpl, depth) {
@@ -1446,7 +1476,7 @@ function buildFolderTree(allFolders, parentId, invalidIds, currentParentId, acti
     const clickable = !isInvalid && !isCurrent;
     return `<div class="folder-tree-branch${depth === 0 ? '' : ''}" data-folder-name="${f.name.toLowerCase()}">
       <div class="folder-tree-node depth-${depth + 1} ${isCurrent ? 'is-current' : ''} ${isInvalid ? 'is-disabled' : ''}"
-        onclick="${clickable ? action : ''}" style="cursor:${clickable ? 'pointer' : 'default'};padding-left:${(depth + 1) * 20 + 8}px" data-folder-name="${f.name.toLowerCase()}">
+        onclick="${clickable ? action : ''}" style="cursor:${clickable ? 'pointer' : 'default'};padding-left:${(depth + 1) * 20 + 8}px" data-folder-name="${f.name.toLowerCase()}" data-folder-id="${f.id}">
         ${hasChildren || subTree ? `<span class="folder-tree-toggle" onclick="event.stopPropagation();this.closest('.folder-tree-branch').classList.toggle('collapsed')">${icons.chevronRight}</span>` : '<span class="folder-tree-toggle-placeholder"></span>'}
         <span class="folder-tree-icon">${icons.folder}</span>
         <span class="folder-tree-label">${f.name}</span>
@@ -1687,16 +1717,31 @@ function showMoveWfModal(wfId) {
   const wf = (wsWorkflows[wsCurrentId] || []).find(x => x.id === wfId); if (!wf) return;
   const ws = workspaces.find(w => w.id === wsCurrentId);
   const allFolders = wsFolders[wsCurrentId] || [];
-  const treeHtml = buildFolderTree(allFolders, null, null, wf.folderId, `moveWf(${wfId}, __ID__)`, 0);
+  _moveTargetFolderId = undefined;
+  const treeHtml = buildFolderTree(allFolders, null, null, wf.folderId, `selectMoveTarget(${wfId}, __ID__)`, 0);
   showModal(`<div class="modal" style="max-width:480px"><div class="modal-header"><h2 class="modal-title">移动工作流</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
-  <div class="move-modal-info"><span class="move-modal-info-icon" style="background:var(--md-primary-container);color:var(--md-on-primary-container)">${icons.workflow}</span><div><div class="move-modal-info-name">${wf.name}</div><div class="move-modal-info-hint">选择目标位置，点击文件夹即可完成移动</div></div></div>
+  <div class="move-modal-info"><span class="move-modal-info-icon" style="background:var(--md-primary-container);color:var(--md-on-primary-container)">${icons.workflow}</span><div><div class="move-modal-info-name">${wf.name}</div><div class="move-modal-info-hint">选择目标文件夹后点击「确认移动」</div></div></div>
   <div class="move-modal-search">${icons.search}<input type="text" class="move-modal-search-input" placeholder="搜索文件夹..." oninput="filterMoveTree(this.value)" /></div>
   <div class="folder-tree" id="moveTreeContainer">
-    <div class="folder-tree-node ${wf.folderId === null ? 'is-current' : ''}" onclick="${wf.folderId === null ? '' : `moveWf(${wfId}, null)`}" style="cursor:${wf.folderId === null ? 'default' : 'pointer'}" data-folder-name="${ws.name}（根目录）">
+    <div class="folder-tree-node ${wf.folderId === null ? 'is-current' : ''}" onclick="${wf.folderId === null ? '' : `selectMoveTarget(${wfId}, null)`}" style="cursor:${wf.folderId === null ? 'default' : 'pointer'}" data-folder-name="${ws.name}（根目录）" data-folder-id="null">
       <span class="folder-tree-icon">${icons.folder}</span><span class="folder-tree-label">${ws.name}（根目录）</span>${wf.folderId === null ? '<span class="folder-tree-badge">当前位置</span>' : ''}
     </div>
     ${treeHtml}
-  </div></div></div>`);
+  </div></div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" id="confirmMoveBtn" disabled onclick="confirmMoveWf(${wfId})">确认移动</button></div></div>`);
+}
+let _moveTargetFolderId = undefined;
+function selectMoveTarget(wfId, folderId) {
+  _moveTargetFolderId = folderId;
+  document.querySelectorAll('#moveTreeContainer .folder-tree-node').forEach(n => n.classList.remove('is-selected'));
+  const nodes = document.querySelectorAll('#moveTreeContainer .folder-tree-node');
+  nodes.forEach(n => { if (n.getAttribute('data-folder-id') === String(folderId)) n.classList.add('is-selected'); });
+  const btn = document.getElementById('confirmMoveBtn');
+  if (btn) btn.disabled = false;
+}
+function confirmMoveWf(wfId) {
+  if (_moveTargetFolderId === undefined) return;
+  moveWf(wfId, _moveTargetFolderId);
+  _moveTargetFolderId = undefined;
 }
 function moveWf(wfId, targetFolderId) {
   const wf = (wsWorkflows[wsCurrentId] || []).find(x => x.id === wfId); if (!wf) return;
@@ -2032,7 +2077,7 @@ function onExecTriggerFilter(val) { wsExecTriggerFilter = val; wsExecPage = 1; r
 function onExecTimeRange(val) { wsExecTimeRange = val; wsExecPage = 1; render(); }
 function goToExecPage(p) { wsExecPage = p; render(); }
 function onExecPageSizeChange(val) { wsExecPageSize = parseInt(val); wsExecPage = 1; render(); }
-function viewExecDetail(execId) { wsExecDetailId = execId; render(); }
+function viewExecDetail(execId) { wsExecDetailId = execId; wsExecSelectedNodeIdx = null; render(); }
 
 function renderExecDetail(ws) {
   const exec = (wsExecutions[ws.id] || []).find(e => e.id === wsExecDetailId);
@@ -2041,12 +2086,140 @@ function renderExecDetail(ws) {
   const statusClass = { running: 'exec-running', paused: 'exec-paused', completed: 'exec-completed', failed: 'exec-failed', cancelled: 'exec-cancelled' };
   const triggerLabel = { manual: '手动', scheduled: '定时', event: '事件触发', subflow: '子流程调用' };
   const nodeStatusClass = { success: 'success', failed: 'failed', running: 'running', skipped: 'skipped', paused: 'running' };
+  const nodeStatusLabel = { success: '成功', failed: '失败', running: '运行中', skipped: '跳过', paused: '已暂停' };
+  const hasPanel = wsExecSelectedNodeIdx !== null && exec.nodes && exec.nodes[wsExecSelectedNodeIdx];
+  const selectedNode = hasPanel ? exec.nodes[wsExecSelectedNodeIdx] : null;
+
+  // Helper: render key-value cards for params
+  function renderKvCards(params) {
+    if (!params || Object.keys(params).length === 0) return '';
+    return `<div class="kv-cards">${Object.entries(params).map(([key, p]) => {
+      const isJson = p.type === 'Object' || (typeof p.value === 'string' && (p.value.trim().startsWith('{') || p.value.trim().startsWith('[')));
+      return `<div class="kv-card">
+        <div class="kv-card-header"><span class="kv-card-name">${p.label || key}</span><span class="kv-card-type">${p.type}</span></div>
+        <div class="kv-card-value ${isJson ? 'json-value' : ''}">${escHtml(String(p.value))}</div>
+      </div>`;
+    }).join('')}</div>`;
+  }
+
+  // Helper: render JSON block for panel
+  function renderJsonBlock(data) {
+    if (data === null || data === undefined) return '<div class="panel-empty">无数据</div>';
+    const str = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+    return `<div class="panel-json-block">${escHtml(str)}</div>`;
+  }
+
+  // Helper: render alert level badge
+  function renderAlertLevel(level) {
+    const cls = level === '严重' ? 'alert-level-critical' : level === '警告' ? 'alert-level-warning' : 'alert-level-info';
+    return `<span class="alert-level ${cls}">${level}</span>`;
+  }
+
+  // Build input params section
+  let inputsHtml = '';
+  if (exec.inputs && Object.keys(exec.inputs).length > 0) {
+    inputsHtml = `
+      <div class="exec-section-header">${icons.upload} 输入参数 <span class="section-count">${Object.keys(exec.inputs).length} 项</span></div>
+      ${renderKvCards(exec.inputs)}`;
+  }
+
+  // Build output results section (only for completed)
+  let outputsHtml = '';
+  if (exec.status === 'completed' && exec.outputs && Object.keys(exec.outputs).length > 0) {
+    outputsHtml = `
+      <div class="exec-section-header">${icons.checkCircle} 输出结果 <span class="section-count">${Object.keys(exec.outputs).length} 项</span></div>
+      ${renderKvCards(exec.outputs)}`;
+  }
+
+  // Build node timeline
+  let timelineHtml = '';
+  if (exec.nodes && exec.nodes.length > 0) {
+    timelineHtml = `
+      <div class="exec-section-header">${icons.workflow} 节点执行时间线 <span class="section-count">${exec.nodes.length} 个节点</span></div>
+      <div class="node-timeline-v2">${exec.nodes.map((node, idx) => `
+        <div class="node-item-v2 ${node.status === 'failed' ? 'node-item-failed' : ''} ${wsExecSelectedNodeIdx === idx ? 'active' : ''}" onclick="selectExecNode(${idx})">
+          <div class="node-dot ${nodeStatusClass[node.status] || ''}"></div>
+          <div class="node-main">
+            <div class="node-header-row">
+              <span class="node-name-text">${node.name}</span>
+              <span class="badge badge-type" style="font-size:10px">${node.type}</span>
+              <span class="exec-status ${statusClass[node.status] || ''}" style="font-size:11px">${nodeStatusLabel[node.status] || node.status}</span>
+            </div>
+            <div class="node-meta-row">
+              <span>开始: ${node.startTime}</span><span>耗时: ${node.duration}</span>
+            </div>
+            ${node.error ? `<div class="node-error-brief">${node.error}</div>` : ''}
+          </div>
+          <div class="node-select-arrow">${icons.chevronRight}</div>
+        </div>`).join('')}</div>`;
+  }
+
+  // Build alerts section
+  let alertsHtml = '';
+  const alerts = exec.alerts || [];
+  alertsHtml = `
+    <div class="exec-section-header">${icons.alertTriangle} 告警记录 <span class="section-count">${alerts.length} 条</span></div>
+    ${alerts.length === 0
+      ? '<div class="alert-empty">该实例暂无告警记录</div>'
+      : `<div class="table-wrapper"><table class="alert-records-table"><thead><tr><th>触发时间</th><th>告警类型</th><th>告警级别</th><th>推送状态</th><th>操作</th></tr></thead><tbody>
+        ${alerts.map((a, ai) => `<tr>
+          <td style="font-family:'Roboto Mono',monospace">${a.time}</td>
+          <td>${a.type}</td>
+          <td>${renderAlertLevel(a.level)}</td>
+          <td><span class="alert-push-status ${a.pushStatus === 'success' ? 'alert-push-success' : 'alert-push-failed'}">${a.pushStatus === 'success' ? icons.checkCircle + ' 成功' : icons.xCircle + ' 失败'}</span></td>
+          <td>${a.pushStatus === 'failed' ? `<button class="alert-repush-btn" onclick="event.stopPropagation();repushAlert(${exec.id},${ai})">${icons.redo} 重新推送</button>` : ''}</td>
+        </tr>`).join('')}
+      </tbody></table></div>`}`;
+
+  // Build right panel
+  let panelHtml = '';
+  if (hasPanel && selectedNode) {
+    panelHtml = `
+      <div class="exec-node-panel">
+        <div class="exec-panel-header">
+          <div class="exec-panel-title">${icons.info} 节点详情</div>
+          <button class="exec-panel-close" onclick="closeExecNodePanel()">${icons.close}</button>
+        </div>
+        <div class="exec-panel-body">
+          <div class="panel-node-status">
+            <div class="node-dot ${nodeStatusClass[selectedNode.status] || ''}"></div>
+            <div class="panel-node-status-info">
+              <div style="font-weight:500;font-size:var(--font-size-sm)">${selectedNode.name}</div>
+              <div class="node-type">${selectedNode.type}</div>
+              <div class="node-timing">开始: ${selectedNode.startTime} &middot; 耗时: ${selectedNode.duration}</div>
+            </div>
+            <span class="exec-status ${statusClass[selectedNode.status] || ''}" style="font-size:11px">${nodeStatusLabel[selectedNode.status] || selectedNode.status}</span>
+          </div>
+
+          <div class="panel-section">
+            <div class="panel-section-title">${icons.upload} 输入数据</div>
+            ${renderJsonBlock(selectedNode.inputData)}
+          </div>
+
+          <div class="panel-section">
+            <div class="panel-section-title">${icons.checkCircle} 输出数据</div>
+            ${renderJsonBlock(selectedNode.outputData)}
+          </div>
+
+          <div class="panel-section">
+            <div class="panel-section-title">${icons.database} 变量快照</div>
+            ${renderJsonBlock(selectedNode.variables)}
+          </div>
+
+          ${selectedNode.status === 'failed' && (selectedNode.error || selectedNode.errorDetail) ? `
+          <div class="panel-section">
+            <div class="panel-section-title" style="color:var(--md-error)">${icons.xCircle} 错误信息</div>
+            <div class="panel-error-block">${escHtml(selectedNode.errorDetail || selectedNode.error || '')}</div>
+          </div>` : ''}
+        </div>
+      </div>`;
+  }
 
   return `
-    <div class="detail-back" onclick="wsExecDetailId = null; render()" style="margin-bottom:var(--space-4)">${icons.arrowLeft}<span>返回执行记录列表</span></div>
+    <div class="detail-back" onclick="wsExecDetailId = null; wsExecSelectedNodeIdx = null; render()" style="margin-bottom:var(--space-4)">${icons.arrowLeft}<span>返回执行记录列表</span></div>
     <div class="exec-detail-header">
       <div style="display:flex;align-items:center;gap:var(--space-3)">
-        <h2 style="font-size:var(--font-size-lg);font-weight:500;margin:0">执行详情 #${exec.id}</h2>
+        <h2 style="font-size:var(--font-size-lg);font-weight:500;margin:0">执行详情 <code style="font-size:var(--font-size-md);color:var(--md-outline)">#${exec.id}</code></h2>
         <span class="exec-status ${statusClass[exec.status]}" style="font-size:var(--font-size-sm)">${statusLabel[exec.status]}</span>
         ${exec.stale ? '<span class="stale-mark">异常滞留</span>' : ''}
       </div>
@@ -2057,32 +2230,83 @@ function renderExecDetail(ws) {
         ${['completed','failed','cancelled'].includes(exec.status) && ws.myRole !== 'viewer' ? `<button class="btn btn-primary btn-sm" onclick="showReExecuteModal(${exec.id})">${icons.redo}<span>重新执行</span></button>` : ''}
       </div>
     </div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:var(--space-4);margin:var(--space-4) 0;padding:var(--space-4);background:var(--md-surface);border-radius:var(--radius-lg)">
-      <div class="exec-detail-field"><span class="exec-detail-field-label">工作流</span><span class="exec-detail-field-value" style="font-weight:500">${exec.wfName}</span></div>
-      <div class="exec-detail-field"><span class="exec-detail-field-label">版本</span><span class="version-badge">v${exec.version}</span></div>
-      <div class="exec-detail-field"><span class="exec-detail-field-label">触发方式</span><span>${triggerLabel[exec.trigger]}</span></div>
-      <div class="exec-detail-field"><span class="exec-detail-field-label">触发人</span><span>${exec.triggerUser}</span></div>
-      <div class="exec-detail-field"><span class="exec-detail-field-label">开始时间</span><span>${exec.startTime}</span></div>
-      <div class="exec-detail-field"><span class="exec-detail-field-label">结束时间</span><span>${exec.endTime}</span></div>
-      <div class="exec-detail-field"><span class="exec-detail-field-label">执行时长</span><span>${exec.duration}</span></div>
-    </div>
-    ${exec.nodes && exec.nodes.length > 0 ? `
-    <h3 style="font-size:var(--font-size-md);font-weight:500;margin:var(--space-6) 0 var(--space-3)">节点执行时间线</h3>
-    <div class="node-timeline">${exec.nodes.map(node => `
-      <div class="node-item ${node.status === 'failed' ? 'node-item-failed' : ''}">
-        <div class="node-dot ${nodeStatusClass[node.status] || ''}"></div>
-        <div style="flex:1">
-          <div style="display:flex;align-items:center;gap:var(--space-3)">
-            <span style="font-weight:500;font-size:var(--font-size-sm)">${node.name}</span>
-            <span class="badge badge-type" style="font-size:10px">${node.type}</span>
-            <span class="exec-status ${statusClass[node.status] || ''}" style="font-size:11px">${statusLabel[node.status] || node.status}</span>
+
+    <div class="exec-detail-split ${hasPanel ? 'panel-open' : ''}">
+      <div class="exec-detail-main">
+        <!-- Overview Card -->
+        <div class="exec-overview-card">
+          <div class="exec-overview-grid">
+            <div class="exec-overview-item">
+              <span class="exec-overview-label">工作流</span>
+              <span class="exec-overview-value"><a onclick="navigateToWfDetail(${exec.wfId})">${exec.wfName}</a></span>
+            </div>
+            <div class="exec-overview-item">
+              <span class="exec-overview-label">版本</span>
+              <span class="exec-overview-value"><span class="version-badge">v${exec.version}</span></span>
+            </div>
+            <div class="exec-overview-item">
+              <span class="exec-overview-label">触发方式</span>
+              <span class="exec-overview-value">${triggerLabel[exec.trigger]}</span>
+            </div>
+            <div class="exec-overview-item">
+              <span class="exec-overview-label">触发人</span>
+              <span class="exec-overview-value">${exec.triggerUser}</span>
+            </div>
+            <div class="exec-overview-item">
+              <span class="exec-overview-label">开始时间</span>
+              <span class="exec-overview-value" style="font-family:'Roboto Mono',monospace;font-size:var(--font-size-xs)">${exec.startTime}</span>
+            </div>
+            <div class="exec-overview-item">
+              <span class="exec-overview-label">结束时间</span>
+              <span class="exec-overview-value" style="font-family:'Roboto Mono',monospace;font-size:var(--font-size-xs)">${exec.endTime}</span>
+            </div>
+            <div class="exec-overview-item">
+              <span class="exec-overview-label">执行时长</span>
+              <span class="exec-overview-value">${exec.duration}</span>
+            </div>
+            <div class="exec-overview-item">
+              <span class="exec-overview-label">实例 ID</span>
+              <span class="exec-overview-value" style="font-family:'Roboto Mono',monospace">${exec.id}</span>
+            </div>
           </div>
-          <div style="display:flex;gap:var(--space-4);margin-top:2px;font-size:var(--font-size-xs);color:var(--md-outline)">
-            <span>开始: ${node.startTime}</span><span>耗时: ${node.duration}</span>
-          </div>
-          ${node.error ? `<div style="margin-top:4px;padding:6px 8px;background:rgba(179,38,30,0.05);border-radius:var(--radius-md);font-size:var(--font-size-xs);color:var(--md-error)">${node.error}</div>` : ''}
         </div>
-      </div>`).join('')}</div>` : ''}`;
+
+        ${inputsHtml}
+        ${outputsHtml}
+        ${timelineHtml}
+        ${alertsHtml}
+      </div>
+
+      ${panelHtml}
+    </div>`;
+}
+
+function selectExecNode(idx) {
+  wsExecSelectedNodeIdx = (wsExecSelectedNodeIdx === idx) ? null : idx;
+  render();
+}
+
+function closeExecNodePanel() {
+  wsExecSelectedNodeIdx = null;
+  render();
+}
+
+function navigateToWfDetail(wfId) {
+  // Navigate to workflow detail view within the current workspace
+  const ws = workspaces.find(w => w.id === wsCurrentId);
+  if (!ws) return;
+  const wf = (wsWorkflows[wsCurrentId] || []).find(w => w.id === wfId);
+  if (wf) {
+    showToast('info', '跳转', '即将跳转至工作流「' + wf.name + '」详情');
+  }
+}
+
+function repushAlert(execId, alertIdx) {
+  const exec = (wsExecutions[wsCurrentId] || []).find(e => e.id === execId);
+  if (!exec || !exec.alerts || !exec.alerts[alertIdx]) return;
+  exec.alerts[alertIdx].pushStatus = 'success';
+  showToast('success', '推送成功', '告警已重新推送至 Snake 平台');
+  render();
 }
 
 function showCancelExecModal(execId) {
