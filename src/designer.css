@@ -1516,6 +1516,251 @@
   white-space: nowrap;
 }
 
+/* ========== Condition Visual Builder ========== */
+
+/* Mode tab switcher (visual | expr) */
+.cond-mode-tabs {
+  display: flex;
+  gap: 2px;
+  background: var(--md-surface-container-high);
+  border-radius: 6px;
+  padding: 2px;
+}
+
+.cond-mode-tab {
+  padding: 3px 10px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--md-on-surface-variant);
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  transition: var(--transition-fast);
+  white-space: nowrap;
+}
+
+.cond-mode-tab:hover {
+  color: var(--md-on-surface);
+  background: var(--md-surface-container);
+}
+
+.cond-mode-tab.active {
+  color: var(--md-primary);
+  background: var(--md-surface);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+}
+
+/* Single condition row */
+.condition-visual-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  background: var(--md-surface);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 6px;
+}
+
+.condition-visual-row .cond-left-select,
+.condition-visual-row .cond-left-input {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  font-size: 12px;
+  padding: 0 8px;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 4px;
+  background: var(--md-surface-container);
+  color: var(--md-on-surface);
+  outline: none;
+}
+
+.condition-visual-row .cond-left-select:focus,
+.condition-visual-row .cond-left-input:focus {
+  border-color: var(--md-primary);
+  background: var(--md-surface);
+}
+
+.cond-op-select {
+  width: 108px;
+  flex-shrink: 0;
+  height: 28px;
+  font-size: 11px;
+  padding: 0 6px;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 4px;
+  background: var(--md-surface-container);
+  color: var(--md-on-surface);
+  outline: none;
+  cursor: pointer;
+}
+
+.cond-op-select:focus {
+  border-color: var(--md-primary);
+}
+
+.condition-visual-row .cond-right-input {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  font-size: 12px;
+  padding: 0 8px;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 4px;
+  background: var(--md-surface-container);
+  color: var(--md-on-surface);
+  outline: none;
+}
+
+.condition-visual-row .cond-right-input:focus {
+  border-color: var(--md-primary);
+  background: var(--md-surface);
+}
+
+.cond-delete-btn {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  color: var(--md-outline);
+  cursor: pointer;
+  transition: var(--transition-fast);
+  padding: 0;
+}
+
+.cond-delete-btn:hover {
+  background: var(--md-error-container);
+  color: var(--md-error);
+}
+
+.cond-delete-btn svg {
+  width: 13px;
+  height: 13px;
+}
+
+/* AND tag between rows */
+.condition-and-tag {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--md-outline);
+  letter-spacing: 0.05em;
+  padding-left: 2px;
+}
+
+.condition-and-tag::before,
+.condition-and-tag::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--md-outline-variant);
+}
+
+/* Add condition button */
+.cond-add-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  justify-content: center;
+  padding: 5px 0;
+  margin-top: 6px;
+  border: 1px dashed var(--md-outline-variant);
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--md-primary);
+  background: transparent;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.cond-add-btn:hover {
+  border-color: var(--md-primary);
+  background: var(--md-primary-container);
+}
+
+.cond-add-btn svg {
+  width: 13px;
+  height: 13px;
+}
+
+/* IF node else block */
+.if-else-block {
+  margin-top: var(--space-3);
+  padding: 8px 10px;
+  background: var(--md-surface-container);
+  border-radius: 6px;
+  border-left: 3px solid #94a3b8;
+}
+
+.if-else-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--md-outline);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 2px;
+}
+
+.if-else-desc {
+  font-size: 11px;
+  color: var(--md-on-surface-variant);
+}
+
+/* IF node if-block */
+.if-block {
+  padding: 8px 10px;
+  background: var(--md-surface-container);
+  border-radius: 6px;
+  border-left: 3px solid var(--md-primary);
+}
+
+.if-block-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--md-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 8px;
+}
+
+/* Switch branch card condMode toggle (compact) */
+.branch-cond-mode-btn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 500;
+  border: 1px solid var(--md-outline-variant);
+  background: var(--md-surface);
+  color: var(--md-on-surface-variant);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.branch-cond-mode-btn:hover {
+  border-color: var(--md-primary);
+  color: var(--md-primary);
+}
+
+.branch-cond-mode-btn.active {
+  border-color: var(--md-primary);
+  color: var(--md-primary);
+  background: var(--md-primary-container);
+}
+
 /* Switch branch card */
 .branch-card {
   padding: var(--space-3);
@@ -1880,16 +2125,104 @@
 
 /* --- Trigger Input Parameter Card --- */
 .trigger-param-card {
-  padding: 8px 10px;
   background: var(--md-surface-container);
   border-radius: var(--radius-sm);
   margin-bottom: var(--space-2);
+  border: 1px solid var(--md-outline-variant);
   border-left: 3px solid var(--md-primary-container);
   transition: border-color 0.15s;
+  overflow: hidden;
 }
 
 .trigger-param-card:hover {
   border-left-color: var(--md-primary);
+}
+
+.trigger-param-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 10px;
+  background: var(--md-surface-container-low, rgba(0,0,0,0.02));
+  border-bottom: 1px solid var(--md-outline-variant);
+}
+
+.trigger-param-card-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.trigger-param-index {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--md-primary-container);
+  color: var(--md-on-primary-container);
+  font-size: 10px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.trigger-param-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--md-on-surface);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
+}
+
+.trigger-param-type-badge {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  background: var(--md-secondary-container, rgba(103,80,164,0.1));
+  color: var(--md-on-secondary-container, var(--md-primary));
+  font-family: var(--font-family-mono);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.trigger-param-required-toggle {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  color: var(--md-on-surface-variant);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.trigger-param-card-body {
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.trigger-param-row {
+  display: flex;
+  gap: 8px;
+}
+
+.trigger-param-field {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.trigger-param-field-label {
+  font-size: 10px;
+  color: var(--md-on-surface-variant);
+  font-weight: 500;
 }
 
 .trigger-param-card .config-input,

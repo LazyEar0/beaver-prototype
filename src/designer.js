@@ -899,27 +899,69 @@ function renderTriggerConfig(node) {
   </div>
   <div class="config-section">
     <div class="config-section-title" style="display:flex;align-items:center;justify-content:space-between">输入参数 <button class="btn btn-ghost btn-sm" style="height:24px;font-size:11px" onclick="addTriggerParam(${node.id})">${icons.plus} 添加</button></div>
-    <div class="config-field-help" style="margin-bottom:var(--space-2)">定义触发流程时需要传入的参数，可在后续节点中通过 \${参数名} 引用</div>
-    ${inputParams.length === 0 ? '<div style="text-align:center;padding:var(--space-3);color:var(--md-outline);font-size:var(--font-size-xs)">暂无输入参数，点击上方按钮添加</div>' :
-    inputParams.map((p, i) => `
+    <div class="config-field-help" style="margin-bottom:var(--space-2)">定义触发流程时需要传入的参数，可在后续节点中通过 \${变量名} 引用</div>
+    ${inputParams.length === 0 ? '<div style="text-align:center;padding:var(--space-3);color:var(--md-outline);font-size:var(--font-size-xs)">暂无输入参数，点击上方添加按钮</div>' :
+    inputParams.map((p, i) => {
+      const fieldType = p.fieldType || 'shortText';
+      const fieldTypeOptions = [
+        { value: 'shortText',  label: '短文本' },
+        { value: 'longText',   label: '长文本' },
+        { value: 'number',     label: '数字' },
+        { value: 'toggle',     label: '开关' },
+        { value: 'datetime',   label: '日期时间' },
+        { value: 'file',       label: '文件' },
+        { value: 'json',       label: 'JSON 对象' },
+      ];
+      const fieldTypeTypeMap = { shortText: 'String', longText: 'String', number: 'Integer', toggle: 'Boolean', datetime: 'DateTime', file: 'File', json: 'Object' };
+      const inferredType = fieldTypeTypeMap[fieldType] || 'String';
+      return `
       <div class="trigger-param-card">
-        <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
-          <input class="config-input" value="${p.name}" placeholder="参数名" style="flex:1;font-family:var(--font-family-mono);font-size:11px" />
-          <select class="config-select" style="width:90px;font-size:11px">
-            <option ${p.type === 'String' ? 'selected' : ''}>String</option>
-            <option ${p.type === 'Integer' ? 'selected' : ''}>Integer</option>
-            <option ${p.type === 'Double' ? 'selected' : ''}>Double</option>
-            <option ${p.type === 'Boolean' ? 'selected' : ''}>Boolean</option>
-            <option ${p.type === 'DateTime' ? 'selected' : ''}>DateTime</option>
-            <option ${p.type === 'Object' ? 'selected' : ''}>Object</option>
-            <option ${p.type === 'File' ? 'selected' : ''}>File</option>
-          </select>
-          <label style="display:flex;align-items:center;gap:2px;font-size:10px;color:var(--md-on-surface-variant);white-space:nowrap"><input type="checkbox" ${p.required ? 'checked' : ''} style="accent-color:var(--md-primary);width:12px;height:12px">必填</label>
-          <button class="table-action-btn danger" style="width:20px;height:20px;flex-shrink:0" onclick="removeTriggerParam(${node.id},${i})">${icons.close}</button>
+        <div class="trigger-param-card-header">
+          <div class="trigger-param-card-title">
+            <span class="trigger-param-index">${i + 1}</span>
+            <span class="trigger-param-label">${p.label || p.name || '未命名参数'}</span>
+            <span class="trigger-param-type-badge">${inferredType}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <label class="trigger-param-required-toggle">
+              <input type="checkbox" ${p.required ? 'checked' : ''} style="accent-color:var(--md-primary);width:12px;height:12px">
+              <span>必填</span>
+            </label>
+            <button class="table-action-btn danger" style="width:20px;height:20px;flex-shrink:0" onclick="removeTriggerParam(${node.id},${i})">${icons.close}</button>
+          </div>
         </div>
-        <input class="config-input" value="${p.desc || ''}" placeholder="参数说明" style="font-size:11px" />
-      </div>
-    `).join('')}
+        <div class="trigger-param-card-body">
+          <div class="trigger-param-row">
+            <div class="trigger-param-field">
+              <label class="trigger-param-field-label">显示名称</label>
+              <input class="config-input" value="${escHtml(p.label || '')}" placeholder="如：客户姓名" style="font-size:11px" oninput="updateTriggerParamField(${node.id},${i},'label',this.value)" />
+            </div>
+            <div class="trigger-param-field">
+              <label class="trigger-param-field-label">字段类型</label>
+              <select class="config-select" style="font-size:11px" onchange="updateTriggerParamField(${node.id},${i},'fieldType',this.value)">
+                ${fieldTypeOptions.map(o => `<option value="${o.value}" ${fieldType === o.value ? 'selected' : ''}>${o.label}</option>`).join('')}
+              </select>
+            </div>
+          </div>
+          <div class="trigger-param-row">
+            <div class="trigger-param-field">
+              <label class="trigger-param-field-label">变量名 <span style="color:var(--md-error)">*</span></label>
+              <input class="config-input" value="${escHtml(p.name || '')}" placeholder="如：customer_name" style="font-size:11px;font-family:var(--font-family-mono)" oninput="updateTriggerParamField(${node.id},${i},'name',this.value)" />
+            </div>
+            <div class="trigger-param-field">
+              <label class="trigger-param-field-label">占位提示</label>
+              <input class="config-input" value="${escHtml(p.placeholder || '')}" placeholder="输入框的提示文字" style="font-size:11px" oninput="updateTriggerParamField(${node.id},${i},'placeholder',this.value)" />
+            </div>
+          </div>
+          <div class="trigger-param-row">
+            <div class="trigger-param-field" style="flex:1">
+              <label class="trigger-param-field-label">参数说明</label>
+              <input class="config-input" value="${escHtml(p.desc || '')}" placeholder="对这个参数的用途做简要说明" style="font-size:11px" oninput="updateTriggerParamField(${node.id},${i},'desc',this.value)" />
+            </div>
+          </div>
+        </div>
+      </div>`;
+    }).join('')}
   </div>`;
 }
 
@@ -929,8 +971,16 @@ function addTriggerParam(nodeId) {
   if (!node.config) node.config = {};
   if (!node.config.inputParams) node.config.inputParams = [];
   const idx = node.config.inputParams.length + 1;
-  node.config.inputParams.push({ name: 'param_' + idx, type: 'String', required: false, desc: '' });
+  node.config.inputParams.push({ name: 'param_' + idx, label: '', fieldType: 'shortText', required: false, placeholder: '', desc: '' });
   renderDesigner();
+}
+
+function updateTriggerParamField(nodeId, index, field, value) {
+  const node = designerNodes.find(n => n.id === nodeId);
+  if (!node?.config?.inputParams?.[index]) return;
+  node.config.inputParams[index][field] = value;
+  // Re-render only if the header-visible fields change (label, fieldType)
+  if (field === 'label' || field === 'fieldType') renderDesigner();
 }
 
 function removeTriggerParam(nodeId, index) {
