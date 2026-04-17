@@ -706,7 +706,6 @@ function removeTriggerParam(nodeId, index) {
   node.config.inputParams.splice(index, 1);
   renderDesigner();
 }
-}
 
 function renderIfConfig(node) {
   return `<div class="config-section">
