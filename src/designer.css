@@ -2285,3 +2285,120 @@
   align-items: center;
   gap: 4px;
 }
+
+/* --- Zoom Input --- */
+.canvas-zoom-input {
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  color: var(--md-on-surface);
+  width: 48px;
+  text-align: center;
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-xs);
+  padding: 2px 4px;
+  font-family: inherit;
+  outline: none;
+  transition: all 0.2s;
+}
+
+.canvas-zoom-input:hover {
+  color: var(--md-primary);
+  background: var(--md-surface-container);
+}
+
+.canvas-zoom-input:focus {
+  border-color: var(--md-primary);
+  background: var(--md-surface);
+  color: var(--md-on-surface);
+  cursor: text;
+  width: 52px;
+}
+
+/* --- More Dropdown Menu --- */
+.designer-more-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 180px;
+  background: var(--md-surface);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  z-index: 100;
+  padding: 4px 0;
+  animation: fadeInScale 0.15s cubic-bezier(0.2, 0, 0, 1);
+}
+
+@keyframes fadeInScale {
+  from { opacity: 0; transform: scale(0.95) translateY(-4px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.more-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  font-size: var(--font-size-sm);
+  color: var(--md-on-surface);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.more-dropdown-item:hover {
+  background: var(--md-surface-container);
+}
+
+.more-dropdown-item svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.more-dropdown-divider {
+  height: 1px;
+  background: var(--md-outline-variant);
+  margin: 4px 0;
+}
+
+/* --- Switch Node Ports --- */
+.port-switch-case,
+.port-switch-default {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--md-surface);
+  border: 2px solid #1890FF;
+  cursor: crosshair;
+  z-index: 3;
+  transition: all 0.2s;
+}
+
+.port-switch-default {
+  border-color: #94a3b8;
+}
+
+.port-switch-case:hover,
+.port-switch-default:hover {
+  transform: translateX(-50%) scale(1.5) !important;
+  background: #1890FF;
+  border-color: #1890FF;
+}
+
+.port-switch-default:hover {
+  background: #94a3b8;
+  border-color: #94a3b8;
+}
+
+/* --- Space Pan Cursor --- */
+.canvas-container.space-panning {
+  cursor: grab !important;
+}
+
+.canvas-container.space-panning:active {
+  cursor: grabbing !important;
+}

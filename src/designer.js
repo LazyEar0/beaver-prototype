@@ -44,6 +44,11 @@ let designerBoxSelectStart = null;
 let designerBoxSelectRect = null;
 let designerContextMenu = null; // Right-click context menu
 let designerBottomResizing = false; // Bottom panel resize
+let designerFullscreen = false; // Fullscreen toggle
+let designerSpaceDown = false; // Space key held for pan mode
+let designerUndoStack = []; // Undo state stack (max 50)
+let designerRedoStack = []; // Redo state stack
+let designerMoreMenuOpen = false; // "More" dropdown menu state
 
 // --- Node Type Definitions ---
 const nodeTypes = [
@@ -143,7 +148,17 @@ function openDesigner(wsId, wfId) {
 
 function closeDesigner() {
   designerActive = false;
+  designerSpaceDown = false;
+  designerMoreMenuOpen = false;
+  designerUndoStack = [];
+  designerRedoStack = [];
+  designerFullscreen = false;
+  // Exit fullscreen if active
+  if (document.fullscreenElement) {
+    document.exitFullscreen().catch(() => {});
+  }
   stopAutoSave();
+  document.removeEventListener('keyup', designerKeyUpHandler);
   const shell = document.getElementById('designerShell');
   shell.classList.remove('active');
   render(); // Re-render main app
@@ -326,6 +341,12 @@ function renderDesigner() {
         <button class="toolbar-btn ${designerMinimapVisible ? 'active' : ''}" onclick="toggleMinimap()" title="${designerMinimapVisible ? '隐藏小地图' : '显示小地图'}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2"/><rect x="12" y="12" width="8" height="8" rx="1"/></svg>
         </button>
+        <button class="toolbar-btn ${designerFullscreen ? 'active' : ''}" onclick="toggleDesignerFullscreen()" title="${designerFullscreen ? '退出全屏 (F11)' : '进入全屏 (F11)'}">
+          ${designerFullscreen
+            ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="4 14 4 20 10 20"/><polyline points="20 10 20 4 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg>'
+            : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>'
+          }
+        </button>
         <span class="toolbar-divider"></span>
         <button class="toolbar-btn ${designerBottomPanel === 'variables' ? 'active' : ''}" onclick="toggleDesignerBottom('variables')" title="查看和管理变量定义">
           ${icons.hash} <span>变量</span>
@@ -341,8 +362,23 @@ function renderDesigner() {
         ${designerOnlineUsers.length > 1 ? '<span class="toolbar-divider"></span>' : ''}
         <button class="btn btn-secondary btn-sm" onclick="enterDebugMode()" ${designerDebugMode ? 'disabled style="opacity:0.5"' : ''} title="调试运行工作流 (模拟执行)">${icons.play}<span>调试</span></button>
         <button class="btn btn-secondary btn-sm" onclick="designerSave()" title="手动保存草稿 (Ctrl+S)">${icons.check}<span>保存</span></button>
-        <button class="btn btn-secondary btn-sm" onclick="showDesignerSettings()" title="工作流全局设置">${icons.settings}<span>设置</span></button>
-        <button class="btn btn-secondary btn-sm" onclick="showDesignerVersions()" title="查看版本发布历史">${icons.history}<span>版本</span></button>
+        <div class="designer-more-menu-wrap" style="position:relative">
+          <button class="btn btn-secondary btn-sm" onclick="toggleDesignerMoreMenu(event)" title="更多操作">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg><span>更多</span>
+          </button>
+          ${designerMoreMenuOpen ? `<div class="designer-more-dropdown" onclick="event.stopPropagation()">
+            <div class="more-dropdown-item" onclick="showDesignerSettings();closeDesignerMoreMenu()">
+              ${icons.settings} <span>工作流设置</span>
+            </div>
+            <div class="more-dropdown-item" onclick="showDesignerVersions();closeDesignerMoreMenu()">
+              ${icons.history} <span>版本历史</span>
+            </div>
+            <div class="more-dropdown-divider"></div>
+            <div class="more-dropdown-item" onclick="exportDesignerJSON();closeDesignerMoreMenu()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> <span>导出 JSON</span>
+            </div>
+          </div>` : ''}
+        </div>
         <button class="btn btn-primary btn-sm" onclick="showPublishDialog()" ${wf.status === 'disabled' ? 'disabled style="opacity:0.5"' : ''} title="发布当前工作流版本">${icons.arrowUp || icons.check}<span>发布</span></button>
       </div>
     </div>
@@ -356,10 +392,10 @@ function renderDesigner() {
           <svg class="canvas-svg" id="canvasSvg">
             <defs>
               <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
-                <polygon points="0 0, 10 3.5, 0 7" fill="#94a3b8" />
+                <polygon points="0 0, 10 3.5, 0 7" fill="#555" />
               </marker>
               <marker id="arrowhead-active" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
-                <polygon points="0 0, 10 3.5, 0 7" fill="var(--md-primary)" />
+                <polygon points="0 0, 10 3.5, 0 7" fill="#1890FF" />
               </marker>
             </defs>
             <g transform="translate(${designerPanX}, ${designerPanY}) scale(${designerZoom})">
@@ -372,7 +408,7 @@ function renderDesigner() {
         </div>
         <div class="canvas-controls">
           <button class="canvas-control-btn" onclick="designerZoomOut()" title="缩小视图">${icons.arrowDown}</button>
-          <span class="canvas-zoom-level" onclick="designerResetZoom()" title="点击重置为100%">${Math.round(designerZoom * 100)}%</span>
+          <input class="canvas-zoom-input" id="canvasZoomInput" type="text" value="${Math.round(designerZoom * 100)}%" onfocus="onZoomInputFocus(this)" onblur="onZoomInputBlur(this)" onkeydown="onZoomInputKey(event, this)" title="输入精确缩放值 (25%-200%)" />
           <button class="canvas-control-btn" onclick="designerZoomIn()" title="放大视图">${icons.arrowUp}</button>
           <span style="width:1px;height:16px;background:var(--md-outline-variant);margin:0 4px"></span>
           <button class="canvas-control-btn" onclick="designerFitCanvas()" title="自适应画布大小">${icons.workflow}</button>
@@ -468,6 +504,16 @@ function renderCanvasNodes() {
     if (node.type === 'if') {
       portsHtml += `<div class="canvas-node-port port-true" data-port="true" data-node="${node.id}"><span class="canvas-node-port-label" style="bottom:-18px;left:-4px;color:var(--md-success)">T</span></div>`;
       portsHtml += `<div class="canvas-node-port port-false" data-port="false" data-node="${node.id}"><span class="canvas-node-port-label" style="bottom:-18px;left:-4px;color:var(--md-error)">F</span></div>`;
+    } else if (node.type === 'switch') {
+      // Switch node: multiple branch output ports + default
+      const branches = node.config?.branches || [{ name: '分支1' }, { name: '分支2' }];
+      const totalPorts = branches.length + 1; // branches + default
+      branches.forEach((b, idx) => {
+        const portPos = (idx + 1) / (totalPorts + 1) * 100;
+        portsHtml += `<div class="canvas-node-port port-switch-case" data-port="case${idx}" data-node="${node.id}" style="bottom:-6px;left:${portPos}%;transform:translateX(-50%)"><span class="canvas-node-port-label" style="bottom:-18px;left:50%;transform:translateX(-50%);color:#1890FF;white-space:nowrap;font-size:10px">${b.name}</span></div>`;
+      });
+      const defPos = totalPorts / (totalPorts + 1) * 100;
+      portsHtml += `<div class="canvas-node-port port-switch-default" data-port="caseDefault" data-node="${node.id}" style="bottom:-6px;left:${defPos}%;transform:translateX(-50%)"><span class="canvas-node-port-label" style="bottom:-18px;left:50%;transform:translateX(-50%);color:#94a3b8;white-space:nowrap;font-size:10px">Default</span></div>`;
     } else if (node.type !== 'end') {
       portsHtml += `<div class="canvas-node-port port-out" data-port="out" data-node="${node.id}"></div>`;
     }
@@ -527,8 +573,8 @@ function renderConnections() {
 
     const isActive = designerDebugMode && conn._debugActive;
 
-    return `<path d="${path}" fill="none" stroke="${isActive ? 'var(--md-primary)' : '#94a3b8'}" stroke-width="${isActive ? 3 : 2.5}" marker-end="url(#${isActive ? 'arrowhead-active' : 'arrowhead'})" ${isActive ? 'class="connection-flow"' : ''} onclick="onConnectionClick(event, ${conn.id})" style="filter:drop-shadow(0 1px 2px rgba(0,0,0,0.1))" />
-    ${conn.label ? `<text x="${(fromPos.x + toPos.x) / 2}" y="${(fromPos.y + toPos.y) / 2 - 10}" text-anchor="middle" font-size="11" fill="${conn.label === 'TRUE' ? '#16a34a' : conn.label === 'FALSE' ? '#dc2626' : '#64748b'}" font-weight="700" font-family="Roboto, sans-serif" paint-order="stroke" stroke="#fff" stroke-width="3">${conn.label}</text>` : ''}`;
+    return `<path d="${path}" fill="none" stroke="${isActive ? '#1890FF' : '#555'}" stroke-width="${isActive ? 2.5 : 2}" marker-end="url(#${isActive ? 'arrowhead-active' : 'arrowhead'})" ${isActive ? 'class="connection-flow"' : ''} onclick="onConnectionClick(event, ${conn.id})" style="cursor:pointer" />
+    ${conn.label ? `<text x="${(fromPos.x + toPos.x) / 2}" y="${(fromPos.y + toPos.y) / 2 - 10}" text-anchor="middle" font-size="11" fill="${conn.label === 'TRUE' ? '#16a34a' : conn.label === 'FALSE' ? '#dc2626' : conn.label === 'Default' ? '#94a3b8' : '#1890FF'}" font-weight="700" font-family="Roboto, sans-serif" paint-order="stroke" stroke="#fff" stroke-width="3">${conn.label}</text>` : ''}`;
   }).join('');
 }
 
@@ -539,7 +585,23 @@ function getPortPosition(node, port) {
     case 'out': return { x: node.x + w, y: node.y + h / 2 };
     case 'true': return { x: node.x + w * 0.35, y: node.y + h };
     case 'false': return { x: node.x + w * 0.65, y: node.y + h };
-    default: return { x: node.x + w, y: node.y + h / 2 };
+    case 'caseDefault': {
+      const branches = node.config?.branches || [{ name: '分支1' }, { name: '分支2' }];
+      const totalPorts = branches.length + 1;
+      const defPos = totalPorts / (totalPorts + 1);
+      return { x: node.x + w * defPos, y: node.y + h };
+    }
+    default: {
+      // Switch case ports: case0, case1, case2...
+      if (port.startsWith('case')) {
+        const idx = parseInt(port.replace('case', ''));
+        const branches = node.config?.branches || [{ name: '分支1' }, { name: '分支2' }];
+        const totalPorts = branches.length + 1;
+        const pos = (idx + 1) / (totalPorts + 1);
+        return { x: node.x + w * pos, y: node.y + h };
+      }
+      return { x: node.x + w, y: node.y + h / 2 };
+    }
   }
 }
 
@@ -1347,6 +1409,18 @@ function onCanvasMouseDown(e) {
   // Close context menu on click
   if (designerContextMenu) { designerContextMenu = null; renderDesigner(); return; }
 
+  // Close more menu if open
+  if (designerMoreMenuOpen) { designerMoreMenuOpen = false; renderDesigner(); return; }
+
+  // Space+drag = force panning (PRD: space+drag canvas pan)
+  if (designerSpaceDown) {
+    e.preventDefault();
+    designerIsPanning = true;
+    designerPanStart = { x: e.clientX - designerPanX, y: e.clientY - designerPanY };
+    document.getElementById('canvasContainer').style.cursor = 'grabbing';
+    return;
+  }
+
   // Shift+drag = box selection
   if (e.shiftKey) {
     e.preventDefault();
@@ -1471,13 +1545,15 @@ function onCanvasMouseUp(e) {
 
 function onCanvasWheel(e) {
   e.preventDefault();
+  // PRD: Ctrl+滚轮缩放，普通滚轮不触发缩放
+  if (!e.ctrlKey && !e.metaKey) return;
   const delta = e.deltaY > 0 ? -0.05 : 0.05;
   const newZoom = Math.max(0.25, Math.min(2, designerZoom + delta));
   designerZoom = newZoom;
   updateCanvasTransform();
   // Update zoom display
-  const zoomEl = document.querySelector('.canvas-zoom-level');
-  if (zoomEl) zoomEl.textContent = Math.round(designerZoom * 100) + '%';
+  const zoomEl = document.getElementById('canvasZoomInput');
+  if (zoomEl) zoomEl.value = Math.round(designerZoom * 100) + '%';
 }
 
 function onCanvasDblClick(e) {
@@ -1593,6 +1669,7 @@ function showDesignerOverview() {
 // --- Node CRUD ---
 function addNodeToCanvas(type, x, y) {
   if (designerDebugMode) return;
+  pushUndoState();
   const nt = nodeTypes.find(t => t.type === type);
   if (!nt) return;
 
@@ -1614,7 +1691,7 @@ function addNodeToCanvas(type, x, y) {
     code: `${nt.code}_${count}`,
     x: x || 400,
     y: y || 200,
-    config: {},
+    config: type === 'switch' ? { branches: [{ name: '分支1', condition: '' }, { name: '分支2', condition: '' }], matchMode: 'first' } : {},
     warnings: 0,
   };
 
@@ -1627,6 +1704,7 @@ function addNodeToCanvas(type, x, y) {
 
 function deleteSelectedNode() {
   if (designerDebugMode || designerReadonly) return;
+  pushUndoState();
 
   // Multi-select delete
   if (designerSelectedNodeIds.length > 1) {
@@ -1748,13 +1826,27 @@ function completeConnection(fromNodeId, fromPort, targetId) {
     showToast('error', '检测到环', '该连线会形成循环依赖，不允许创建'); return;
   }
 
+  pushUndoState();
+
+  // Determine label for Switch branches
+  const fromNode = designerNodes.find(n => n.id === fromNodeId);
+  let connLabel = fromPort === 'true' ? 'TRUE' : fromPort === 'false' ? 'FALSE' : '';
+  if (fromNode && fromNode.type === 'switch' && fromPort.startsWith('case') && fromPort !== 'caseDefault') {
+    const caseIdx = parseInt(fromPort.replace('case', ''));
+    const branches = fromNode.config?.branches || [{ name: '分支1' }, { name: '分支2' }];
+    connLabel = caseIdx < branches.length ? branches[caseIdx].name : `Case ${caseIdx + 1}`;
+  }
+  if (fromNode && fromNode.type === 'switch' && fromPort === 'caseDefault') {
+    connLabel = 'Default';
+  }
+
   designerConnections.push({
     id: designerConnIdCounter++,
     from: fromNodeId,
     to: targetId,
     fromPort,
     toPort: 'in',
-    label: fromPort === 'true' ? 'TRUE' : fromPort === 'false' ? 'FALSE' : '',
+    label: connLabel,
   });
 
   renderDesigner();
@@ -1765,6 +1857,7 @@ function onConnectionClick(e, connId) {
   e.stopPropagation();
   if (designerDebugMode) return;
   if (confirm('删除此连线？')) {
+    pushUndoState();
     designerConnections = designerConnections.filter(c => c.id !== connId);
     syncDesignerState();
     renderDesigner();
@@ -1831,10 +1924,142 @@ function closeBottomPanel() {
 }
 
 // --- Toolbar Actions ---
-function designerUndo() { showToast('info', '撤销', '已撤销上一步操作'); }
-function designerRedo() { showToast('info', '重做', '已重做上一步操作'); }
+
+// --- Undo/Redo Stack (50 steps max) ---
+function _captureDesignerState() {
+  return JSON.stringify({
+    nodes: designerNodes.map(n => ({ ...n })),
+    connections: designerConnections.map(c => ({ ...c })),
+    variables: designerVariables.map(v => ({ ...v })),
+  });
+}
+
+function pushUndoState() {
+  const state = _captureDesignerState();
+  // Don't push duplicate state
+  if (designerUndoStack.length > 0 && designerUndoStack[designerUndoStack.length - 1] === state) return;
+  designerUndoStack.push(state);
+  if (designerUndoStack.length > 50) designerUndoStack.shift();
+  // Clear redo stack on new action
+  designerRedoStack = [];
+}
+
+function _restoreDesignerState(stateJson) {
+  const state = JSON.parse(stateJson);
+  designerNodes = state.nodes;
+  designerConnections = state.connections;
+  designerVariables = state.variables;
+  designerSelectedNodeId = null;
+  designerSelectedNodeIds = [];
+  designerRightPanel = 'overview';
+}
+
+function designerUndo() {
+  if (designerUndoStack.length === 0) {
+    showToast('info', '撤销', '没有更多操作可撤销');
+    return;
+  }
+  // Save current state to redo stack
+  designerRedoStack.push(_captureDesignerState());
+  // Restore previous state
+  const prevState = designerUndoStack.pop();
+  _restoreDesignerState(prevState);
+  renderDesigner();
+  showToast('info', '撤销', `已撤销（剩余 ${designerUndoStack.length} 步）`);
+}
+
+function designerRedo() {
+  if (designerRedoStack.length === 0) {
+    showToast('info', '重做', '没有更多操作可重做');
+    return;
+  }
+  // Save current state to undo stack
+  designerUndoStack.push(_captureDesignerState());
+  // Restore next state
+  const nextState = designerRedoStack.pop();
+  _restoreDesignerState(nextState);
+  renderDesigner();
+  showToast('info', '重做', `已重做（剩余 ${designerRedoStack.length} 步）`);
+}
+
+// --- Fullscreen Toggle ---
+function toggleDesignerFullscreen() {
+  const shell = document.getElementById('shell');
+  if (!shell) return;
+  if (!designerFullscreen) {
+    if (shell.requestFullscreen) shell.requestFullscreen();
+    else if (shell.webkitRequestFullscreen) shell.webkitRequestFullscreen();
+    designerFullscreen = true;
+  } else {
+    if (document.exitFullscreen) document.exitFullscreen();
+    else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+    designerFullscreen = false;
+  }
+  renderDesigner();
+}
+
+// --- Zoom Input Handlers ---
+function onZoomInputFocus(el) {
+  el.value = Math.round(designerZoom * 100);
+  el.select();
+}
+
+function onZoomInputBlur(el) {
+  applyZoomInput(el);
+}
+
+function onZoomInputKey(e, el) {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    applyZoomInput(el);
+    el.blur();
+  }
+  if (e.key === 'Escape') {
+    el.value = Math.round(designerZoom * 100) + '%';
+    el.blur();
+  }
+}
+
+function applyZoomInput(el) {
+  let val = parseInt(el.value.replace('%', '').trim());
+  if (isNaN(val)) val = 100;
+  val = Math.max(25, Math.min(200, val));
+  designerZoom = val / 100;
+  updateCanvasTransform();
+  el.value = Math.round(designerZoom * 100) + '%';
+}
+
+// --- More Menu ---
+function toggleDesignerMoreMenu(e) {
+  e && e.stopPropagation();
+  designerMoreMenuOpen = !designerMoreMenuOpen;
+  renderDesigner();
+}
+
+function closeDesignerMoreMenu() {
+  designerMoreMenuOpen = false;
+  renderDesigner();
+}
+
+function exportDesignerJSON() {
+  const data = {
+    nodes: designerNodes,
+    connections: designerConnections,
+    variables: designerVariables,
+    version: designerWf?.version || 0,
+    exportedAt: new Date().toISOString(),
+  };
+  const json = JSON.stringify(data, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `${designerWf?.name || 'workflow'}_export.json`; a.click();
+  URL.revokeObjectURL(url);
+  showToast('success', '导出成功', '工作流 JSON 已下载');
+}
 
 function autoLayout() {
+  pushUndoState();
   // Simple auto-layout: arrange nodes left to right
   let x = 100, y = 120;
   const sorted = [...designerNodes].sort((a, b) => {
@@ -2200,13 +2425,32 @@ function onMinimapDrag(e, minimapRect) {
 function setupDesignerKeys() {
   // Remove previous listeners
   document.removeEventListener('keydown', designerKeyHandler);
+  document.removeEventListener('keyup', designerKeyUpHandler);
   if (designerActive) {
     document.addEventListener('keydown', designerKeyHandler);
+    document.addEventListener('keyup', designerKeyUpHandler);
   }
 }
 
 function designerKeyHandler(e) {
   if (!designerActive) return;
+
+  // F11 = fullscreen toggle (always active, even in input)
+  if (e.key === 'F11') {
+    e.preventDefault();
+    toggleDesignerFullscreen();
+    return;
+  }
+
+  // Space key for pan mode (not in input fields)
+  if (e.key === ' ' && !e.repeat && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'SELECT') {
+    e.preventDefault();
+    designerSpaceDown = true;
+    const container = document.getElementById('canvasContainer');
+    if (container) container.style.cursor = 'grab';
+    return;
+  }
+
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
 
   if (e.key === 'Delete' || e.key === 'Backspace') {
@@ -2214,6 +2458,7 @@ function designerKeyHandler(e) {
   }
   if (e.key === 'Escape') {
     if (designerConnecting) { cancelConnection(); }
+    else if (designerMoreMenuOpen) { designerMoreMenuOpen = false; renderDesigner(); }
     else if (designerContextMenu) { designerContextMenu = null; renderDesigner(); }
     else if (designerDebugMode) exitDebugMode();
     else deselectNode();
@@ -2224,6 +2469,15 @@ function designerKeyHandler(e) {
   if (e.ctrlKey && e.key === 'c') { e.preventDefault(); designerCopyNodes(); }
   if (e.ctrlKey && e.key === 'v') { e.preventDefault(); designerPasteNodes(); }
   if (e.ctrlKey && e.key === 'a') { e.preventDefault(); designerSelectAll(); }
+}
+
+function designerKeyUpHandler(e) {
+  if (!designerActive) return;
+  if (e.key === ' ') {
+    designerSpaceDown = false;
+    const container = document.getElementById('canvasContainer');
+    if (container && !designerIsPanning) container.style.cursor = '';
+  }
 }
 
 // --- Context Menu ---
@@ -2493,6 +2747,7 @@ function designerCopyNodes() {
 function designerPasteNodes() {
   if (designerReadonly) return;
   if (designerClipboard.length === 0) { showToast('warning', '提示', '剪贴板为空'); return; }
+  pushUndoState();
   const newIds = [];
   designerClipboard.forEach(src => {
     // Skip trigger/end nodes
