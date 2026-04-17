@@ -3176,3 +3176,37 @@
 .upstream-output-copy-btn:hover {
   background: var(--md-primary-container);
 }
+
+/* ========== Output Variables Section (输出变量区域) ========== */
+
+.output-var-item {
+  transition: var(--transition-fast);
+}
+
+.output-var-item:hover {
+  background: var(--md-surface-container-high) !important;
+  transform: translateX(2px);
+}
+
+.output-var-item:active {
+  background: var(--md-surface-container-highest) !important;
+}
+
+/* Output variable type badges */
+.var-icon.type-String { background: #dbeafe; color: #2563eb; }
+.var-icon.type-Number { background: #fef3c7; color: #d97706; }
+.var-icon.type-Boolean { background: #fce7f3; color: #db2777; }
+.var-icon.type-Object { background: #e0e7ff; color: #4f46e5; }
+.var-icon.type-Array { background: #d1fae5; color: #059669; }
+.var-icon.type-Any { background: #f1f5f9; color: #64748b; }
+
+/* Variable reference code tag style */
+.var-ref-tag {
+  font-size: 9px;
+  font-family: var(--font-family-mono);
+  background: var(--md-primary-container);
+  color: var(--md-primary);
+  padding: 2px 6px;
+  border-radius: 3px;
+  white-space: nowrap;
+}

@@ -531,7 +531,14 @@ function renderCanvasNodes() {
     const hasWarning = getNodeWarnings(node).length;
     const isPlaceholder = node.type === 'placeholder';
     const inputConns = designerConnections.filter(c => c.to === node.id);
-    const mergeIndicator = inputConns.length > 1 && node.type !== 'end' ? `<div class="merge-strategy-badge" onclick="event.stopPropagation();showMergeStrategyConfig(${node.id})" title="汇合策略: ${node.config?._mergeStrategy === 'any' ? '任一完成' : '等待全部'}">${node.config?._mergeStrategy === 'any' ? '任一' : '全部'}</div>` : '';
+    // Don't show merge strategy badge when all inputs come from loop ports of the same loop node
+    // (loop body and done never fire simultaneously, so merging makes no sense)
+    const loopPortInputs = inputConns.filter(c => {
+      const src = designerNodes.find(n => n.id === c.from);
+      return src && src.type === 'loop' && (c.fromPort === 'loop' || c.fromPort === 'done');
+    });
+    const showMerge = inputConns.length > 1 && node.type !== 'end' && loopPortInputs.length < inputConns.length;
+    const mergeIndicator = showMerge ? `<div class="merge-strategy-badge" onclick="event.stopPropagation();showMergeStrategyConfig(${node.id})" title="汇合策略: ${node.config?._mergeStrategy === 'any' ? '任一完成' : '等待全部'}">${node.config?._mergeStrategy === 'any' ? '任一' : '全部'}</div>` : '';
 
     let portsHtml = '';
     if (node.type !== 'trigger') portsHtml += `<div class="canvas-node-port port-in" data-port="in" data-node="${node.id}"></div>`;
@@ -1210,6 +1217,8 @@ function renderSwitchConfig(node) {
 
 function renderHttpConfig(node) {
   const upstreamPreview = renderUpstreamOutputPreview(node.id);
+  const outputVarsSection = renderOutputVariablesSection(node);
+  
   return `<div class="config-section">
     <div class="config-section-title">HTTP 请求配置</div>
     <div class="config-field">
@@ -1256,15 +1265,19 @@ function renderHttpConfig(node) {
       })}
     </div>
     <div class="config-field">
-      <div class="config-field-label">响应变量</div>
-      <input class="config-input" value="${node.config?.responseVar || 'response'}" placeholder="response" style="font-family:var(--font-family-mono)" onchange="updateNodeConfig(${node.id}, 'responseVar', this.value)" />
+      <div class="config-field-label">响应变量名</div>
+      <input class="config-input" value="${node.config?.responseVar || 'response'}" placeholder="response" style="font-family:var(--font-family-mono)" onchange="updateNodeConfig(${node.id}, 'responseVar', this.value); renderDesigner()" />
+      <div class="config-field-help">自定义响应变量名，修改后下方输出变量将同步更新</div>
     </div>
     ${upstreamPreview}
-  </div>`;
+  </div>
+  ${outputVarsSection}`;
 }
 
 function renderCodeConfig(node) {
   const upstreamPreview = renderUpstreamOutputPreview(node.id);
+  const outputVarsSection = renderOutputVariablesSection(node);
+  
   return `<div class="config-section">
     <div class="config-section-title">代码配置</div>
     <div class="config-field">
@@ -1284,9 +1297,11 @@ function renderCodeConfig(node) {
         minHeight: 120,
         onChange: `updateNodeConfig(${node.id}, 'script', this.value)`
       })}
+      <div class="config-field-help">使用 <code style="background:var(--md-surface-container);padding:0 3px;border-radius:2px">return</code> 返回结果，返回值将作为 <code style="background:var(--md-surface-container);padding:0 3px;border-radius:2px">result</code> 输出变量</div>
     </div>
     ${upstreamPreview}
-  </div>`;
+  </div>
+  ${outputVarsSection}`;
 }
 
 function renderDelayConfig(node) {
@@ -1305,6 +1320,7 @@ function renderDelayConfig(node) {
 
 function renderAssignConfig(node) {
   const upstreamPreview = renderUpstreamOutputPreview(node.id);
+  const outputVarsSection = renderOutputVariablesSection(node);
   const assignments = node.config?.assignments || [{ target: 'processedData', source: '' }];
   
   return `<div class="config-section">
@@ -1312,7 +1328,7 @@ function renderAssignConfig(node) {
     ${assignments.map((a, i) => `
     <div class="condition-row" style="flex-direction:column;gap:6px;align-items:stretch;margin-bottom:var(--space-2)">
       <div style="display:flex;gap:6px;align-items:center">
-        <input class="config-input" placeholder="目标变量" value="${a.target}" style="flex:1;font-family:var(--font-family-mono)" onchange="updateAssignment(${node.id}, ${i}, 'target', this.value)" />
+        <input class="config-input" placeholder="目标变量" value="${a.target}" style="flex:1;font-family:var(--font-family-mono)" onchange="updateAssignment(${node.id}, ${i}, 'target', this.value); renderDesigner()" />
         <span class="condition-op">=</span>
         ${renderExprEditor({
           id: `assign_src_${node.id}_${i}`,
@@ -1326,7 +1342,8 @@ function renderAssignConfig(node) {
     </div>`).join('')}
     <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;margin-top:var(--space-2)" onclick="addAssignment(${node.id})">${icons.plus} 添加赋值规则</button>
     ${upstreamPreview}
-  </div>`;
+  </div>
+  ${outputVarsSection}`;
 }
 
 function updateAssignment(nodeId, index, field, value) {
@@ -1841,6 +1858,14 @@ function getProblems() {
         const hasDoneOut = designerConnections.some(c => c.from === node.id && c.fromPort === 'done');
         if (!hasLoopOut) problems.push({ level: 'error', message: `循环节点「${node.name}」未连接循环体（"循环体"端口无连线）`, location: node.code, nodeId: node.id });
         if (!hasDoneOut) problems.push({ level: 'warning', message: `循环节点「${node.name}」没有"完成"出口连线，循环结束后流程无法继续`, location: node.code, nodeId: node.id });
+        // Detect confusion: loop body and done connecting to the same downstream node
+        if (hasLoopOut && hasDoneOut) {
+          const loopTarget = designerConnections.find(c => c.from === node.id && c.fromPort === 'loop')?.to;
+          const doneTarget = designerConnections.find(c => c.from === node.id && c.fromPort === 'done')?.to;
+          if (loopTarget && doneTarget && loopTarget === doneTarget) {
+            problems.push({ level: 'warning', message: `循环节点「${node.name}」的"循环体"和"完成"出口连向了同一节点，这通常是错误的连线——循环体是每次迭代的入口，完成是所有迭代结束后的出口`, location: node.code, nodeId: node.id });
+          }
+        }
         // Validate required config
         if ((!node.config?.loopMode || node.config.loopMode === 'forEach') && !node.config?.listVar) {
           problems.push({ level: 'error', message: `循环节点「${node.name}」未配置遍历列表变量`, location: node.code, nodeId: node.id });
@@ -3619,9 +3644,12 @@ function getUpstreamNodes(nodeId) {
 
 /**
  * 获取节点的输出变量定义
+ * @param {object} node - 节点对象
+ * @param {boolean} forPicker - 是否用于变量选择器（生成引用路径）
  */
-function getNodeOutputs(node) {
+function getNodeOutputs(node, forPicker = false) {
   const outputs = [];
+  const nodeCode = node.code;
   
   switch (node.type) {
     case 'trigger':
@@ -3631,45 +3659,181 @@ function getNodeOutputs(node) {
           outputs.push({
             name: p.key || p.label,
             type: p.fieldType || 'String',
-            desc: p.label
+            desc: p.label,
+            editable: false
           });
         });
       }
-      outputs.push({ name: 'triggerTime', type: 'String', desc: '触发时间' });
+      outputs.push({ name: 'triggerTime', type: 'String', desc: '触发时间', editable: false });
       break;
       
-    case 'http':
-      outputs.push({ name: 'response', type: 'Object', desc: 'HTTP响应对象' });
-      outputs.push({ name: 'response.status', type: 'Number', desc: 'HTTP状态码' });
-      outputs.push({ name: 'response.data', type: 'Object', desc: '响应数据' });
-      outputs.push({ name: 'response.headers', type: 'Object', desc: '响应头' });
+    case 'http': {
+      const varPrefix = node.config?.responseVar || 'response';
+      outputs.push({ 
+        name: varPrefix, 
+        type: 'Object', 
+        desc: 'HTTP响应对象',
+        editable: true,
+        configField: 'responseVar'
+      });
+      outputs.push({ 
+        name: `${varPrefix}.status`, 
+        type: 'Number', 
+        desc: 'HTTP状态码',
+        editable: false
+      });
+      outputs.push({ 
+        name: `${varPrefix}.data`, 
+        type: 'Object', 
+        desc: '响应数据体',
+        editable: false
+      });
+      outputs.push({ 
+        name: `${varPrefix}.headers`, 
+        type: 'Object', 
+        desc: '响应头',
+        editable: false
+      });
       break;
+    }
       
     case 'code':
-      outputs.push({ name: 'result', type: 'Object', desc: '代码执行结果' });
+      outputs.push({ 
+        name: 'result', 
+        type: 'Object', 
+        desc: '代码 return 返回的结果',
+        editable: false
+      });
       break;
       
-    case 'assign':
-      if (node.config?.targetVar) {
-        outputs.push({ name: node.config.targetVar, type: 'Object', desc: '赋值结果' });
-      }
+    case 'assign': {
+      const assignments = node.config?.assignments || [{ target: 'processedData', source: '' }];
+      assignments.forEach(a => {
+        if (a.target) {
+          outputs.push({ 
+            name: a.target, 
+            type: 'Object', 
+            desc: '赋值结果',
+            editable: true,
+            configField: 'assignments'
+          });
+        }
+      });
       break;
+    }
       
-    case 'loop':
-      outputs.push({ name: 'item', type: 'Object', desc: '当前迭代项' });
-      outputs.push({ name: 'index', type: 'Number', desc: '当前索引' });
-      outputs.push({ name: 'results', type: 'Array', desc: '所有迭代结果' });
-      break;
+    case 'loop': {
+      const itemVar = node.config?.itemVar || 'item';
+      const indexVar = node.config?.indexVar || 'index';
+      const outputVar = node.config?.outputVar || 'loopResult';
       
-    case 'workflow':
-      outputs.push({ name: node.config?.outputVar || 'wfResult', type: 'Object', desc: '工作流调用结果' });
+      outputs.push({ 
+        name: itemVar, 
+        type: 'Object', 
+        desc: '当前迭代元素（循环体内可用）',
+        editable: true,
+        configField: 'itemVar'
+      });
+      outputs.push({ 
+        name: indexVar, 
+        type: 'Number', 
+        desc: '当前迭代索引（循环体内可用）',
+        editable: true,
+        configField: 'indexVar'
+      });
+      outputs.push({ 
+        name: outputVar, 
+        type: 'Array', 
+        desc: '收集的循环结果（循环完成后可用）',
+        editable: true,
+        configField: 'outputVar'
+      });
       break;
+    }
+      
+    case 'workflow': {
+      const outputVar = node.config?.outputVar || 'wfResult';
+      outputs.push({ 
+        name: outputVar, 
+        type: 'Object', 
+        desc: '被调用工作流的返回结果',
+        editable: true,
+        configField: 'outputVar'
+      });
+      break;
+    }
+      
+    case 'mq': {
+      const msgVar = node.config?.messageVar || 'message';
+      outputs.push({ 
+        name: msgVar, 
+        type: 'Object', 
+        desc: '消费的消息内容',
+        editable: true,
+        configField: 'messageVar'
+      });
+      break;
+    }
       
     default:
-      outputs.push({ name: 'output', type: 'Object', desc: '节点输出' });
+      outputs.push({ name: 'output', type: 'Object', desc: '节点输出', editable: false });
   }
   
   return outputs;
+}
+
+/**
+ * 渲染节点输出变量区域
+ * @param {object} node - 节点对象
+ */
+function renderOutputVariablesSection(node) {
+  const outputs = getNodeOutputs(node);
+  if (outputs.length === 0) return '';
+  
+  const nodeCode = node.code;
+  
+  return `
+    <div class="config-section" style="background:linear-gradient(135deg,#f0fdf4 0%,#fafafa 100%);border:1px solid #bbf7d0;border-radius:var(--radius-md)">
+      <div class="config-section-title" style="color:#16a34a;display:flex;align-items:center;gap:6px">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/>
+        </svg>
+        输出变量
+        <span style="font-size:10px;font-weight:400;color:var(--md-outline);margin-left:auto">下游节点可引用</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        ${outputs.map(o => `
+          <div class="output-var-item" onclick="copyOutputVarPath('${nodeCode}', '${o.name}')" title="点击复制引用路径" style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--md-surface);border-radius:4px;cursor:pointer;transition:var(--transition-fast)">
+            <span class="var-icon type-${o.type}" style="width:20px;height:20px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0" title="${o.type}">${o.type.charAt(0)}</span>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:var(--font-size-xs);font-weight:500;color:var(--md-on-surface);font-family:var(--font-family-mono)">${o.name}</div>
+              <div style="font-size:10px;color:var(--md-on-surface-variant)">${o.desc}</div>
+            </div>
+            <code style="font-size:9px;color:var(--md-primary);background:var(--md-primary-container);padding:2px 6px;border-radius:3px;white-space:nowrap">{{${nodeCode}.${o.name}}}</code>
+          </div>
+        `).join('')}
+      </div>
+      <div style="font-size:10px;color:var(--md-outline);margin-top:8px;display:flex;align-items:center;gap:4px">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <path d="M12 16v-4M12 8h.01"/>
+        </svg>
+        点击变量行可复制引用路径，下游节点可通过此路径引用输出值
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * 复制输出变量路径到剪贴板
+ */
+function copyOutputVarPath(nodeCode, varName) {
+  const path = `{{${nodeCode}.${varName}}}`;
+  navigator.clipboard.writeText(path).then(() => {
+    showToast('success', '已复制', `变量路径 ${path} 已复制到剪贴板`);
+  }).catch(() => {
+    showToast('error', '复制失败', '请手动复制');
+  });
 }
 
 /**
