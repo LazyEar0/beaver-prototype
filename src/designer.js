@@ -50,6 +50,8 @@ let designerUndoStack = []; // Undo state stack (max 50)
 let designerRedoStack = []; // Redo state stack
 let designerMoreMenuOpen = false; // "More" dropdown menu state
 let designerDirty = false; // Track unsaved changes
+let designerVarPickerOpen = null; // Active variable picker: { editorId, position }
+let designerVarPickerHighlighted = -1; // Keyboard navigation highlight index
 
 // --- Node Type Definitions ---
 const nodeTypes = [
@@ -201,6 +203,12 @@ function initDesignerNodes(wf) {
 }
 
 function generateRealisticNodes(wf) {
+  // If workflow name suggests looping, generate a loop-based example
+  const isLoopScenario = wf.name && (wf.name.includes('批量') || wf.name.includes('遍历') || wf.name.includes('循环') || wf.name.includes('列表'));
+  if (isLoopScenario) {
+    return generateLoopExampleNodes(wf);
+  }
+
   const nodes = [
     { id: 1, type: 'trigger', name: '触发器', code: 'trigger_1', x: 80, y: 240, config: { triggerType: 'manual' }, warnings: 0 },
     { id: 2, type: 'http', name: '查询数据', code: 'http_1', x: 320, y: 160, config: { method: 'GET', url: 'https://api.example.com/data' }, warnings: 0 },
@@ -229,7 +237,33 @@ function generateRealisticNodes(wf) {
   return { nodes, conns, vars };
 }
 
-// --- Auto Save ---
+function generateLoopExampleNodes(wf) {
+  // Example: Fetch a list, loop over each item to process it, then summarize
+  const nodes = [
+    { id: 1, type: 'trigger', name: '触发器', code: 'trigger_1', x: 80, y: 220, config: { triggerType: 'manual' }, warnings: 0 },
+    { id: 2, type: 'http', name: '获取数据列表', code: 'http_1', x: 300, y: 220, config: { method: 'GET', url: 'https://api.example.com/items' }, warnings: 0 },
+    { id: 3, type: 'loop', name: '遍历列表', code: 'loop_1', x: 540, y: 220, config: { loopMode: 'forEach', listVar: '${http_1.data.items}', itemVar: 'item', indexVar: 'index', maxIterations: 1000, allowBreak: false, outputVar: 'loopResult', collectOutput: true }, warnings: 0 },
+    { id: 4, type: 'http', name: '处理每条记录', code: 'http_2', x: 680, y: 380, config: { method: 'POST', url: 'https://api.example.com/process' }, warnings: 0 },
+    { id: 5, type: 'assign', name: '汇总结果', code: 'assign_1', x: 800, y: 220, config: {}, warnings: 0 },
+    { id: 6, type: 'end', name: '结束', code: 'end_1', x: 1020, y: 220, config: {}, warnings: 0 },
+  ];
+  const conns = [
+    { id: 1, from: 1, to: 2, fromPort: 'out', toPort: 'in' },
+    { id: 2, from: 2, to: 3, fromPort: 'out', toPort: 'in' },
+    { id: 3, from: 3, to: 4, fromPort: 'loop', toPort: 'in', label: '循环体' },
+    { id: 4, from: 3, to: 5, fromPort: 'done', toPort: 'in', label: '完成' },
+    { id: 5, from: 5, to: 6, fromPort: 'out', toPort: 'in' },
+  ];
+  const vars = [
+    { name: 'input', type: 'Object', scope: '输入变量', desc: '工作流输入参数' },
+    { name: 'item', type: 'Object', scope: '中间变量', desc: '循环当前元素' },
+    { name: 'index', type: 'Number', scope: '中间变量', desc: '循环当前索引' },
+    { name: 'loopResult', type: 'Array', scope: '中间变量', desc: '循环收集的结果列表' },
+  ];
+  return { nodes, conns, vars };
+}
+
+
 // Helper: sync designer state back to workflow object after mutations
 function syncDesignerState() {
   if (designerWf) {
@@ -514,11 +548,15 @@ function renderCanvasNodes() {
       });
       const defPos = totalPorts / (totalPorts + 1) * 100;
       portsHtml += `<div class="canvas-node-port port-switch-default" data-port="caseDefault" data-node="${node.id}" style="bottom:-6px;left:${defPos}%;transform:translateX(-50%)"><span class="canvas-node-port-label" style="bottom:-18px;left:50%;transform:translateX(-50%);color:#94a3b8;white-space:nowrap;font-size:10px">Default</span></div>`;
+    } else if (node.type === 'loop') {
+      // Loop node: two output ports — "loop body" (bottom) and "done" (right)
+      portsHtml += `<div class="canvas-node-port port-loop" data-port="loop" data-node="${node.id}"><span class="canvas-node-port-label" style="bottom:-18px;left:50%;transform:translateX(-50%);color:#7c3aed;white-space:nowrap;font-size:10px">循环体</span></div>`;
+      portsHtml += `<div class="canvas-node-port port-done" data-port="done" data-node="${node.id}"><span class="canvas-node-port-label" style="top:50%;right:-34px;transform:translateY(-50%);color:#16a34a;font-size:10px">完成</span></div>`;
     } else if (node.type !== 'end') {
       portsHtml += `<div class="canvas-node-port port-out" data-port="out" data-node="${node.id}"></div>`;
     }
 
-    return `<div class="canvas-node ${isSelected ? 'selected' : ''} ${debugClass} ${isPlaceholder ? 'node-placeholder' : ''}" id="node-${node.id}"
+    return `<div class="canvas-node ${isSelected ? 'selected' : ''} ${debugClass} ${isPlaceholder ? 'node-placeholder' : ''} ${node.type === 'loop' ? 'loop-node-style' : ''}" id="node-${node.id}"
       style="left:${node.x}px;top:${node.y}px"
       onmousedown="onNodeMouseDown(event, ${node.id})"
       onclick="onNodeClick(event, ${node.id})"
@@ -536,6 +574,7 @@ function renderCanvasNodes() {
         ${isPlaceholder ? '<div class="placeholder-tag">待完善</div>' : ''}
         ${node.config?.condition ? `<div style="margin-top:4px;font-size:10px;color:var(--md-on-surface-variant)">${truncate(node.config.condition, 30)}</div>` : ''}
         ${node.config?.url ? `<div style="margin-top:4px;font-size:10px;color:var(--md-on-surface-variant)">${truncate(node.config.url, 30)}</div>` : ''}
+        ${node.type === 'loop' ? `<div style="margin-top:4px;font-size:10px;color:var(--md-on-surface-variant)">${node.config?.loopMode === 'while' ? `While: ${truncate(node.config?.whileCondition || '未配置条件', 22)}` : `ForEach: ${truncate(node.config?.listVar || '未配置列表', 22)}`}</div>` : ''}
       </div>
       ${portsHtml}
     </div>`;
@@ -574,7 +613,7 @@ function renderConnections() {
     const isActive = designerDebugMode && conn._debugActive;
 
     return `<path d="${path}" fill="none" stroke="${isActive ? '#1890FF' : '#222'}" stroke-width="${isActive ? 3.5 : 2.5}" marker-end="url(#${isActive ? 'arrowhead-active' : 'arrowhead'})" ${isActive ? 'class="connection-flow"' : ''} onclick="onConnectionClick(event, ${conn.id})" style="cursor:pointer" />
-    ${conn.label ? `<text x="${(fromPos.x + toPos.x) / 2}" y="${(fromPos.y + toPos.y) / 2 - 10}" text-anchor="middle" font-size="11" fill="${conn.label === 'TRUE' ? '#16a34a' : conn.label === 'FALSE' ? '#dc2626' : conn.label === 'Default' ? '#94a3b8' : '#1890FF'}" font-weight="700" font-family="Roboto, sans-serif" paint-order="stroke" stroke="#fff" stroke-width="3">${conn.label}</text>` : ''}`;
+    ${conn.label ? `<text x="${(fromPos.x + toPos.x) / 2}" y="${(fromPos.y + toPos.y) / 2 - 10}" text-anchor="middle" font-size="11" fill="${conn.label === 'TRUE' ? '#16a34a' : conn.label === 'FALSE' ? '#dc2626' : conn.label === 'Default' ? '#94a3b8' : conn.label === '循环体' ? '#7c3aed' : conn.label === '完成' ? '#16a34a' : '#1890FF'}" font-weight="700" font-family="Roboto, sans-serif" paint-order="stroke" stroke="#fff" stroke-width="3">${conn.label}</text>` : ''}`;
   }).join('');
 }
 
@@ -585,6 +624,8 @@ function getPortPosition(node, port) {
     case 'out': return { x: node.x + w, y: node.y + h / 2 };
     case 'true': return { x: node.x + w * 0.35, y: node.y + h };
     case 'false': return { x: node.x + w * 0.65, y: node.y + h };
+    case 'loop': return { x: node.x + w * 0.35, y: node.y + h };   // 底部偏左，循环体入口
+    case 'done': return { x: node.x + w, y: node.y + h / 2 };       // 右侧中央，循环完成出口
     case 'caseDefault': {
       const branches = node.config?.branches || [{ name: '分支1' }, { name: '分支2' }];
       const totalPorts = branches.length + 1;
@@ -620,7 +661,7 @@ function renderRightPanel() {
     content = renderDesignerVersionPanel();
   }
 
-  return `<div class="right-panel ${isOpen ? 'open' : ''}">${content}</div>`;
+  return `<div class="right-panel ${isOpen ? 'open' : ''}" id="designerRightPanel"><div class="right-panel-resize-handle" id="rightPanelResizeHandle" onmousedown="startRightPanelResize(event)"></div>${content}</div>`;
 }
 
 function renderOverviewPanel() {
@@ -747,7 +788,7 @@ function renderNodeConfigFields(node, nt) {
     end: { scene: '作为工作流的终止节点，汇总输出结果', rules: '每个工作流只能有一个结束节点；应映射需要输出的变量' },
     'if': { scene: '根据数据判断走不同的业务分支，例如「订单金额 > 1000 走审批流」', rules: '必须配置条件表达式；TRUE 和 FALSE 分支都应连接后续节点' },
     'switch': { scene: '当有多个业务分支时使用，例如「根据订单来源渠道分发到不同处理流程」', rules: '至少配置 2 个分支条件；建议配置 Default 分支兜底' },
-    loop: { scene: '需要重复处理列表数据或轮询等待时使用', rules: 'ForEach 模式必须指定列表变量；建议设置最大循环次数防止死循环' },
+    loop: { scene: '需要重复处理列表数据或轮询等待时使用，例如「批量处理订单」「遍历用户列表逐条推送」', rules: 'ForEach 模式必须指定列表变量；"循环体"端口（底部）连接循环内的节点，"完成"端口（右侧）连接循环结束后的节点；建议设置最大循环次数防止死循环；循环结果通过输出变量名引用' },
     delay: { scene: '需要等待一段时间后再继续执行，例如「等待审批结果」或「定时重试」', rules: '固定时长模式需设置具体时长；到指定时间模式需设置目标时刻' },
     assign: { scene: '对变量进行计算或转换，例如「将接口返回数据映射到业务变量」', rules: '目标变量名不能为空；支持 ${变量名} 引用其他变量' },
     output: { scene: '记录流程执行日志，便于调试和问题排查', rules: 'INFO 级别用于常规记录，ERROR 级别会触发告警' },
@@ -1029,24 +1070,37 @@ function renderConditionRows(conditions, addFnStr, removeFnPfx, updateFnPfx) {
     }
     const isPreset = COND_VAR_PRESETS.slice(0, -1).some(p => p.value === cond.left);
     const opIsNoRight = noRightOps.includes(cond.op);
+
+    // Find op label for display
+    const opObj = COND_OPS.find(o => o.value === (cond.op || 'eq')) || COND_OPS[0];
+
     html += `<div class="condition-visual-row">
-      ${isPreset
-        ? `<select class="cond-left-select" onchange="${updateFnPfx}${idx},'left',this.value)">
-            ${COND_VAR_PRESETS.map(p => `<option value="${escHtml(p.value)}" ${cond.left === p.value ? 'selected' : ''}>${p.label}</option>`).join('')}
-          </select>`
-        : `<input class="cond-left-input" value="${escHtml(cond.left || '')}" placeholder="输入变量路径" onchange="${updateFnPfx}${idx},'left',this.value)" />`
-      }
-      <select class="cond-op-select" onchange="${updateFnPfx}${idx},'op',this.value)">
-        ${COND_OPS.map(o => `<option value="${o.value}" ${cond.op === o.value ? 'selected' : ''}>${o.label}</option>`).join('')}
-      </select>
-      ${opIsNoRight
-        ? `<span style="flex:1;font-size:11px;color:var(--md-outline);padding:0 4px;text-align:center">—</span>`
-        : `<input class="cond-right-input" value="${escHtml(cond.right || '')}" placeholder="输入或引用值" onchange="${updateFnPfx}${idx},'right',this.value)" />`
-      }
-      ${conditions.length > 1
-        ? `<button class="cond-delete-btn" onclick="${removeFnPfx}${idx})" title="删除此条件">${icons.close}</button>`
-        : `<span style="width:22px;flex-shrink:0"></span>`
-      }
+      <!-- Row 1: variable selector -->
+      <div class="cond-row-top">
+        ${isPreset
+          ? `<select class="cond-left-select" onchange="${updateFnPfx}${idx},'left',this.value)">
+              ${COND_VAR_PRESETS.map(p => `<option value="${escHtml(p.value)}" ${cond.left === p.value ? 'selected' : ''}>${p.label}</option>`).join('')}
+            </select>`
+          : `<input class="cond-left-input" value="${escHtml(cond.left || '')}" placeholder="输入变量路径" onchange="${updateFnPfx}${idx},'left',this.value)" />`
+        }
+        ${conditions.length > 1
+          ? `<button class="cond-delete-btn" onclick="${removeFnPfx}${idx})" title="删除此条件">${icons.close}</button>`
+          : ''
+        }
+      </div>
+      <!-- Row 2: operator + value -->
+      <div class="cond-row-bottom">
+        <select class="cond-op-select" onchange="${updateFnPfx}${idx},'op',this.value)">
+          ${COND_OPS.map(o => `<option value="${o.value}" ${(cond.op || 'eq') === o.value ? 'selected' : ''}>${o.label}</option>`).join('')}
+        </select>
+        ${opIsNoRight
+          ? `<span style="flex:1;font-size:11px;color:var(--md-outline);padding:0 10px;font-style:italic">（无需填写值）</span>`
+          : `<div class="cond-right-wrap">
+              <input class="cond-right-input" value="${escHtml(cond.right || '')}" placeholder="输入或引用参数值" onchange="${updateFnPfx}${idx},'right',this.value)" />
+              <button class="cond-ref-btn" title="引用变量" onclick="showToast('info','引用变量','点击从流程变量中选取引用值')">⊙</button>
+            </div>`
+        }
+      </div>
     </div>`;
   });
   html += `<button class="cond-add-btn" onclick="${addFnStr}">${icons.plus} 添加条件</button>`;
@@ -1150,6 +1204,7 @@ function renderSwitchConfig(node) {
 }
 
 function renderHttpConfig(node) {
+  const upstreamPreview = renderUpstreamOutputPreview(node.id);
   return `<div class="config-section">
     <div class="config-section-title">HTTP 请求配置</div>
     <div class="config-field">
@@ -1164,34 +1219,69 @@ function renderHttpConfig(node) {
     </div>
     <div class="config-field">
       <div class="config-field-label">请求 URL <span class="required">*</span></div>
-      <input class="config-input" value="${node.config?.url || ''}" placeholder="https://api.example.com/endpoint" onchange="updateNodeConfig(${node.id}, 'url', this.value)" />
+      ${renderExprEditor({
+        id: `http_url_${node.id}`,
+        value: node.config?.url || '',
+        placeholder: 'https://api.example.com/endpoint 或 {{input.apiUrl}}',
+        nodeId: node.id,
+        singleLine: true,
+        onChange: `updateNodeConfig(${node.id}, 'url', this.value)`
+      })}
     </div>
     <div class="config-field">
       <div class="config-field-label">请求头</div>
-      <textarea class="expr-editor" style="min-height:50px" placeholder='{"Content-Type": "application/json"}'>${node.config?.headers || ''}</textarea>
+      ${renderExprEditor({
+        id: `http_headers_${node.id}`,
+        value: node.config?.headers || '',
+        placeholder: '{"Content-Type": "application/json", "Authorization": "{{input.token}}"}',
+        nodeId: node.id,
+        minHeight: 50,
+        onChange: `updateNodeConfig(${node.id}, 'headers', this.value)`
+      })}
     </div>
     <div class="config-field">
       <div class="config-field-label">请求体</div>
-      <textarea class="expr-editor" style="min-height:60px" placeholder='{"key": "value"}'>${node.config?.body || ''}</textarea>
+      ${renderExprEditor({
+        id: `http_body_${node.id}`,
+        value: node.config?.body || '',
+        placeholder: '{"key": "value", "userId": "{{input.userId}}"}',
+        nodeId: node.id,
+        minHeight: 60,
+        onChange: `updateNodeConfig(${node.id}, 'body', this.value)`
+      })}
     </div>
     <div class="config-field">
       <div class="config-field-label">响应变量</div>
-      <input class="config-input" value="${node.config?.responseVar || 'response'}" placeholder="response" style="font-family:var(--font-family-mono)" />
+      <input class="config-input" value="${node.config?.responseVar || 'response'}" placeholder="response" style="font-family:var(--font-family-mono)" onchange="updateNodeConfig(${node.id}, 'responseVar', this.value)" />
     </div>
+    ${upstreamPreview}
   </div>`;
 }
 
 function renderCodeConfig(node) {
+  const upstreamPreview = renderUpstreamOutputPreview(node.id);
   return `<div class="config-section">
     <div class="config-section-title">代码配置</div>
     <div class="config-field">
       <div class="config-field-label">脚本语言</div>
-      <select class="config-select"><option>JavaScript</option><option>Python</option></select>
+      <select class="config-select" onchange="updateNodeConfig(${node.id}, 'language', this.value)">
+        <option ${node.config?.language === 'JavaScript' ? 'selected' : ''}>JavaScript</option>
+        <option ${node.config?.language === 'Python' ? 'selected' : ''}>Python</option>
+      </select>
     </div>
     <div class="config-field">
       <div class="config-field-label">代码</div>
-      <textarea class="expr-editor" style="min-height:120px;font-size:12px" placeholder="// 在此编写代码...">${node.config?.script || '// 处理逻辑\nconst result = input;\nreturn result;'}</textarea>
+      ${renderExprEditor({
+        id: `code_script_${node.id}`,
+        value: node.config?.script || '// 处理逻辑\nconst result = input;\nreturn result;',
+        placeholder: '// 在此编写代码，可用 {{变量名}} 引用上游输出',
+        nodeId: node.id,
+        minHeight: 120,
+        onChange: `updateNodeConfig(${node.id}, 'script', this.value)`
+      })}
+      <div class="config-field-help">输入 <code>{{</code> 可快速插入变量引用，代码中可直接使用变量名</div>
     </div>
+    ${upstreamPreview}
   </div>`;
 }
 
@@ -1210,30 +1300,74 @@ function renderDelayConfig(node) {
 }
 
 function renderAssignConfig(node) {
+  const upstreamPreview = renderUpstreamOutputPreview(node.id);
+  const assignments = node.config?.assignments || [{ target: 'processedData', source: 'response.data' }];
+  
   return `<div class="config-section">
     <div class="config-section-title">赋值规则</div>
-    <div class="condition-row" style="flex-direction:column;gap:6px;align-items:stretch">
+    ${assignments.map((a, i) => `
+    <div class="condition-row" style="flex-direction:column;gap:6px;align-items:stretch;margin-bottom:var(--space-2)">
       <div style="display:flex;gap:6px;align-items:center">
-        <input class="config-input" placeholder="目标变量" value="processedData" style="flex:1;font-family:var(--font-family-mono)" />
+        <input class="config-input" placeholder="目标变量" value="${a.target}" style="flex:1;font-family:var(--font-family-mono)" onchange="updateAssignment(${node.id}, ${i}, 'target', this.value)" />
         <span class="condition-op">=</span>
-        <input class="config-input" placeholder="表达式或值" value="response.data" style="flex:1;font-family:var(--font-family-mono)" />
+        ${renderExprEditor({
+          id: `assign_src_${node.id}_${i}`,
+          value: a.source,
+          placeholder: '{{上游节点.输出变量}}',
+          nodeId: node.id,
+          singleLine: true,
+          onChange: `updateAssignment(${node.id}, ${i}, 'source', this.value)`
+        })}
       </div>
-    </div>
-    <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;margin-top:var(--space-2)">${icons.plus} 添加赋值规则</button>
+    </div>`).join('')}
+    <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;margin-top:var(--space-2)" onclick="addAssignment(${node.id})">${icons.plus} 添加赋值规则</button>
+    ${upstreamPreview}
   </div>`;
 }
 
+function updateAssignment(nodeId, index, field, value) {
+  const node = designerNodes.find(n => n.id === nodeId);
+  if (!node) return;
+  if (!node.config.assignments) node.config.assignments = [{ target: 'processedData', source: 'response.data' }];
+  if (node.config.assignments[index]) {
+    node.config.assignments[index][field] = value;
+  }
+  designerDirty = true;
+}
+
+function addAssignment(nodeId) {
+  const node = designerNodes.find(n => n.id === nodeId);
+  if (!node) return;
+  if (!node.config.assignments) node.config.assignments = [];
+  node.config.assignments.push({ target: 'newVar', source: '' });
+  designerDirty = true;
+  renderDesigner();
+}
+
 function renderOutputConfig(node) {
+  const upstreamPreview = renderUpstreamOutputPreview(node.id);
   return `<div class="config-section">
     <div class="config-section-title">输出配置</div>
     <div class="config-field">
       <div class="config-field-label">输出级别</div>
-      <select class="config-select"><option>INFO</option><option>WARNING</option><option>ERROR</option></select>
+      <select class="config-select" onchange="updateNodeConfig(${node.id}, 'level', this.value)">
+        <option ${node.config?.level === 'INFO' ? 'selected' : ''}>INFO</option>
+        <option ${node.config?.level === 'WARNING' ? 'selected' : ''}>WARNING</option>
+        <option ${node.config?.level === 'ERROR' ? 'selected' : ''}>ERROR</option>
+      </select>
     </div>
     <div class="config-field">
       <div class="config-field-label">输出内容</div>
-      <textarea class="expr-editor" placeholder="输入输出内容或表达式...">${node.config?.content || ''}</textarea>
+      ${renderExprEditor({
+        id: `output_content_${node.id}`,
+        value: node.config?.content || '',
+        placeholder: '输出内容或 {{变量名}} 引用',
+        nodeId: node.id,
+        minHeight: 60,
+        onChange: `updateNodeConfig(${node.id}, 'content', this.value)`
+      })}
     </div>
+    ${upstreamPreview}
   </div>`;
 }
 
@@ -1299,6 +1433,35 @@ function renderLoopConfig(node) {
         <textarea class="expr-editor" style="min-height:36px;font-size:11px" placeholder="errorCount > 5" onchange="updateNodeConfig(${node.id}, 'breakCondition', this.value)">${node.config?.breakCondition || ''}</textarea>
       </div>
     ` : ''}
+  </div>
+  <div class="config-section">
+    <div class="config-section-title">输出结果收集</div>
+    <div class="config-field">
+      <div class="config-field-label">输出变量名</div>
+      <input class="config-input" value="${node.config?.outputVar || 'loopResult'}" style="font-family:var(--font-family-mono)" onchange="updateNodeConfig(${node.id}, 'outputVar', this.value)" placeholder="loopResult" />
+      <div class="config-field-help">每次循环的输出将被收集到此数组变量中，循环完成后可在"完成"出口的后续节点中引用</div>
+    </div>
+    <div class="config-field">
+      <div style="display:flex;align-items:center;gap:10px">
+        <label class="toggle-sm"><input type="checkbox" ${node.config?.collectOutput !== false ? 'checked' : ''} onchange="updateNodeConfig(${node.id}, 'collectOutput', this.checked)" /><span class="toggle-sm-slider"></span></label>
+        <span style="font-size:var(--font-size-xs);color:var(--md-on-surface-variant)">启用结果收集（关闭则循环体输出不汇总）</span>
+      </div>
+    </div>
+  </div>
+  <div class="config-section">
+    <div class="config-section-title" style="display:flex;align-items:center;gap:6px">
+      <span>端口说明</span>
+    </div>
+    <div style="font-size:var(--font-size-xs);color:var(--md-on-surface-variant);line-height:1.8">
+      <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:6px">
+        <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#ede9fe;border:2px solid #7c3aed;flex-shrink:0;margin-top:2px"></span>
+        <span><strong style="color:#7c3aed">循环体</strong>（底部端口）— 连接循环体内的第一个节点，每次迭代都会执行此路径</span>
+      </div>
+      <div style="display:flex;align-items:flex-start;gap:8px">
+        <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#dcfce7;border:2px solid #16a34a;flex-shrink:0;margin-top:2px"></span>
+        <span><strong style="color:#16a34a">完成</strong>（右侧端口）— 所有迭代结束后继续执行的路径，可引用收集到的 <code style="font-family:var(--font-family-mono);font-size:10px;background:var(--md-surface-container);padding:0 3px;border-radius:2px">\${${node.config?.outputVar || 'loopResult'}}</code></span>
+      </div>
+    </div>
   </div>`;
 }
 
@@ -1630,9 +1793,25 @@ function getProblems() {
       if (!hasIn) problems.push({ level: 'error', message: `结束节点没有输入连线`, location: node.code, nodeId: node.id });
     } else {
       const hasIn = designerConnections.some(c => c.to === node.id);
-      const hasOut = designerConnections.some(c => c.from === node.id);
-      if (!hasIn) problems.push({ level: 'error', message: `节点「${node.name}」没有输入连线`, location: node.code, nodeId: node.id });
-      if (!hasOut) problems.push({ level: 'warning', message: `节点「${node.name}」没有输出连线`, location: node.code, nodeId: node.id });
+      // For loop nodes, check specific ports instead of generic "has any out"
+      if (node.type === 'loop') {
+        if (!hasIn) problems.push({ level: 'error', message: `节点「${node.name}」没有输入连线`, location: node.code, nodeId: node.id });
+        const hasLoopOut = designerConnections.some(c => c.from === node.id && c.fromPort === 'loop');
+        const hasDoneOut = designerConnections.some(c => c.from === node.id && c.fromPort === 'done');
+        if (!hasLoopOut) problems.push({ level: 'error', message: `循环节点「${node.name}」未连接循环体（"循环体"端口无连线）`, location: node.code, nodeId: node.id });
+        if (!hasDoneOut) problems.push({ level: 'warning', message: `循环节点「${node.name}」没有"完成"出口连线，循环结束后流程无法继续`, location: node.code, nodeId: node.id });
+        // Validate required config
+        if ((!node.config?.loopMode || node.config.loopMode === 'forEach') && !node.config?.listVar) {
+          problems.push({ level: 'error', message: `循环节点「${node.name}」未配置遍历列表变量`, location: node.code, nodeId: node.id });
+        }
+        if (node.config?.loopMode === 'while' && !node.config?.whileCondition) {
+          problems.push({ level: 'error', message: `循环节点「${node.name}」未配置 While 条件`, location: node.code, nodeId: node.id });
+        }
+      } else {
+        const hasOut = designerConnections.some(c => c.from === node.id);
+        if (!hasIn) problems.push({ level: 'error', message: `节点「${node.name}」没有输入连线`, location: node.code, nodeId: node.id });
+        if (!hasOut) problems.push({ level: 'warning', message: `节点「${node.name}」没有输出连线`, location: node.code, nodeId: node.id });
+      }
     }
 
     // Check required configs
@@ -2076,6 +2255,13 @@ function completeConnection(fromNodeId, fromPort, targetId) {
   if (designerConnections.some(c => c.from === fromNodeId && c.to === targetId)) {
     showToast('warning', '提示', '该连线已存在'); return;
   }
+  // For loop nodes: each output port (loop / done) can only have one outgoing connection
+  if (fromNode && fromNode.type === 'loop' && (fromPort === 'loop' || fromPort === 'done')) {
+    if (designerConnections.some(c => c.from === fromNodeId && c.fromPort === fromPort)) {
+      const portName = fromPort === 'loop' ? '循环体' : '完成';
+      showToast('warning', '提示', `"${portName}"端口已连接，请先删除原有连线再重新连接`); return;
+    }
+  }
   // Cycle detection
   if (detectCycle(fromNodeId, targetId)) {
     showToast('error', '检测到环', '该连线会形成循环依赖，不允许创建'); return;
@@ -2093,6 +2279,13 @@ function completeConnection(fromNodeId, fromPort, targetId) {
   }
   if (fromNode && fromNode.type === 'switch' && fromPort === 'caseDefault') {
     connLabel = 'Default';
+  }
+  // Determine label for Loop ports
+  if (fromNode && fromNode.type === 'loop' && fromPort === 'loop') {
+    connLabel = '循环体';
+  }
+  if (fromNode && fromNode.type === 'loop' && fromPort === 'done') {
+    connLabel = '完成';
   }
 
   designerConnections.push({
@@ -2292,7 +2485,50 @@ function updateSwitchCondition(nodeId, branchIdx, condIdx, field, value) {
   if (field === 'op') renderDesigner();
 }
 
-// --- Zoom Controls ---
+// --- Right Panel Resize ---
+let _rpResizing = false;
+let _rpStartX = 0;
+let _rpStartWidth = 360;
+
+function startRightPanelResize(e) {
+  e.preventDefault();
+  const panel = document.getElementById('designerRightPanel');
+  if (!panel) return;
+  _rpResizing = true;
+  _rpStartX = e.clientX;
+  _rpStartWidth = panel.offsetWidth;
+  const handle = document.getElementById('rightPanelResizeHandle');
+  if (handle) handle.classList.add('dragging');
+  document.addEventListener('mousemove', _onRpResizeMove);
+  document.addEventListener('mouseup', _onRpResizeUp);
+  document.body.style.cursor = 'ew-resize';
+  document.body.style.userSelect = 'none';
+}
+
+function _onRpResizeMove(e) {
+  if (!_rpResizing) return;
+  const panel = document.getElementById('designerRightPanel');
+  if (!panel) return;
+  const dx = _rpStartX - e.clientX; // dragging left = wider
+  const newWidth = Math.min(720, Math.max(280, _rpStartWidth + dx));
+  panel.style.width = newWidth + 'px';
+  panel.style.transition = 'none';
+}
+
+function _onRpResizeUp() {
+  _rpResizing = false;
+  const handle = document.getElementById('rightPanelResizeHandle');
+  if (handle) handle.classList.remove('dragging');
+  document.removeEventListener('mousemove', _onRpResizeMove);
+  document.removeEventListener('mouseup', _onRpResizeUp);
+  document.body.style.cursor = '';
+  document.body.style.userSelect = '';
+  // Restore transition
+  const panel = document.getElementById('designerRightPanel');
+  if (panel) panel.style.transition = '';
+}
+
+
 function designerZoomIn() { designerZoom = Math.min(2, designerZoom + 0.1); renderDesigner(); }
 function designerZoomOut() { designerZoom = Math.max(0.25, designerZoom - 0.1); renderDesigner(); }
 function designerResetZoom() { designerZoom = 1; designerPanX = 0; designerPanY = 0; renderDesigner(); }
@@ -3238,4 +3474,523 @@ function onBottomResizeStart(e) {
   }
   document.addEventListener('mousemove', onMove);
   document.addEventListener('mouseup', onUp);
+}
+
+// ============================================
+// Variable Picker (变量选择器)
+// ============================================
+
+/**
+ * 获取当前节点可引用的所有变量
+ * @param {number} currentNodeId - 当前节点ID
+ * @returns {Array} 分组后的变量列表
+ */
+function getAvailableVariables(currentNodeId) {
+  const groups = [];
+  
+  // 1. 输入变量（工作流级别）
+  const inputVars = designerVariables.filter(v => v.scope === '输入变量');
+  if (inputVars.length > 0) {
+    groups.push({
+      id: 'input',
+      name: '📥 输入变量',
+      source: 'input',
+      variables: inputVars.map(v => ({
+        name: v.name,
+        type: v.type,
+        desc: v.desc,
+        path: `input.${v.name}`,
+        ref: `{{input.${v.name}}}`
+      }))
+    });
+  }
+  
+  // 2. 上游节点输出
+  const upstreamNodes = getUpstreamNodes(currentNodeId);
+  upstreamNodes.forEach(node => {
+    const nodeType = nodeTypes.find(t => t.type === node.type);
+    const outputs = getNodeOutputs(node);
+    if (outputs.length > 0) {
+      groups.push({
+        id: `node_${node.id}`,
+        name: `${nodeType?.icon || '📦'} ${node.name}`,
+        source: 'node',
+        nodeId: node.id,
+        nodeType: node.type,
+        variables: outputs.map(o => ({
+          name: o.name,
+          type: o.type,
+          desc: o.desc,
+          path: `${node.code}.${o.name}`,
+          ref: `{{${node.code}.${o.name}}}`
+        }))
+      });
+    }
+  });
+  
+  // 3. 中间变量
+  const middleVars = designerVariables.filter(v => v.scope === '中间变量');
+  if (middleVars.length > 0) {
+    groups.push({
+      id: 'middle',
+      name: '📊 中间变量',
+      source: 'middle',
+      variables: middleVars.map(v => ({
+        name: v.name,
+        type: v.type,
+        desc: v.desc,
+        path: `vars.${v.name}`,
+        ref: `{{vars.${v.name}}}`
+      }))
+    });
+  }
+  
+  return groups;
+}
+
+/**
+ * 获取节点的上游节点列表（按执行顺序）
+ */
+function getUpstreamNodes(nodeId) {
+  const visited = new Set();
+  const result = [];
+  
+  function traverse(id) {
+    if (visited.has(id)) return;
+    visited.add(id);
+    
+    // 找到所有连接到此节点的上游节点
+    const incomingConns = designerConnections.filter(c => c.to === id);
+    incomingConns.forEach(conn => {
+      const sourceNode = designerNodes.find(n => n.id === conn.from);
+      if (sourceNode) {
+        traverse(conn.from);
+        result.push(sourceNode);
+      }
+    });
+  }
+  
+  traverse(nodeId);
+  return result;
+}
+
+/**
+ * 获取节点的输出变量定义
+ */
+function getNodeOutputs(node) {
+  const outputs = [];
+  
+  switch (node.type) {
+    case 'trigger':
+      // 触发器的输入参数作为输出
+      if (node.config?.inputParams) {
+        node.config.inputParams.forEach(p => {
+          outputs.push({
+            name: p.key || p.label,
+            type: p.fieldType || 'String',
+            desc: p.label
+          });
+        });
+      }
+      outputs.push({ name: 'triggerTime', type: 'String', desc: '触发时间' });
+      break;
+      
+    case 'http':
+      outputs.push({ name: 'response', type: 'Object', desc: 'HTTP响应对象' });
+      outputs.push({ name: 'response.status', type: 'Number', desc: 'HTTP状态码' });
+      outputs.push({ name: 'response.data', type: 'Object', desc: '响应数据' });
+      outputs.push({ name: 'response.headers', type: 'Object', desc: '响应头' });
+      break;
+      
+    case 'code':
+      outputs.push({ name: 'result', type: 'Object', desc: '代码执行结果' });
+      break;
+      
+    case 'assign':
+      if (node.config?.targetVar) {
+        outputs.push({ name: node.config.targetVar, type: 'Object', desc: '赋值结果' });
+      }
+      break;
+      
+    case 'loop':
+      outputs.push({ name: 'item', type: 'Object', desc: '当前迭代项' });
+      outputs.push({ name: 'index', type: 'Number', desc: '当前索引' });
+      outputs.push({ name: 'results', type: 'Array', desc: '所有迭代结果' });
+      break;
+      
+    case 'workflow':
+      outputs.push({ name: node.config?.outputVar || 'wfResult', type: 'Object', desc: '工作流调用结果' });
+      break;
+      
+    default:
+      outputs.push({ name: 'output', type: 'Object', desc: '节点输出' });
+  }
+  
+  return outputs;
+}
+
+/**
+ * 渲染带变量选择器的表达式编辑器
+ * @param {object} options - 配置选项
+ */
+function renderExprEditor(options) {
+  const {
+    id,
+    value = '',
+    placeholder = '',
+    nodeId,
+    minHeight = 60,
+    onChange = '',
+    singleLine = false
+  } = options;
+  
+  const editorId = `expr_${id}_${Date.now()}`;
+  const tag = singleLine ? 'input' : 'textarea';
+  const inputAttrs = singleLine 
+    ? `type="text" style="height:32px;padding-right:36px"` 
+    : `style="min-height:${minHeight}px;padding-right:36px"`;
+  
+  return `
+    <div class="expr-editor-wrapper" data-editor-id="${editorId}">
+      <${tag} 
+        id="${editorId}"
+        class="expr-editor" 
+        ${inputAttrs}
+        placeholder="${placeholder}"
+        onchange="${onChange}"
+        oninput="handleExprInput(event, '${editorId}', ${nodeId})"
+        onkeydown="handleExprKeydown(event, '${editorId}', ${nodeId})"
+        onfocus="handleExprFocus(event, '${editorId}', ${nodeId})"
+        onblur="handleExprBlur(event, '${editorId}')"
+      >${singleLine ? '' : escHtml(value)}</${tag}>
+      <button class="var-picker-trigger" onclick="toggleVarPicker('${editorId}', ${nodeId}, event)" title="插入变量">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M4 7V4h16v3M9 20h6M12 4v16"/>
+        </svg>
+      </button>
+      <div id="${editorId}_picker" class="var-picker-popup" style="display:none"></div>
+    </div>
+  `;
+}
+
+/**
+ * 处理表达式编辑器输入
+ */
+function handleExprInput(event, editorId, nodeId) {
+  const editor = event.target;
+  const value = editor.value;
+  const cursorPos = editor.selectionStart;
+  
+  // 检测是否输入了 {{ 触发变量选择器
+  const beforeCursor = value.substring(Math.max(0, cursorPos - 2), cursorPos);
+  if (beforeCursor === '{{') {
+    showVarPicker(editorId, nodeId);
+  }
+}
+
+/**
+ * 处理键盘导航
+ */
+function handleExprKeydown(event, editorId, nodeId) {
+  if (!designerVarPickerOpen || designerVarPickerOpen.editorId !== editorId) return;
+  
+  const picker = document.getElementById(editorId + '_picker');
+  if (!picker) return;
+  
+  const items = picker.querySelectorAll('.var-picker-item');
+  const itemCount = items.length;
+  
+  switch (event.key) {
+    case 'ArrowDown':
+      event.preventDefault();
+      designerVarPickerHighlighted = Math.min(designerVarPickerHighlighted + 1, itemCount - 1);
+      updateVarPickerHighlight(items);
+      break;
+      
+    case 'ArrowUp':
+      event.preventDefault();
+      designerVarPickerHighlighted = Math.max(designerVarPickerHighlighted - 1, 0);
+      updateVarPickerHighlight(items);
+      break;
+      
+    case 'Enter':
+      event.preventDefault();
+      if (designerVarPickerHighlighted >= 0 && items[designerVarPickerHighlighted]) {
+        selectVariable(editorId, items[designerVarPickerHighlighted].dataset.ref);
+      }
+      break;
+      
+    case 'Escape':
+      hideVarPicker(editorId);
+      break;
+  }
+}
+
+/**
+ * 更新变量选择器高亮
+ */
+function updateVarPickerHighlight(items) {
+  items.forEach((item, idx) => {
+    item.classList.toggle('highlighted', idx === designerVarPickerHighlighted);
+  });
+  
+  // 滚动到可见区域
+  if (items[designerVarPickerHighlighted]) {
+    items[designerVarPickerHighlighted].scrollIntoView({ block: 'nearest' });
+  }
+}
+
+/**
+ * 处理表达式编辑器聚焦
+ */
+function handleExprFocus(event, editorId, nodeId) {
+  // 可选：聚焦时自动显示变量选择器
+}
+
+/**
+ * 处理表达式编辑器失焦
+ */
+function handleExprBlur(event, editorId) {
+  // 延迟隐藏，以便点击变量选择器中的项
+  setTimeout(() => {
+    if (designerVarPickerOpen && designerVarPickerOpen.editorId === editorId) {
+      hideVarPicker(editorId);
+    }
+  }, 200);
+}
+
+/**
+ * 切换变量选择器显示状态
+ */
+function toggleVarPicker(editorId, nodeId, event) {
+  if (event) event.stopPropagation();
+  
+  const picker = document.getElementById(editorId + '_picker');
+  if (!picker) return;
+  
+  if (picker.style.display === 'none') {
+    showVarPicker(editorId, nodeId);
+  } else {
+    hideVarPicker(editorId);
+  }
+}
+
+/**
+ * 显示变量选择器
+ */
+function showVarPicker(editorId, nodeId) {
+  const picker = document.getElementById(editorId + '_picker');
+  const editor = document.getElementById(editorId);
+  if (!picker || !editor) return;
+  
+  designerVarPickerOpen = { editorId, nodeId };
+  designerVarPickerHighlighted = -1;
+  
+  const groups = getAvailableVariables(nodeId);
+  
+  picker.innerHTML = `
+    <div class="var-picker-search">
+      <input type="text" placeholder="搜索变量..." oninput="filterVarPicker('${editorId}', this.value)">
+    </div>
+    <div class="var-picker-body" id="${editorId}_picker_body">
+      ${renderVarPickerGroups(groups, editorId)}
+    </div>
+  `;
+  
+  picker.style.display = 'flex';
+  
+  // 聚焦搜索框
+  setTimeout(() => {
+    const searchInput = picker.querySelector('.var-picker-search input');
+    if (searchInput) searchInput.focus();
+  }, 50);
+}
+
+/**
+ * 渲染变量分组
+ */
+function renderVarPickerGroups(groups, editorId) {
+  if (groups.length === 0) {
+    return '<div class="var-picker-empty">暂无可用变量</div>';
+  }
+  
+  return groups.map(group => `
+    <div class="var-picker-group" data-group="${group.id}">
+      <div class="var-picker-group-header">
+        <span>${group.name}</span>
+      </div>
+      ${group.variables.map(v => `
+        <div class="var-picker-item" 
+             data-ref="${v.ref}" 
+             data-path="${v.path}"
+             onclick="selectVariable('${editorId}', '${v.ref}')">
+          <div class="var-icon type-${v.type}" title="${v.type}">${v.type.charAt(0)}</div>
+          <div class="var-info">
+            <div class="var-name">${v.name}</div>
+            <div class="var-path">${v.path}</div>
+            ${v.desc ? `<div class="var-desc">${v.desc}</div>` : ''}
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `).join('');
+}
+
+/**
+ * 过滤变量选择器
+ */
+function filterVarPicker(editorId, keyword) {
+  const body = document.getElementById(editorId + '_picker_body');
+  if (!body) return;
+  
+  const groups = body.querySelectorAll('.var-picker-group');
+  const lowerKeyword = keyword.toLowerCase();
+  
+  groups.forEach(group => {
+    const items = group.querySelectorAll('.var-picker-item');
+    let hasVisible = false;
+    
+    items.forEach(item => {
+      const name = item.querySelector('.var-name')?.textContent || '';
+      const path = item.dataset.path || '';
+      const desc = item.querySelector('.var-desc')?.textContent || '';
+      
+      const visible = !keyword || 
+        name.toLowerCase().includes(lowerKeyword) ||
+        path.toLowerCase().includes(lowerKeyword) ||
+        desc.toLowerCase().includes(lowerKeyword);
+      
+      item.style.display = visible ? '' : 'none';
+      if (visible) hasVisible = true;
+    });
+    
+    group.style.display = hasVisible ? '' : 'none';
+  });
+}
+
+/**
+ * 选择变量并插入到编辑器
+ */
+function selectVariable(editorId, ref) {
+  const editor = document.getElementById(editorId);
+  if (!editor) return;
+  
+  const value = editor.value;
+  const cursorPos = editor.selectionStart;
+  
+  // 检查光标前是否有 {{ ，如果有则替换
+  const beforeCursor = value.substring(Math.max(0, cursorPos - 2), cursorPos);
+  let newValue, newPos;
+  
+  if (beforeCursor === '{{') {
+    // 替换 {{ 为完整的变量引用
+    const before = value.substring(0, cursorPos - 2);
+    const after = value.substring(cursorPos);
+    newValue = before + ref + after;
+    newPos = before.length + ref.length;
+  } else {
+    // 在光标位置插入
+    const before = value.substring(0, cursorPos);
+    const after = value.substring(cursorPos);
+    newValue = before + ref + after;
+    newPos = cursorPos + ref.length;
+  }
+  
+  editor.value = newValue;
+  editor.selectionStart = editor.selectionEnd = newPos;
+  editor.focus();
+  
+  // 触发 change 事件
+  editor.dispatchEvent(new Event('change', { bubbles: true }));
+  
+  hideVarPicker(editorId);
+}
+
+/**
+ * 隐藏变量选择器
+ */
+function hideVarPicker(editorId) {
+  const picker = document.getElementById(editorId + '_picker');
+  if (picker) {
+    picker.style.display = 'none';
+  }
+  designerVarPickerOpen = null;
+  designerVarPickerHighlighted = -1;
+}
+
+/**
+ * 渲染上游节点输出预览
+ */
+function renderUpstreamOutputPreview(nodeId) {
+  const upstreamNodes = getUpstreamNodes(nodeId);
+  if (upstreamNodes.length === 0) return '';
+  
+  const lastNode = upstreamNodes[upstreamNodes.length - 1];
+  const nodeType = nodeTypes.find(t => t.type === lastNode.type);
+  const outputs = getNodeOutputs(lastNode);
+  
+  // 生成示例输出数据
+  const sampleOutput = generateSampleOutput(lastNode);
+  
+  return `
+    <div class="upstream-output-preview">
+      <div class="upstream-output-preview-header">
+        <div class="upstream-output-preview-title">
+          <span class="node-icon ${nodeType?.color || ''}">${nodeType?.icon || '📦'}</span>
+          <span>上游输出: ${lastNode.name}</span>
+        </div>
+        <button class="upstream-output-copy-btn" onclick="copyUpstreamOutput('${lastNode.code}')">复制路径</button>
+      </div>
+      <div class="upstream-output-preview-content collapsed" onclick="this.classList.toggle('collapsed')">
+${JSON.stringify(sampleOutput, null, 2)}
+      </div>
+      <div style="font-size:10px;color:var(--md-outline);margin-top:4px">点击展开/收起</div>
+    </div>
+  `;
+}
+
+/**
+ * 生成节点示例输出数据
+ */
+function generateSampleOutput(node) {
+  switch (node.type) {
+    case 'http':
+      return {
+        response: {
+          status: 200,
+          data: { items: [{ id: 1, name: '示例数据' }] },
+          headers: { 'content-type': 'application/json' }
+        }
+      };
+    case 'trigger':
+      return {
+        triggerTime: '2025-01-15T10:30:00Z',
+        ...(node.config?.inputParams?.reduce((acc, p) => {
+          acc[p.key || p.label] = p.fieldType === 'Number' ? 0 : '示例值';
+          return acc;
+        }, {}) || {})
+      };
+    case 'code':
+      return { result: { data: '代码执行结果' } };
+    case 'loop':
+      return {
+        index: 0,
+        item: { id: 1, name: '当前项' },
+        results: []
+      };
+    default:
+      return { output: '节点输出' };
+  }
+}
+
+/**
+ * 复制上游输出路径
+ */
+function copyUpstreamOutput(nodeCode) {
+  const path = `{{${nodeCode}.output}}`;
+  navigator.clipboard.writeText(path).then(() => {
+    showToast('success', '已复制', `变量路径 ${path} 已复制到剪贴板`);
+  }).catch(() => {
+    showToast('error', '复制失败', '请手动复制');
+  });
 }
