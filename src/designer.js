@@ -203,8 +203,9 @@ function initDesignerNodes(wf) {
 }
 
 function generateRealisticNodes(wf) {
-  // If workflow name suggests looping, generate a loop-based example
-  const isLoopScenario = wf.name && (wf.name.includes('批量') || wf.name.includes('遍历') || wf.name.includes('循环') || wf.name.includes('列表'));
+  // If workflow name/id suggests looping, generate a loop-based example
+  // id=8 (库存预警通知) is the canonical loop demo workflow
+  const isLoopScenario = wf.id === 8 || (wf.name && (wf.name.includes('批量') || wf.name.includes('遍历') || wf.name.includes('循环') || wf.name.includes('列表') || wf.name.includes('预警')));
   if (isLoopScenario) {
     return generateLoopExampleNodes(wf);
   }
@@ -238,27 +239,94 @@ function generateRealisticNodes(wf) {
 }
 
 function generateLoopExampleNodes(wf) {
-  // Example: Fetch a list, loop over each item to process it, then summarize
+  // ──────────────────────────────────────────────────────
+  //  示例场景："库存预警通知" — 遍历所有低库存房型，逐一发送飞书通知
+  //
+  //  流程逻辑：
+  //  触发器
+  //    └→ 拉取低库存房型列表（HTTP GET）
+  //         └→ [循环节点] 遍历房型列表
+  //                │
+  //                ├─ 循环体端口（每轮执行）→ 发送飞书告警（HTTP POST）
+  //                │                              ↑ 无需连出口，执行完自动进入下一轮
+  //                │
+  //                └─ 完成端口（全部遍历完）→ 记录汇总日志 → 结束
+  // ──────────────────────────────────────────────────────
   const nodes = [
-    { id: 1, type: 'trigger', name: '触发器', code: 'trigger_1', x: 80, y: 220, config: { triggerType: 'manual' }, warnings: 0 },
-    { id: 2, type: 'http', name: '获取数据列表', code: 'http_1', x: 300, y: 220, config: { method: 'GET', url: 'https://api.example.com/items' }, warnings: 0 },
-    { id: 3, type: 'loop', name: '遍历列表', code: 'loop_1', x: 540, y: 220, config: { loopMode: 'forEach', listVar: '${http_1.data.items}', itemVar: 'item', indexVar: 'index', maxIterations: 1000, allowBreak: false, outputVar: 'loopResult', collectOutput: true }, warnings: 0 },
-    { id: 4, type: 'http', name: '处理每条记录', code: 'http_2', x: 680, y: 380, config: { method: 'POST', url: 'https://api.example.com/process' }, warnings: 0 },
-    { id: 5, type: 'assign', name: '汇总结果', code: 'assign_1', x: 800, y: 220, config: {}, warnings: 0 },
-    { id: 6, type: 'end', name: '结束', code: 'end_1', x: 1020, y: 220, config: {}, warnings: 0 },
+    {
+      id: 1, type: 'trigger', name: '触发器', code: 'trigger_1',
+      x: 80, y: 260,
+      config: { triggerType: 'manual' }, warnings: 0
+    },
+    {
+      // ① 先获取需要预警的房型列表
+      id: 2, type: 'http', name: '拉取低库存房型', code: 'http_1',
+      x: 300, y: 260,
+      config: { method: 'GET', url: 'https://api.internal.com/rooms/low-stock' }, warnings: 0
+    },
+    {
+      // ② 循环节点：遍历列表中的每一条房型
+      //    listVar  → 上游HTTP节点返回的数组
+      //    itemVar  → 循环体内用 ${roomItem} 引用当前房型
+      id: 3, type: 'loop', name: '遍历预警房型', code: 'loop_1',
+      x: 560, y: 260,
+      config: {
+        loopMode: 'forEach',
+        listVar: '${http_1.data.rooms}',   // 上游列表
+        itemVar: 'roomItem',               // 当前元素变量名
+        indexVar: 'roomIndex',             // 当前索引变量名
+        maxIterations: 500,
+        allowBreak: false,
+        outputVar: 'notifyResults',
+        collectOutput: true
+      }, warnings: 0
+    },
+    {
+      // ③ 【循环体】每轮：对当前房型发送飞书预警消息
+      //    这个节点通过"循环体"端口连接，每轮迭代执行一次
+      //    执行完后无需连出口，引擎自动进入下一轮
+      id: 4, type: 'http', name: '发送飞书预警', code: 'http_2',
+      x: 700, y: 440,
+      config: {
+        method: 'POST',
+        url: 'https://open.feishu.cn/open-apis/bot/v2/hook/xxx',
+        body: '{"text":"房型 ${roomItem.name} 库存仅剩 ${roomItem.stock} 间，请及时补充"}'
+      }, warnings: 0
+    },
+    {
+      // ④ 【循环完成后】汇总本次通知结果，写入日志
+      //    通过"完成"端口连接，在所有房型都处理完后执行一次
+      id: 5, type: 'assign', name: '记录通知汇总', code: 'assign_1',
+      x: 860, y: 260,
+      config: {
+        assignments: [
+          { target: 'summary', value: '共通知 ${loop_1.iterationCount} 个房型' }
+        ]
+      }, warnings: 0
+    },
+    {
+      id: 6, type: 'end', name: '结束', code: 'end_1',
+      x: 1080, y: 260,
+      config: {}, warnings: 0
+    },
   ];
   const conns = [
-    { id: 1, from: 1, to: 2, fromPort: 'out', toPort: 'in' },
-    { id: 2, from: 2, to: 3, fromPort: 'out', toPort: 'in' },
-    { id: 3, from: 3, to: 4, fromPort: 'loop', toPort: 'in', label: '循环体' },
-    { id: 4, from: 3, to: 5, fromPort: 'done', toPort: 'in', label: '完成' },
-    { id: 5, from: 5, to: 6, fromPort: 'out', toPort: 'in' },
+    { id: 1, from: 1, to: 2, fromPort: 'out',  toPort: 'in' },
+    { id: 2, from: 2, to: 3, fromPort: 'out',  toPort: 'in' },
+    // 循环体端口 → 循环体内第一个节点（每轮执行）
+    { id: 3, from: 3, to: 4, fromPort: 'loop', toPort: 'in', label: '循环体（每轮）' },
+    // 完成端口 → 循环全部结束后的下一步
+    { id: 4, from: 3, to: 5, fromPort: 'done', toPort: 'in', label: '完成（全部结束后）' },
+    { id: 5, from: 5, to: 6, fromPort: 'out',  toPort: 'in' },
+    // 注意：节点4（发送飞书预警）没有出口连线 ← 这是正确的！
+    // 循环体最后一个节点不需要连出口，执行完引擎自动进入下一轮
   ];
   const vars = [
-    { name: 'input', type: 'Object', scope: '输入变量', desc: '工作流输入参数' },
-    { name: 'item', type: 'Object', scope: '中间变量', desc: '循环当前元素' },
-    { name: 'index', type: 'Number', scope: '中间变量', desc: '循环当前索引' },
-    { name: 'loopResult', type: 'Array', scope: '中间变量', desc: '循环收集的结果列表' },
+    { name: 'input',         type: 'Object', scope: '输入变量', desc: '工作流输入参数' },
+    { name: 'roomItem',      type: 'Object', scope: '中间变量', desc: '当前迭代的房型对象 (循环体内可用)' },
+    { name: 'roomIndex',     type: 'Number', scope: '中间变量', desc: '当前迭代索引，从 0 开始' },
+    { name: 'notifyResults', type: 'Array',  scope: '中间变量', desc: '每轮收集的通知结果列表（完成后可用）' },
+    { name: 'summary',       type: 'String', scope: '中间变量', desc: '汇总文案' },
   ];
   return { nodes, conns, vars };
 }
@@ -1239,6 +1307,7 @@ function renderHttpConfig(node) {
         placeholder: 'https://api.example.com/endpoint 或 {{input.apiUrl}}',
         nodeId: node.id,
         singleLine: true,
+        label: '请求 URL',
         onChange: `updateNodeConfig(${node.id}, 'url', this.value)`
       })}
     </div>
@@ -1250,6 +1319,8 @@ function renderHttpConfig(node) {
         placeholder: '{"Content-Type": "application/json", "Authorization": "{{input.token}}"}',
         nodeId: node.id,
         minHeight: 50,
+        label: '请求头',
+        hint: 'JSON 格式，支持 {{变量}} 引用',
         onChange: `updateNodeConfig(${node.id}, 'headers', this.value)`
       })}
     </div>
@@ -1261,13 +1332,10 @@ function renderHttpConfig(node) {
         placeholder: '{"key": "value", "userId": "{{input.userId}}"}',
         nodeId: node.id,
         minHeight: 60,
+        label: '请求体',
+        hint: 'JSON 格式，支持 {{变量}} 引用',
         onChange: `updateNodeConfig(${node.id}, 'body', this.value)`
       })}
-    </div>
-    <div class="config-field">
-      <div class="config-field-label">响应变量名</div>
-      <input class="config-input" value="${node.config?.responseVar || 'response'}" placeholder="response" style="font-family:var(--font-family-mono)" onchange="updateNodeConfig(${node.id}, 'responseVar', this.value); renderDesigner()" />
-      <div class="config-field-help">自定义响应变量名，修改后下方输出变量将同步更新</div>
     </div>
     ${upstreamPreview}
   </div>
@@ -1295,6 +1363,8 @@ function renderCodeConfig(node) {
         placeholder: '// 在此编写代码，输入 {{ 可快速插入变量',
         nodeId: node.id,
         minHeight: 120,
+        label: '代码',
+        hint: '使用 return 返回结果，返回值将作为 result 输出变量',
         onChange: `updateNodeConfig(${node.id}, 'script', this.value)`
       })}
       <div class="config-field-help">使用 <code style="background:var(--md-surface-container);padding:0 3px;border-radius:2px">return</code> 返回结果，返回值将作为 <code style="background:var(--md-surface-container);padding:0 3px;border-radius:2px">result</code> 输出变量</div>
@@ -3792,33 +3862,67 @@ function renderOutputVariablesSection(node) {
   
   const nodeCode = node.code;
   
+  // 分离可编辑和固定输出
+  const editableOutputs = outputs.filter(o => o.editable);
+  const fixedOutputs = outputs.filter(o => !o.editable);
+  
+  // 检查是否有嵌套子变量（如 response.status）
+  const hasChildren = outputs.some(o => o.isChild);
+  const parentOutputs = outputs.filter(o => !o.isChild);
+  const childOutputs = outputs.filter(o => o.isChild);
+  
   return `
-    <div class="config-section" style="background:linear-gradient(135deg,#f0fdf4 0%,#fafafa 100%);border:1px solid #bbf7d0;border-radius:var(--radius-md)">
+    <div class="config-section output-vars-section">
       <div class="config-section-title" style="color:#16a34a;display:flex;align-items:center;gap:6px">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/>
+          <path d="M9 14l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
         </svg>
         输出变量
         <span style="font-size:10px;font-weight:400;color:var(--md-outline);margin-left:auto">下游节点可引用</span>
       </div>
-      <div style="display:flex;flex-direction:column;gap:4px">
-        ${outputs.map(o => `
-          <div class="output-var-item" onclick="copyOutputVarPath('${nodeCode}', '${o.name}')" title="点击复制引用路径" style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--md-surface);border-radius:4px;cursor:pointer;transition:var(--transition-fast)">
-            <span class="var-icon type-${o.type}" style="width:20px;height:20px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0" title="${o.type}">${o.type.charAt(0)}</span>
-            <div style="flex:1;min-width:0">
-              <div style="font-size:var(--font-size-xs);font-weight:500;color:var(--md-on-surface);font-family:var(--font-family-mono)">${o.name}</div>
-              <div style="font-size:10px;color:var(--md-on-surface-variant)">${o.desc}</div>
+      
+      ${editableOutputs.length > 0 ? `
+        <div class="output-vars-editable">
+          ${editableOutputs.map(o => `
+            <div class="output-var-edit-row">
+              <div class="output-var-edit-main">
+                <span class="var-icon type-${o.type}" title="${o.type}">${o.type.charAt(0)}</span>
+                <input 
+                  class="output-var-input" 
+                  value="${o.name}" 
+                  placeholder="变量名" 
+                  style="flex:1;font-family:var(--font-family-mono)" 
+                  onchange="updateNodeConfig(${node.id}, '${o.configField}', this.value); renderDesigner()"
+                />
+                <code class="var-ref-tag">{{${nodeCode}.${o.name}}}</code>
+              </div>
+              <div class="output-var-desc">${o.desc}</div>
             </div>
-            <code style="font-size:9px;color:var(--md-primary);background:var(--md-primary-container);padding:2px 6px;border-radius:3px;white-space:nowrap">{{${nodeCode}.${o.name}}}</code>
-          </div>
-        `).join('')}
-      </div>
-      <div style="font-size:10px;color:var(--md-outline);margin-top:8px;display:flex;align-items:center;gap:4px">
+          `).join('')}
+        </div>
+      ` : ''}
+      
+      ${fixedOutputs.length > 0 ? `
+        <div class="output-vars-fixed">
+          ${fixedOutputs.map(o => `
+            <div class="output-var-item" onclick="copyOutputVarPath('${nodeCode}', '${o.name}')" title="点击复制引用路径">
+              <span class="var-icon type-${o.type}" title="${o.type}">${o.type.charAt(0)}</span>
+              <div class="output-var-info">
+                <div class="output-var-name">${o.name}</div>
+                <div class="output-var-desc-inline">${o.desc}</div>
+              </div>
+              <code class="var-ref-tag">{{${nodeCode}.${o.name}}}</code>
+            </div>
+          `).join('')}
+        </div>
+      ` : ''}
+      
+      <div class="output-vars-hint">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="12" cy="12" r="10"/>
           <path d="M12 16v-4M12 8h.01"/>
         </svg>
-        点击变量行可复制引用路径，下游节点可通过此路径引用输出值
+        点击变量行或引用路径可复制，下游节点通过此路径引用输出值
       </div>
     </div>
   `;
@@ -3848,28 +3952,41 @@ function renderExprEditor(options) {
     nodeId,
     minHeight = 60,
     onChange = '',
-    singleLine = false
+    singleLine = false,
+    label = '',       // 字段名，用于展开弹窗标题
+    hint = '',        // 展开弹窗内的提示文字
+    expandable = true // 是否显示展开按钮，代码/表达式场景默认 true
   } = options;
   
   const editorId = `expr_${id}_${Date.now()}`;
   const tag = singleLine ? 'input' : 'textarea';
   const inputAttrs = singleLine 
-    ? `type="text" style="height:32px;padding-right:36px"` 
-    : `style="min-height:${minHeight}px;padding-right:36px"`;
+    ? `type="text" style="height:32px;padding-right:${expandable ? 60 : 36}px"` 
+    : `style="min-height:${minHeight}px;padding-right:${expandable ? 60 : 36}px"`;
   
+  const expandBtn = expandable ? `
+    <button class="expr-expand-btn" 
+      onclick="openExprExpandModal('${editorId}', ${nodeId}, ${JSON.stringify(label || id)}, ${JSON.stringify(hint || placeholder)})"
+      title="展开编辑">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+      </svg>
+    </button>` : '';
+
   return `
-    <div class="expr-editor-wrapper" data-editor-id="${editorId}">
+    <div class="expr-editor-wrapper${expandable ? ' has-expand' : ''}" data-editor-id="${editorId}">
       <${tag} 
         id="${editorId}"
         class="expr-editor" 
         ${inputAttrs}
-        placeholder="${placeholder}"
+        placeholder="${escHtml(placeholder)}"
         onchange="${onChange}"
         oninput="handleExprInput(event, '${editorId}', ${nodeId})"
         onkeydown="handleExprKeydown(event, '${editorId}', ${nodeId})"
         onfocus="handleExprFocus(event, '${editorId}', ${nodeId})"
         onblur="handleExprBlur(event, '${editorId}')"
       >${singleLine ? '' : escHtml(value)}</${tag}>
+      ${expandBtn}
       <button class="var-picker-trigger" onclick="toggleVarPicker('${editorId}', ${nodeId}, event)" title="插入变量">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M4 7V4h16v3M9 20h6M12 4v16"/>
@@ -4200,4 +4317,185 @@ function copyUpstreamOutput(nodeCode) {
   }).catch(() => {
     showToast('error', '复制失败', '请手动复制');
   });
+}
+
+// ============================================================
+// 表达式/代码 展开弹窗（Expand Editor Modal）
+// ============================================================
+
+let _exprExpandState = null; // { editorId, onConfirm }
+
+/**
+ * 打开展开编辑器弹窗
+ * @param {string} editorId  - 原编辑器 DOM id
+ * @param {number} nodeId    - 当前节点 id
+ * @param {string} label     - 字段名称（显示在弹窗标题）
+ * @param {string} hint      - 工具提示文字
+ */
+function openExprExpandModal(editorId, nodeId, label, hint) {
+  // 读取原编辑器当前值
+  const origEl = document.getElementById(editorId);
+  const currentValue = origEl ? origEl.value : '';
+
+  // 获取可用变量
+  const varGroups = getAvailableVariables(nodeId);
+
+  // 渲染左侧变量列表
+  let varListHtml = '';
+  if (varGroups.length === 0) {
+    varListHtml = '<div style="padding:12px;font-size:11px;color:var(--md-outline)">暂无可用变量</div>';
+  } else {
+    varGroups.forEach(group => {
+      varListHtml += `<div class="expr-expand-var-group">
+        <div class="expr-expand-var-group-label">${escHtml(group.name)}</div>`;
+      group.variables.forEach(v => {
+        varListHtml += `<div class="expr-expand-var-item" 
+          onclick="insertVarIntoExpandModal(${JSON.stringify(v.ref)})"
+          title="${escHtml(v.desc || v.ref)}">
+          <span class="expr-expand-var-name">${escHtml(v.path)}</span>
+          <span class="expr-expand-var-type">${escHtml(v.type || '')}</span>
+          <span class="expr-expand-var-insert">插入</span>
+        </div>`;
+      });
+      varListHtml += '</div>';
+    });
+  }
+
+  const hintHtml = hint
+    ? `<span class="expr-expand-editor-hint">${escHtml(hint)} · 输入 <code>{{</code> 引用变量</span>`
+    : `<span class="expr-expand-editor-hint">输入 <code>{{</code> 可快速引用变量</span>`;
+
+  const modalHtml = `
+  <div class="expr-expand-overlay" id="exprExpandOverlay" onclick="handleExpandOverlayClick(event)">
+    <div class="expr-expand-modal" onclick="event.stopPropagation()">
+      <div class="expr-expand-header">
+        <div class="expr-expand-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15">
+            <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>
+          </svg>
+          ${escHtml(label || '编辑表达式')}
+          <span class="expr-expand-title-badge">表达式编辑器</span>
+        </div>
+        <div class="expr-expand-header-actions">
+          <button class="expr-expand-close" onclick="closeExprExpandModal(false)" title="取消（Esc）">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+      <div class="expr-expand-body">
+        <div class="expr-expand-vars">
+          <div class="expr-expand-vars-header">可用变量</div>
+          <div class="expr-expand-vars-list" id="exprExpandVarList">
+            ${varListHtml}
+          </div>
+        </div>
+        <div class="expr-expand-editor-area">
+          <div class="expr-expand-editor-toolbar">
+            ${hintHtml}
+          </div>
+          <textarea 
+            id="exprExpandTextarea"
+            class="expr-expand-textarea"
+            placeholder="${escHtml(hint || label || '在此输入表达式或代码...')}"
+            onkeydown="handleExpandKeydown(event)"
+          >${escHtml(currentValue)}</textarea>
+        </div>
+      </div>
+      <div class="expr-expand-footer">
+        <button class="btn-ghost" onclick="closeExprExpandModal(false)">取消</button>
+        <button class="btn-primary" onclick="closeExprExpandModal(true)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="13" height="13">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+          确认
+        </button>
+      </div>
+    </div>
+  </div>`;
+
+  // 挂载到 body
+  const container = document.createElement('div');
+  container.id = 'exprExpandContainer';
+  container.innerHTML = modalHtml;
+  document.body.appendChild(container);
+
+  // 聚焦到大编辑区，光标移到末尾
+  const ta = document.getElementById('exprExpandTextarea');
+  if (ta) {
+    ta.focus();
+    ta.setSelectionRange(ta.value.length, ta.value.length);
+  }
+
+  // 保存状态
+  _exprExpandState = { editorId };
+
+  // Esc 关闭
+  document.addEventListener('keydown', _onExpandEsc);
+}
+
+/**
+ * 关闭展开弹窗
+ * @param {boolean} confirm - true=确认写回原编辑器，false=取消
+ */
+function closeExprExpandModal(confirm) {
+  const container = document.getElementById('exprExpandContainer');
+  if (!container) return;
+
+  if (confirm && _exprExpandState) {
+    const ta = document.getElementById('exprExpandTextarea');
+    const origEl = document.getElementById(_exprExpandState.editorId);
+    if (ta && origEl) {
+      origEl.value = ta.value;
+      // 触发 change 事件，让原编辑器的 onchange 回调执行
+      origEl.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  }
+
+  container.remove();
+  _exprExpandState = null;
+  document.removeEventListener('keydown', _onExpandEsc);
+}
+
+/**
+ * 点击遮罩关闭
+ */
+function handleExpandOverlayClick(event) {
+  if (event.target.id === 'exprExpandOverlay') {
+    closeExprExpandModal(false);
+  }
+}
+
+/**
+ * 在展开弹窗的大编辑区插入变量引用
+ */
+function insertVarIntoExpandModal(ref) {
+  const ta = document.getElementById('exprExpandTextarea');
+  if (!ta) return;
+  const start = ta.selectionStart;
+  const end   = ta.selectionEnd;
+  const before = ta.value.substring(0, start);
+  const after  = ta.value.substring(end);
+  ta.value = before + ref + after;
+  const pos = start + ref.length;
+  ta.focus();
+  ta.setSelectionRange(pos, pos);
+}
+
+/**
+ * Esc 键关闭弹窗
+ */
+function _onExpandEsc(e) {
+  if (e.key === 'Escape') closeExprExpandModal(false);
+}
+
+/**
+ * 大编辑区键盘事件：Ctrl/Cmd+Enter 确认
+ */
+function handleExpandKeydown(event) {
+  if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+    event.preventDefault();
+    closeExprExpandModal(true);
+  }
 }
