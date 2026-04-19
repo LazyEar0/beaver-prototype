@@ -1347,43 +1347,24 @@ const COND_OPS = [
 // updateFnPfx: function + leading args WITHOUT (condIdx,field,value), e.g. "updateIfCondition(3,"
 //              → rendered as updateFnPfx + idx + ",'left',this.value)"
 function renderConditionRows(conditions, addFnStr, removeFnPfx, updateFnPfx, nodeId) {
-  const COND_VAR_PRESETS = getCondVarPresets(nodeId);
   const noRightOps = ['isEmpty', 'isNotEmpty'];
   let html = '';
   conditions.forEach((cond, idx) => {
     if (idx > 0) {
       html += `<div class="condition-and-tag">AND</div>`;
     }
-    // isPreset: left value matches one of the preset options (excluding __custom__)
-    const isPreset = COND_VAR_PRESETS.slice(0, -1).some(p => p.value === cond.left);
-    // isCustomMode: user explicitly chose "custom" but hasn't typed yet (left === __custom__),
-    //               or left is a non-preset non-empty string they typed
-    const isCustomMode = !isPreset;
-    const customDisplayVal = (cond.left === '__custom__' || !cond.left) ? '' : cond.left;
+    const leftVal = (cond.left === '__custom__' || !cond.left) ? '' : cond.left;
     const opIsNoRight = noRightOps.includes(cond.op);
+    const leftInputId = `cond_left_${nodeId}_${idx}_${Date.now()}`;
 
     html += `<div class="condition-visual-row">
-      <!-- Row 1: variable selector or custom input -->
+      <!-- Row 1: variable input + ref picker -->
       <div class="cond-row-top">
-        ${(() => {
-          const leftInputId = `cond_left_${nodeId}_${idx}_${Date.now()}`;
-          if (isPreset) {
-            return `<div style="display:flex;flex:1;align-items:center;min-width:0;gap:4px">
-              <select class="cond-left-select" style="flex:1" onchange="if(this.value==='__custom__'){${updateFnPfx}${idx},'left','__custom__');}else{${updateFnPfx}${idx},'left',this.value);}">
-                ${COND_VAR_PRESETS.map(p => `<option value="${escHtml(p.value)}" ${cond.left === p.value ? 'selected' : ''}>${p.label}</option>`).join('')}
-              </select>
-              <button class="cond-ref-btn" id="${leftInputId}_btn" title="从变量选择器中引用" onclick="showCondLeftVarPicker('${leftInputId}', ${nodeId}, '${updateFnPfx}${idx}')">⊙</button>
-              <div id="${leftInputId}_picker" class="var-picker-dropdown" style="display:none;position:fixed;z-index:9999;max-height:240px;overflow-y:auto;background:var(--md-surface-container-high);border:1px solid var(--md-outline-variant);border-radius:8px;box-shadow:var(--shadow-lg);flex-direction:column;width:280px"></div>
-            </div>`;
-          } else {
-            return `<div style="display:flex;flex:1;align-items:center;min-width:0;gap:4px">
-              <input id="${leftInputId}" class="cond-left-input" value="${escHtml(customDisplayVal)}" placeholder="输入变量路径，如 vars.amount" onchange="${updateFnPfx}${idx},'left',this.value)" style="flex:1" />
-              <button class="cond-ref-btn" title="从变量选择器中引用" onclick="showCondVarPicker('${leftInputId}', ${nodeId}, '${updateFnPfx}${idx}')">⊙</button>
-              <button class="cond-back-btn" onclick="${updateFnPfx}${idx},'left',${JSON.stringify(COND_VAR_PRESETS[0]?.value || '')})" title="切换为下拉选择">列表</button>
-              <div id="${leftInputId}_picker" class="var-picker-dropdown" style="display:none;position:fixed;z-index:9999;max-height:240px;overflow-y:auto;background:var(--md-surface-container-high);border:1px solid var(--md-outline-variant);border-radius:8px;box-shadow:var(--shadow-lg);flex-direction:column;width:280px"></div>
-            </div>`;
-          }
-        })()}
+        <div class="cond-right-wrap" style="flex:1">
+          <input id="${leftInputId}" class="cond-left-input" value="${escHtml(leftVal)}" placeholder="输入或引用变量，如 vars.status" onchange="${updateFnPfx}${idx},'left',this.value)" style="padding-right:28px;width:100%" />
+          <button class="cond-ref-btn" title="引用变量" onclick="showCondVarPicker('${leftInputId}', ${nodeId}, '${updateFnPfx}${idx}', 'left')">⊙</button>
+          <div id="${leftInputId}_picker" class="var-picker-dropdown" style="display:none;position:fixed;z-index:9999;max-height:240px;overflow-y:auto;background:var(--md-surface-container-high);border:1px solid var(--md-outline-variant);border-radius:8px;box-shadow:var(--shadow-lg);flex-direction:column;width:280px"></div>
+        </div>
         ${conditions.length > 1
           ? `<button class="cond-delete-btn" onclick="${removeFnPfx}${idx})" title="删除此条件">${icons.close}</button>`
           : ''
