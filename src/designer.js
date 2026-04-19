@@ -1391,7 +1391,7 @@ function renderConditionRows(conditions, addFnStr, removeFnPfx, updateFnPfx, nod
               return `<div class="cond-right-wrap" style="position:relative;flex:1">
                 <input id="${rightInputId}" class="cond-right-input" value="${escHtml(cond.right || '')}" placeholder="输入值或引用变量" onchange="${updateFnPfx}${idx},'right',this.value)" style="padding-right:28px;width:100%" />
                 <button class="cond-ref-btn" title="从变量选择器中引用" onclick="showCondVarPicker('${rightInputId}', ${nodeId}, '${updateFnPfx}${idx}')">⊙</button>
-                <div id="${rightInputId}_picker" class="var-picker-dropdown" style="display:none;position:absolute;bottom:calc(100% + 4px);right:0;left:0;z-index:1000;max-height:260px;overflow-y:auto;background:var(--md-surface-container-high);border:1px solid var(--md-outline-variant);border-radius:8px;box-shadow:var(--shadow-lg);flex-direction:column"></div>
+                <div id="${rightInputId}_picker" class="var-picker-dropdown" style="display:none;position:fixed;z-index:9999;max-height:240px;overflow-y:auto;background:var(--md-surface-container-high);border:1px solid var(--md-outline-variant);border-radius:8px;box-shadow:var(--shadow-lg);flex-direction:column;width:280px"></div>
               </div>`;
             })()
         }
@@ -4520,12 +4520,32 @@ function selectVariable(editorId, ref) {
  */
 function showCondVarPicker(inputId, nodeId, updateFnPfx) {
   const picker = document.getElementById(inputId + '_picker');
-  if (!picker) return;
+  const input = document.getElementById(inputId);
+  if (!picker || !input) return;
 
   // 若已打开则关闭
   if (picker.style.display === 'flex') {
     picker.style.display = 'none';
     return;
+  }
+
+  // 计算 input 的屏幕坐标，决定弹出方向
+  const rect = input.getBoundingClientRect();
+  const pickerH = 240;
+  const spaceBelow = window.innerHeight - rect.bottom;
+  const spaceAbove = rect.top;
+
+  picker.style.left = rect.left + 'px';
+  picker.style.width = Math.max(rect.width, 280) + 'px';
+
+  if (spaceBelow >= pickerH || spaceBelow >= spaceAbove) {
+    // 向下弹出
+    picker.style.top = (rect.bottom + 4) + 'px';
+    picker.style.bottom = '';
+  } else {
+    // 向上弹出
+    picker.style.top = '';
+    picker.style.bottom = (window.innerHeight - rect.top + 4) + 'px';
   }
 
   const groups = getAvailableVariables(nodeId);
