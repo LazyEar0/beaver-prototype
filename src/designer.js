@@ -1371,7 +1371,7 @@ function renderConditionRows(conditions, addFnStr, removeFnPfx, updateFnPfx, nod
             </select>`
           : `<div style="display:flex;flex:1;align-items:center;min-width:0">
               <input class="cond-left-input" value="${escHtml(customDisplayVal)}" placeholder="输入变量路径，如 vars.amount" onchange="${updateFnPfx}${idx},'left',this.value)" style="flex:1" />
-              <button class="cond-back-btn" onclick="${updateFnPfx}${idx},'left','vars.status')" title="返回选择预设变量">↩</button>
+              <button class="cond-back-btn" onclick="${updateFnPfx}${idx},'left',${JSON.stringify(COND_VAR_PRESETS[0]?.value || '')})" title="切换为下拉选择">选择变量</button>
             </div>`
         }
         ${conditions.length > 1
