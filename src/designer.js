@@ -1299,14 +1299,26 @@ function removeTriggerParam(nodeId, index) {
 }
 
 // Preset variable options for condition builder
-const COND_VAR_PRESETS = [
-  { label: '应用变量 – keyword', value: 'vars.keyword' },
-  { label: '应用变量 – status', value: 'vars.status' },
-  { label: '上一节点输出 – response.data', value: 'response.data' },
-  { label: '上一节点输出 – response.status', value: 'response.status' },
-  { label: '触发器输入 – input.userId', value: 'input.userId' },
-  { label: '自定义...', value: '__custom__' },
-];
+/**
+ * 动态生成条件节点的变量预设列表（替代原硬编码 COND_VAR_PRESETS）
+ * @param {number} nodeId - 当前节点ID，用于获取上游可用变量
+ */
+function getCondVarPresets(nodeId) {
+  const presets = [];
+  const groups = getAvailableVariables(nodeId);
+  groups.forEach(group => {
+    // 每个分组最多取前5个变量，避免下拉过长
+    group.variables.slice(0, 5).forEach(v => {
+      presets.push({
+        label: `${group.name.replace(/^[^\s]+\s/, '')} — ${v.name}`,
+        value: v.path
+      });
+    });
+  });
+  // 末尾始终保留"自定义"选项
+  presets.push({ label: '自定义...', value: '__custom__' });
+  return presets;
+}
 
 // Operator options
 const COND_OPS = [
@@ -1328,7 +1340,8 @@ const COND_OPS = [
 //              → rendered as removeFnPfx + idx + ")"
 // updateFnPfx: function + leading args WITHOUT (condIdx,field,value), e.g. "updateIfCondition(3,"
 //              → rendered as updateFnPfx + idx + ",'left',this.value)"
-function renderConditionRows(conditions, addFnStr, removeFnPfx, updateFnPfx) {
+function renderConditionRows(conditions, addFnStr, removeFnPfx, updateFnPfx, nodeId) {
+  const COND_VAR_PRESETS = getCondVarPresets(nodeId);
   const noRightOps = ['isEmpty', 'isNotEmpty'];
   let html = '';
   conditions.forEach((cond, idx) => {
@@ -1403,7 +1416,8 @@ function renderIfConfig(node) {
         conditions,
         `addIfCondition(${nid})`,
         `removeIfCondition(${nid},`,
-        `updateIfCondition(${nid},`
+        `updateIfCondition(${nid},`,
+        nid
       )}
     </div>` : `
     <div class="config-field">
@@ -1461,7 +1475,8 @@ function renderSwitchConfig(node) {
               conditions,
               `addSwitchCondition(${nid},${i})`,
               `removeSwitchCondition(${nid},${i},`,
-              `updateSwitchCondition(${nid},${i},`
+              `updateSwitchCondition(${nid},${i},`,
+              nid
             )
           : `<textarea class="expr-editor" style="min-height:36px;font-size:11px" placeholder="输入分支条件表达式..." onchange="updateSwitchBranchCondition(${nid}, ${i}, this.value)">${escHtml(b.condition || '')}</textarea>`
         }
@@ -3854,26 +3869,26 @@ function onBottomResizeStart(e) {
  */
 function getAvailableVariables(currentNodeId) {
   const groups = [];
-  
-  // 1. 输入变量（工作流级别）
-  const inputVars = designerVariables.filter(v => v.scope === '输入变量');
-  if (inputVars.length > 0) {
+
+  // 1. 触发器节点输入参数（流程入口参数，独立展示）
+  const triggerNode = designerNodes.find(n => n.type === 'trigger');
+  if (triggerNode && triggerNode.config?.inputParams?.length > 0) {
     groups.push({
-      id: 'input',
-      name: '📥 输入变量',
-      source: 'input',
-      variables: inputVars.map(v => ({
-        name: v.name,
-        type: v.type,
-        desc: v.desc,
-        path: `input.${v.name}`,
-        ref: `{{input.${v.name}}}`
+      id: 'trigger_input',
+      name: '⚡ 触发器输入',
+      source: 'trigger',
+      variables: triggerNode.config.inputParams.map(p => ({
+        name: p.key || p.label,
+        type: p.fieldType || 'String',
+        desc: p.label || '',
+        path: `${triggerNode.code}.${p.key || p.label}`,
+        ref: `{{${triggerNode.code}.${p.key || p.label}}}`
       }))
     });
   }
-  
-  // 2. 上游节点输出
-  const upstreamNodes = getUpstreamNodes(currentNodeId);
+
+  // 2. 上游节点输出（跳过触发器，触发器已单独展示）
+  const upstreamNodes = getUpstreamNodes(currentNodeId).filter(n => n.type !== 'trigger');
   upstreamNodes.forEach(node => {
     const nodeType = nodeTypes.find(t => t.type === node.type);
     const outputs = getNodeOutputs(node);
@@ -3894,24 +3909,52 @@ function getAvailableVariables(currentNodeId) {
       });
     }
   });
-  
-  // 3. 中间变量
-  const middleVars = designerVariables.filter(v => v.scope === '中间变量');
-  if (middleVars.length > 0) {
+
+  // 3. 流程全局变量（用户主动声明的跨节点共享变量）
+  if (designerVariables.length > 0) {
     groups.push({
-      id: 'middle',
-      name: '📊 中间变量',
-      source: 'middle',
-      variables: middleVars.map(v => ({
+      id: 'global_vars',
+      name: '📦 全局变量',
+      source: 'global',
+      variables: designerVariables.map(v => ({
         name: v.name,
         type: v.type,
-        desc: v.desc,
+        desc: v.desc || (v.defaultValue ? `初始值: ${v.defaultValue}` : ''),
         path: `vars.${v.name}`,
         ref: `{{vars.${v.name}}}`
       }))
     });
   }
-  
+
+  // 4. 数据源数据项（当前空间已授权的数据源）
+  // dataSources 来自 app.js 全局作用域，按空间授权过滤
+  if (typeof dataSources !== 'undefined') {
+    // 筛选：isPublic 或已授权给当前空间的数据源
+    const currentWs = designerWsId;
+    const availableDs = dataSources.filter(ds =>
+      ds.isPublic ||
+      !ds.authorizedSpaces || ds.authorizedSpaces.length === 0 ||
+      ds.authorizedSpaces.includes(currentWs)
+    );
+    availableDs.forEach(ds => {
+      if (ds.items && ds.items.length > 0) {
+        groups.push({
+          id: `ds_${ds.id}`,
+          name: `🗂️ ${ds.name}`,
+          source: 'datasource',
+          dsId: ds.id,
+          variables: ds.items.map(item => ({
+            name: item.key,
+            type: item.type || 'String',
+            desc: item.value ? `值: ${item.value}` : '',
+            path: `ds.${ds.name}.${item.key}`,
+            ref: `{{ds.${ds.name}.${item.key}}}`
+          }))
+        });
+      }
+    });
+  }
+
   return groups;
 }
 
