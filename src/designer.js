@@ -179,10 +179,7 @@ function initDesignerNodes(wf) {
       { id: 2, type: 'end', name: '结束', code: 'end_1', x: 700, y: 200, config: {}, warnings: 0 },
     ];
     wf._designerConns = [];
-    wf._designerVars = [
-      { name: 'input', type: 'Object', scope: '输入变量', desc: '工作流输入参数' },
-      { name: 'output', type: 'Object', scope: '输出变量', desc: '工作流输出结果' },
-    ];
+    wf._designerVars = [];  // 全局变量由用户主动声明，默认为空
 
     // Add more nodes for published workflows (or the designated loop demo wf#8) to look realistic
     const isLoopDemo = wf.id === 8 || (wf.name && (wf.name.includes('批量') || wf.name.includes('遍历') || wf.name.includes('循环') || wf.name.includes('列表') || wf.name.includes('预警')));
@@ -229,13 +226,7 @@ function generateRealisticNodes(wf) {
     { id: 6, from: 6, to: 7, fromPort: 'out', toPort: 'in' },
     { id: 7, from: 5, to: 7, fromPort: 'out', toPort: 'in' },
   ];
-  const vars = [
-    { name: 'input', type: 'Object', scope: '输入变量', desc: '工作流输入参数' },
-    { name: 'output', type: 'Object', scope: '输出变量', desc: '工作流输出结果' },
-    { name: 'response', type: 'Object', scope: '中间变量', desc: 'HTTP响应数据' },
-    { name: 'processedData', type: 'Object', scope: '中间变量', desc: '处理后的数据' },
-    { name: 'errorMsg', type: 'String', scope: '中间变量', desc: '错误信息' },
-  ];
+  const vars = [];  // 节点I/O变量由节点自身配置定义，全局变量由用户主动声明
   return { nodes, conns, vars };
 }
 
@@ -322,13 +313,7 @@ function generateLoopExampleNodes(wf) {
     // 注意：节点4（发送飞书预警）没有出口连线 ← 这是正确的！
     // 循环体最后一个节点不需要连出口，执行完引擎自动进入下一轮
   ];
-  const vars = [
-    { name: 'input',         type: 'Object', scope: '输入变量', desc: '工作流输入参数' },
-    { name: 'roomItem',      type: 'Object', scope: '中间变量', desc: '当前迭代的房型对象 (循环体内可用)' },
-    { name: 'roomIndex',     type: 'Number', scope: '中间变量', desc: '当前迭代索引，从 0 开始' },
-    { name: 'notifyResults', type: 'Array',  scope: '中间变量', desc: '每轮收集的通知结果列表（完成后可用）' },
-    { name: 'summary',       type: 'String', scope: '中间变量', desc: '汇总文案' },
-  ];
+  const vars = [];  // 循环节点的迭代变量、赋值节点的目标变量均属于节点I/O，不在此声明
   return { nodes, conns, vars };
 }
 
@@ -455,8 +440,8 @@ function renderDesigner() {
           }
         </button>
         <span class="toolbar-divider"></span>
-        <button class="toolbar-btn ${designerBottomPanel === 'variables' ? 'active' : ''}" onclick="toggleDesignerBottom('variables')" title="查看和管理变量定义">
-          ${icons.hash} <span>变量</span>
+        <button class="toolbar-btn ${designerBottomPanel === 'variables' ? 'active' : ''}" onclick="toggleDesignerBottom('variables')" title="查看和管理流程全局变量">
+          ${icons.hash} <span>全局变量</span>
           <span class="toolbar-badge" style="background:var(--md-primary-container);color:var(--md-primary)">${designerVariables.length}</span>
         </button>
         <button class="toolbar-btn ${designerBottomPanel === 'problems' ? 'active' : ''}" onclick="toggleDesignerBottom('problems')" title="查看流程中的问题和警告">
@@ -772,13 +757,14 @@ function renderOverviewPanel() {
           <div class="config-field"><div class="config-field-label">调试状态</div><div style="font-size:var(--font-size-sm);color:${wf.debugPassed ? 'var(--md-success)' : 'var(--md-error)'}">${wf.debugPassed ? '已通过' : '未通过'}</div></div>
         </div>
         <div class="config-section">
-          <div class="config-section-title">输入变量</div>
-          ${designerVariables.filter(v => v.scope === '输入变量').map(v => `
-            <div class="var-item">
-              <var-type-badge>${v.type}</var-type-badge>
+          <div class="config-section-title">全局变量</div>
+          ${designerVariables.length > 0 ? designerVariables.map(v => `
+            <div class="var-item" style="padding:4px 0">
+              <span class="var-type-badge">${v.type}</span>
               <span class="var-name">${v.name}</span>
+              ${v.desc ? `<span style="font-size:var(--font-size-xs);color:var(--md-outline);margin-left:6px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${v.desc}</span>` : ''}
             </div>
-          `).join('') || '<div style="font-size:var(--font-size-xs);color:var(--md-outline)">暂无输入变量</div>'}
+          `).join('') : `<div style="font-size:var(--font-size-xs);color:var(--md-outline)">暂无全局变量，<a href="javascript:void(0)" onclick="switchBottomTab('variables');openBottomPanel()" style="color:var(--md-primary);text-decoration:none">点击管理</a></div>`}
         </div>
       </div>
     </div>`;
@@ -1853,11 +1839,11 @@ function renderBottomPanel() {
           ${icons.play} 调试日志
         </div>
         <div class="bottom-panel-tab ${designerBottomTab === 'variables' ? 'active' : ''}" onclick="switchBottomTab('variables')">
-          ${icons.hash} 变量 <span class="bottom-panel-tab-badge" style="background:var(--md-primary-container);color:var(--md-primary)">${vars.length}</span>
+          ${icons.hash} 全局变量 <span class="bottom-panel-tab-badge" style="background:var(--md-primary-container);color:var(--md-primary)">${vars.length}</span>
         </div>
       </div>
       <div class="bottom-panel-actions">
-        ${designerBottomTab === 'variables' ? `<button class="toolbar-btn" style="height:24px;font-size:11px" onclick="showAddVariableDialog()">${icons.plus} 新增</button>` : ''}
+        ${designerBottomTab === 'variables' ? `<button class="toolbar-btn" style="height:24px;font-size:11px" onclick="showAddVariableDialog()">${icons.plus} 新增全局变量</button>` : ''}
         <button class="canvas-control-btn" style="width:24px;height:24px" onclick="closeBottomPanel()">${icons.close}</button>
       </div>
     </div>
@@ -1892,13 +1878,21 @@ function renderDebugPanel(logs) {
 }
 
 function renderVariablesPanel(vars) {
+  if (vars.length === 0) {
+    return `<div style="text-align:center;padding:var(--space-8) var(--space-6);color:var(--md-outline)">
+      <div style="font-size:32px;margin-bottom:var(--space-3)">📦</div>
+      <div style="font-size:var(--font-size-sm);font-weight:500;color:var(--md-on-surface-variant);margin-bottom:var(--space-2)">暂无全局变量</div>
+      <div style="font-size:var(--font-size-xs);line-height:1.6">全局变量独立于节点存在，用于在多个节点间共享状态，<br>如流程开关、计数器、临时标记等。</div>
+    </div>`;
+  }
   return vars.map(v => `
     <div class="var-item">
       <span class="var-type-badge">${v.type}</span>
       <span class="var-name">${v.name}</span>
-      <span class="var-scope">${v.scope}</span>
-      <button class="table-action-btn" style="width:24px;height:24px;margin-left:auto" onclick="showToast('info','编辑变量','${v.name}')">${icons.edit}</button>
-      <button class="table-action-btn danger" style="width:24px;height:24px" onclick="showDeleteVarConfirm('${v.name}')">${icons.trash}</button>
+      ${v.defaultValue ? `<span style="font-size:var(--font-size-xs);color:var(--md-outline);font-family:var(--font-family-mono);margin-left:4px">= ${v.defaultValue}</span>` : ''}
+      ${v.desc ? `<span style="font-size:var(--font-size-xs);color:var(--md-outline);margin-left:8px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${v.desc}</span>` : '<span style="flex:1"></span>'}
+      <button class="table-action-btn" style="width:24px;height:24px;margin-left:auto;flex-shrink:0" onclick="showToast('info','编辑变量','${v.name}')">${icons.edit}</button>
+      <button class="table-action-btn danger" style="width:24px;height:24px;flex-shrink:0" onclick="showDeleteVarConfirm('${v.name}')">${icons.trash}</button>
     </div>
   `).join('');
 }
@@ -3106,10 +3100,11 @@ function filterQuickSearch(query) {
 
 // --- Variable Management ---
 function showAddVariableDialog() {
-  showModal(`<div class="modal" style="max-width:420px"><div class="modal-header"><h2 class="modal-title">新增变量</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
-    <div class="config-field"><div class="config-field-label">变量名 <span class="required">*</span></div><input class="config-input" id="newVarName" placeholder="变量名" style="font-family:var(--font-family-mono)" /></div>
+  showModal(`<div class="modal" style="max-width:420px"><div class="modal-header"><h2 class="modal-title">新增全局变量</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
+    <div style="font-size:var(--font-size-xs);color:var(--md-outline);margin-bottom:var(--space-3);line-height:1.5">全局变量独立于节点存在，可在任意节点中读写，适用于跨节点共享状态、计数器、开关等场景。</div>
+    <div class="config-field"><div class="config-field-label">变量名 <span class="required">*</span></div><input class="config-input" id="newVarName" placeholder="英文标识符，如 retryCount" style="font-family:var(--font-family-mono)" /></div>
     <div class="config-field"><div class="config-field-label">数据类型</div><select class="config-select" id="newVarType"><option>String</option><option>Integer</option><option>Double</option><option>Boolean</option><option>DateTime</option><option>Object</option><option>File</option></select></div>
-    <div class="config-field"><div class="config-field-label">变量类型</div><select class="config-select" id="newVarScope"><option>输入变量</option><option>输出变量</option><option>中间变量</option></select></div>
+    <div class="config-field"><div class="config-field-label">初始值 <span style="color:var(--md-outline);font-weight:400">（可选）</span></div><input class="config-input" id="newVarDefault" placeholder="留空则为空值" /></div>
     <div class="config-field"><div class="config-field-label">描述</div><input class="config-input" id="newVarDesc" placeholder="变量用途描述" /></div>
   </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="addVariable()">添加</button></div></div>`);
 }
@@ -3117,16 +3112,18 @@ function showAddVariableDialog() {
 function addVariable() {
   const name = document.getElementById('newVarName').value.trim();
   const type = document.getElementById('newVarType').value;
-  const scope = document.getElementById('newVarScope').value;
+  const defaultValue = document.getElementById('newVarDefault').value.trim();
   const desc = document.getElementById('newVarDesc').value.trim();
 
   if (!name) { showToast('warning', '提示', '请输入变量名'); return; }
+  if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)) { showToast('warning', '提示', '变量名只能包含英文字母、数字和下划线，且不能以数字开头'); return; }
   if (designerVariables.some(v => v.name === name)) { showToast('warning', '提示', '变量名已存在'); return; }
 
-  designerVariables.push({ name, type, scope, desc });
+  designerVariables.push({ name, type, defaultValue, desc });
+  syncDesignerState();
   closeModal();
   renderDesigner();
-  showToast('success', '添加成功', `变量「${name}」已添加`);
+  showToast('success', '添加成功', `全局变量「${name}」已添加`);
 }
 
 function showDeleteVarConfirm(varName) {
