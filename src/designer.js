@@ -1365,15 +1365,25 @@ function renderConditionRows(conditions, addFnStr, removeFnPfx, updateFnPfx, nod
     html += `<div class="condition-visual-row">
       <!-- Row 1: variable selector or custom input -->
       <div class="cond-row-top">
-        ${isPreset
-          ? `<select class="cond-left-select" onchange="if(this.value==='__custom__'){${updateFnPfx}${idx},'left','__custom__');}else{${updateFnPfx}${idx},'left',this.value);}">
-              ${COND_VAR_PRESETS.map(p => `<option value="${escHtml(p.value)}" ${cond.left === p.value ? 'selected' : ''}>${p.label}</option>`).join('')}
-            </select>`
-          : `<div style="display:flex;flex:1;align-items:center;min-width:0">
-              <input class="cond-left-input" value="${escHtml(customDisplayVal)}" placeholder="输入变量路径，如 vars.amount" onchange="${updateFnPfx}${idx},'left',this.value)" style="flex:1" />
-              <button class="cond-back-btn" onclick="${updateFnPfx}${idx},'left',${JSON.stringify(COND_VAR_PRESETS[0]?.value || '')})" title="切换为下拉选择">选择变量</button>
-            </div>`
-        }
+        ${(() => {
+          const leftInputId = `cond_left_${nodeId}_${idx}_${Date.now()}`;
+          if (isPreset) {
+            return `<div style="display:flex;flex:1;align-items:center;min-width:0;gap:4px">
+              <select class="cond-left-select" style="flex:1" onchange="if(this.value==='__custom__'){${updateFnPfx}${idx},'left','__custom__');}else{${updateFnPfx}${idx},'left',this.value);}">
+                ${COND_VAR_PRESETS.map(p => `<option value="${escHtml(p.value)}" ${cond.left === p.value ? 'selected' : ''}>${p.label}</option>`).join('')}
+              </select>
+              <button class="cond-ref-btn" id="${leftInputId}_btn" title="从变量选择器中引用" onclick="showCondLeftVarPicker('${leftInputId}', ${nodeId}, '${updateFnPfx}${idx}')">⊙</button>
+              <div id="${leftInputId}_picker" class="var-picker-dropdown" style="display:none;position:fixed;z-index:9999;max-height:240px;overflow-y:auto;background:var(--md-surface-container-high);border:1px solid var(--md-outline-variant);border-radius:8px;box-shadow:var(--shadow-lg);flex-direction:column;width:280px"></div>
+            </div>`;
+          } else {
+            return `<div style="display:flex;flex:1;align-items:center;min-width:0;gap:4px">
+              <input id="${leftInputId}" class="cond-left-input" value="${escHtml(customDisplayVal)}" placeholder="输入变量路径，如 vars.amount" onchange="${updateFnPfx}${idx},'left',this.value)" style="flex:1" />
+              <button class="cond-ref-btn" title="从变量选择器中引用" onclick="showCondVarPicker('${leftInputId}', ${nodeId}, '${updateFnPfx}${idx}')">⊙</button>
+              <button class="cond-back-btn" onclick="${updateFnPfx}${idx},'left',${JSON.stringify(COND_VAR_PRESETS[0]?.value || '')})" title="切换为下拉选择">列表</button>
+              <div id="${leftInputId}_picker" class="var-picker-dropdown" style="display:none;position:fixed;z-index:9999;max-height:240px;overflow-y:auto;background:var(--md-surface-container-high);border:1px solid var(--md-outline-variant);border-radius:8px;box-shadow:var(--shadow-lg);flex-direction:column;width:280px"></div>
+            </div>`;
+          }
+        })()}
         ${conditions.length > 1
           ? `<button class="cond-delete-btn" onclick="${removeFnPfx}${idx})" title="删除此条件">${icons.close}</button>`
           : ''
@@ -4511,6 +4521,90 @@ function selectVariable(editorId, ref) {
   
   hideVarPicker(editorId);
 }
+
+/**
+ * 条件行左值（变量对象）的变量选择器
+ * 选中后直接写入路径并触发 update 回调（无论当前是 select 还是 input 模式）
+ */
+function showCondLeftVarPicker(leftInputId, nodeId, updateFnPfx) {
+  const picker = document.getElementById(leftInputId + '_picker');
+  const btn = document.getElementById(leftInputId + '_btn');
+  const anchorEl = btn || document.getElementById(leftInputId);
+  if (!picker || !anchorEl) return;
+
+  if (picker.style.display === 'flex') {
+    picker.style.display = 'none';
+    return;
+  }
+
+  const rect = anchorEl.getBoundingClientRect();
+  const pickerH = 240;
+  const spaceBelow = window.innerHeight - rect.bottom;
+  const spaceAbove = rect.top;
+
+  picker.style.left = rect.left + 'px';
+  picker.style.width = '280px';
+
+  if (spaceBelow >= pickerH || spaceBelow >= spaceAbove) {
+    picker.style.top = (rect.bottom + 4) + 'px';
+    picker.style.bottom = '';
+  } else {
+    picker.style.top = '';
+    picker.style.bottom = (window.innerHeight - rect.top + 4) + 'px';
+  }
+
+  const groups = getAvailableVariables(nodeId);
+  picker.innerHTML = `
+    <div style="padding:8px;border-bottom:1px solid var(--md-outline-variant)">
+      <input type="text" placeholder="搜索变量..." style="width:100%;padding:4px 8px;border:1px solid var(--md-outline-variant);border-radius:4px;font-size:12px;background:var(--md-surface)" oninput="filterCondVarPicker('${leftInputId}', this.value)">
+    </div>
+    <div id="${leftInputId}_picker_body" style="overflow-y:auto;max-height:200px">
+      ${groups.length === 0
+        ? '<div style="padding:16px;text-align:center;font-size:12px;color:var(--md-outline)">暂无可用变量</div>'
+        : groups.map(group => `
+          <div class="cond-var-group" data-group="${group.id}">
+            <div style="padding:6px 10px 2px;font-size:10px;font-weight:600;color:var(--md-outline);text-transform:uppercase;letter-spacing:0.05em">${group.name}</div>
+            ${group.variables.map(v => `
+              <div class="cond-var-item" data-ref="${v.ref}" data-path="${v.path}" data-name="${v.name}"
+                   style="padding:5px 10px;cursor:pointer;display:flex;align-items:center;gap:8px;font-size:12px"
+                   onmouseenter="this.style.background='var(--md-surface-container)'"
+                   onmouseleave="this.style.background=''"
+                   onclick="selectCondLeftVar('${leftInputId}', '${escHtml(v.path)}', '${updateFnPfx}')">
+                <span style="font-size:10px;font-weight:600;padding:1px 4px;border-radius:3px;background:var(--md-primary-container);color:var(--md-on-primary-container);flex-shrink:0">${(v.type||'?').charAt(0)}</span>
+                <div style="flex:1;min-width:0">
+                  <div style="font-weight:500;color:var(--md-on-surface)">${v.name}</div>
+                  <div style="font-size:10px;color:var(--md-outline);font-family:var(--font-family-mono)">${v.path}</div>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        `).join('')}
+    </div>
+  `;
+  picker.style.display = 'flex';
+  picker.style.flexDirection = 'column';
+
+  const closeOnOutside = (e) => {
+    if (!picker.contains(e.target)) {
+      picker.style.display = 'none';
+      document.removeEventListener('mousedown', closeOnOutside, true);
+    }
+  };
+  setTimeout(() => document.addEventListener('mousedown', closeOnOutside, true), 0);
+}
+
+/**
+ * 左值选择：路径写入后触发 update 回调（path 是不带 {{}} 的路径）
+ */
+function selectCondLeftVar(leftInputId, path, updateFnPfx) {
+  // updateFnPfx 形如 "updateIfCondition(3,0," 
+  // 拼成完整调用：updateIfCondition(3, 0, 'left', 'vars.amount')
+  const fn = new Function(`${updateFnPfx}'left',${JSON.stringify(path)})`);
+  try { fn(); } catch(e) { console.warn('selectCondLeftVar callback failed', e); }
+  const picker = document.getElementById(leftInputId + '_picker');
+  if (picker) picker.style.display = 'none';
+}
+
 
 /**
  * 条件行右值的变量选择器（选中后直接替换 input 值，而非光标插入）
