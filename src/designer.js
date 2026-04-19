@@ -633,6 +633,12 @@ function renderCanvasNodes() {
       <div class="canvas-node-body">
         <span class="canvas-node-code">${node.code}</span>
         ${isPlaceholder ? '<div class="placeholder-tag">待完善</div>' : ''}
+        ${node.type === 'trigger' ? (() => {
+          const et = node.config?.enabledTypes || { manual: true, scheduled: false, event: false, webhook: false };
+          const typeLabels = { manual: '手动', scheduled: '定时', event: '事件', webhook: 'Webhook' };
+          const activeOnes = Object.entries(et).filter(([k2,v2]) => v2).map(([k2]) => typeLabels[k2]);
+          return activeOnes.length ? '<div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:3px">' + activeOnes.map(t2 => '<span style="font-size:9px;padding:1px 5px;border-radius:var(--radius-full);background:var(--md-primary-container);color:var(--md-on-primary-container)">' + t2 + '</span>').join('') + '</div>' : '';
+        })() : ''}
         ${node.config?.condition ? `<div style="margin-top:4px;font-size:10px;color:var(--md-on-surface-variant)">${truncate(node.config.condition, 30)}</div>` : ''}
         ${node.config?.url ? `<div style="margin-top:4px;font-size:10px;color:var(--md-on-surface-variant)">${truncate(node.config.url, 30)}</div>` : ''}
         ${node.type === 'loop' ? `<div style="margin-top:4px;font-size:10px;color:var(--md-on-surface-variant)">${node.config?.loopMode === 'while' ? `While: ${truncate(node.config?.whileCondition || '未配置条件', 22)}` : `ForEach: ${truncate(node.config?.listVar || '未配置列表', 22)}`}</div>` : ''}
