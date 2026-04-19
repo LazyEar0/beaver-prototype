@@ -955,29 +955,131 @@ function parseCronToText(expr) {
 }
 
 function renderTriggerConfig(node) {
-  const tt = node.config?.triggerType || 'manual';
+  // Support multiple trigger types with Tab + independent enable switches (PRD requirement)
+  const enabledTypes = node.config?.enabledTypes || { manual: true, scheduled: false, event: false, webhook: false };
+  // Active tab for configuration detail display
+  const activeTab = node.config?.activeTriggerTab || 'manual';
   const inputParams = node.config?.inputParams || [];
-  return `<div class="config-section">
+
+  const triggerTabs = [
+    { key: 'manual', label: '手动触发', icon: '👆' },
+    { key: 'scheduled', label: '定时触发', icon: '🕐' },
+    { key: 'event', label: '事件触发', icon: '📡' },
+    { key: 'webhook', label: 'Webhook', icon: '🔗' },
+  ];
+
+  const enabledCount = Object.values(enabledTypes).filter(Boolean).length;
+
+  let html = `<div class="config-section">
     <div class="config-section-title">触发方式</div>
-    <div class="config-field">
-      <select class="config-select" value="${tt}" onchange="updateNodeConfig(${node.id}, 'triggerType', this.value); renderDesigner()">
-        <option value="manual" ${tt === 'manual' ? 'selected' : ''}>手动触发</option>
-        <option value="scheduled" ${tt === 'scheduled' ? 'selected' : ''}>定时触发</option>
-        <option value="event" ${tt === 'event' ? 'selected' : ''}>事件触发</option>
-        <option value="webhook" ${tt === 'webhook' ? 'selected' : ''}>Webhook</option>
-      </select>
+    <div class="config-field-help" style="margin-bottom:var(--space-2)">至少启用一种触发方式，可同时启用多种，任一满足即可触发工作流</div>
+    ${enabledCount === 0 ? '<div style="padding:6px 10px;background:var(--md-error-container,rgba(179,38,30,0.1));border-radius:var(--radius-sm);font-size:var(--font-size-xs);color:var(--md-error);margin-bottom:var(--space-2)">⚠ 至少启用一种触发方式</div>' : ''}
+    <div class="trigger-tabs">
+      ${triggerTabs.map(t => {
+        const isEnabled = enabledTypes[t.key];
+        const isActive = activeTab === t.key;
+        return `<div class="trigger-tab${isActive ? ' active' : ''}${isEnabled ? ' enabled' : ''}" onclick="updateNodeConfig(${node.id}, 'activeTriggerTab', '${t.key}'); renderDesigner()">
+          <span class="trigger-tab-icon">${t.icon}</span>
+          <span class="trigger-tab-label">${t.label}</span>
+          <label class="trigger-tab-switch" onclick="event.stopPropagation()">
+            <input type="checkbox" ${isEnabled ? 'checked' : ''} onchange="toggleTriggerType(${node.id}, '${t.key}', this.checked)" />
+            <span class="trigger-tab-switch-slider"></span>
+          </label>
+        </div>`;
+      }).join('')}
     </div>
-    ${tt === 'scheduled' ? (() => {
-      const cronVal = node.config?.cron || '0 0 * * *';
-      const cronText = parseCronToText(cronVal);
+  </div>`;
+
+  // Render the active tab's configuration detail
+  html += `<div class="config-section">
+    <div class="config-section-title">${triggerTabs.find(t => t.key === activeTab)?.icon || ''} ${triggerTabs.find(t => t.key === activeTab)?.label || ''}配置</div>`;
+
+  if (activeTab === 'manual') {
+    html += `<div class="config-field-help" style="margin-bottom:var(--space-2)">适用于需要人工手动启动的场景，如数据处理任务、报表生成、临时数据修复</div>`;
+  }
+
+  if (activeTab === 'scheduled') {
+    const cronMode = node.config?.cronMode || 'simple'; // simple | advanced
+    const cronVal = node.config?.cron || '0 0 * * *';
+    const cronText = parseCronToText(cronVal);
+
+    // Simple mode visual config
+    const freqType = node.config?.schedFreq || 'daily'; // hourly | daily | weekly | monthly
+    const schedMinute = node.config?.schedMinute ?? 0;
+    const schedHour = node.config?.schedHour ?? 8;
+    const schedDays = node.config?.schedDays || [1]; // Mon=1..Sun=7
+    const schedMonthDay = node.config?.schedMonthDay || 1;
+
+    html += `<div class="config-field-help" style="margin-bottom:var(--space-2)">适用于定期执行的任务，如每日凌晨同步数据、每周一发送周报、每月末执行对账</div>
+    <div style="display:flex;gap:6px;margin-bottom:var(--space-2)">
+      <button class="cron-preset-chip${cronMode === 'simple' ? ' active' : ''}" onclick="updateNodeConfig(${node.id}, 'cronMode', 'simple'); renderDesigner()">简单模式</button>
+      <button class="cron-preset-chip${cronMode === 'advanced' ? ' active' : ''}" onclick="updateNodeConfig(${node.id}, 'cronMode', 'advanced'); renderDesigner()">高级模式</button>
+    </div>`;
+
+    if (cronMode === 'simple') {
+      const weekOptions = [
+        { value: 1, label: '周一' }, { value: 2, label: '周二' }, { value: 3, label: '周三' },
+        { value: 4, label: '周四' }, { value: 5, label: '周五' }, { value: 6, label: '周六' }, { value: 7, label: '周日' },
+      ];
+
+      html += `<div class="config-field">
+        <div class="config-field-label">频率类型</div>
+        <select class="config-select" onchange="updateNodeConfig(${node.id}, 'schedFreq', this.value); syncSimpleCron(${node.id})">
+          <option value="hourly" ${freqType === 'hourly' ? 'selected' : ''}>每小时</option>
+          <option value="daily" ${freqType === 'daily' ? 'selected' : ''}>每天</option>
+          <option value="weekly" ${freqType === 'weekly' ? 'selected' : ''}>每周</option>
+          <option value="monthly" ${freqType === 'monthly' ? 'selected' : ''}>每月</option>
+        </select>
+      </div>`;
+
+      if (freqType === 'hourly') {
+        html += `<div class="config-field">
+          <div class="config-field-label">指定分钟</div>
+          <input class="config-input" type="number" min="0" max="59" value="${schedMinute}" onchange="updateNodeConfig(${node.id}, 'schedMinute', parseInt(this.value)); syncSimpleCron(${node.id})" placeholder="0-59" style="width:80px" />
+          <div class="config-field-help">每小时第 N 分钟执行</div>
+        </div>`;
+      } else {
+        html += `<div class="config-field">
+          <div class="config-field-label">指定时间</div>
+          <div style="display:flex;gap:6px;align-items:center">
+            <input class="config-input" type="number" min="0" max="23" value="${schedHour}" onchange="updateNodeConfig(${node.id}, 'schedHour', parseInt(this.value)); syncSimpleCron(${node.id})" placeholder="时" style="width:70px" />
+            <span style="color:var(--md-on-surface-variant)">:</span>
+            <input class="config-input" type="number" min="0" max="59" value="${schedMinute}" onchange="updateNodeConfig(${node.id}, 'schedMinute', parseInt(this.value)); syncSimpleCron(${node.id})" placeholder="分" style="width:70px" />
+          </div>
+        </div>`;
+
+        if (freqType === 'weekly') {
+          html += `<div class="config-field">
+            <div class="config-field-label">选择星期</div>
+            <div class="sched-week-chips">
+              ${weekOptions.map(d => `<span class="sched-week-chip${schedDays.includes(d.value) ? ' active' : ''}" onclick="toggleSchedDay(${node.id}, ${d.value})">${d.label}</span>`).join('')}
+            </div>
+          </div>`;
+        }
+
+        if (freqType === 'monthly') {
+          html += `<div class="config-field">
+            <div class="config-field-label">选择日期</div>
+            <input class="config-input" type="number" min="1" max="31" value="${schedMonthDay}" onchange="updateNodeConfig(${node.id}, 'schedMonthDay', parseInt(this.value)); syncSimpleCron(${node.id})" placeholder="1-31" style="width:80px" />
+          </div>`;
+        }
+      }
+
+      // Show computed cron description
+      const computedCron = node.config?.cron || '0 0 * * *';
+      const computedText = parseCronToText(computedCron);
+      if (computedText) {
+        html += `<div class="cron-description"><span class="cron-description-icon">🕐</span><span>${computedText}</span></div>`;
+      }
+    } else {
+      // Advanced mode: Cron expression
       const presets = [
         { label: '每小时', value: '0 * * * *' },
         { label: '每天', value: '0 0 * * *' },
         { label: '每周一', value: '0 0 * * 1' },
         { label: '每月1号', value: '0 0 1 * *' },
       ];
-      return `
-      <div class="config-field">
+      html += `<div class="config-field">
         <div class="config-field-label">Cron 表达式</div>
         <input class="config-input" id="cron-input-${node.id}" value="${cronVal}" onchange="updateNodeConfig(${node.id}, 'cron', this.value); renderDesigner()" style="font-family:var(--font-family-mono)" placeholder="0 0 * * *" />
         <div class="cron-presets">
@@ -985,22 +1087,67 @@ function renderTriggerConfig(node) {
         </div>
         ${cronText ? `<div class="cron-description"><span class="cron-description-icon">🕐</span><span>${cronText}</span></div>` : ''}
       </div>`;
-    })() : ''}
-    ${tt === 'event' ? `
+    }
+  }
+
+  if (activeTab === 'event') {
+    html += `<div class="config-field-help" style="margin-bottom:var(--space-2)">适用于由外部事件触发的场景，如收到订单创建事件后启动订单处理流程</div>
       <div class="config-field">
         <div class="config-field-label">事件源标识 <span class="required">*</span></div>
-        <input class="config-input" value="${node.config?.eventSource || ''}" onchange="updateNodeConfig(${node.id}, 'eventSource', this.value)" placeholder="输入事件源标识" />
-      </div>` : ''}
-    ${tt === 'webhook' ? `
+        <input class="config-input" value="${escHtml(node.config?.eventSource || '')}" oninput="updateNodeConfig(${node.id}, 'eventSource', this.value)" placeholder="输入事件源标识，如 order.created" />
+        <div class="config-field-help">手动填写事件源标识（MVP 阶段暂无事件源管理功能）；同一工作流内不可重复</div>
+      </div>
+      <div class="config-field">
+        <div class="config-field-label">事件描述</div>
+        <textarea class="config-input" style="min-height:48px;resize:vertical" oninput="updateNodeConfig(${node.id}, 'eventDesc', this.value)" placeholder="对事件源的用途做简要说明，方便理解">${escHtml(node.config?.eventDesc || '')}</textarea>
+      </div>
+      <div class="config-field">
+        <div class="config-field-label">匹配规则</div>
+        <input class="config-input" value="${escHtml(node.config?.eventMatchRule || '')}" oninput="updateNodeConfig(${node.id}, 'eventMatchRule', this.value)" placeholder="事件匹配规则表达式，如 type == 'payment'" style="font-family:var(--font-family-mono)" />
+        <div class="config-field-help">选填，支持表达式语法，用于过滤不需要的事件</div>
+      </div>`;
+  }
+
+  if (activeTab === 'webhook') {
+    const whMethod = node.config?.webhookMethod || 'POST';
+    const whAuth = node.config?.webhookAuth || 'none';
+    html += `<div class="config-field-help" style="margin-bottom:var(--space-2)">适用于第三方系统回调通知，如支付完成回调、外部系统集成通知、表单提交回调</div>
       <div class="config-field">
         <div class="config-field-label">Webhook URL</div>
         <div style="display:flex;gap:6px;align-items:center">
           <input class="config-input" value="https://beaver.didatravel.com/webhook/${designerWf?.code || 'WF'}" readonly style="flex:1;background:var(--md-surface);cursor:text" />
           <button class="btn btn-secondary btn-sm" style="flex-shrink:0" onclick="showToast('success','已复制','Webhook URL已复制到剪贴板')">${icons.copy}</button>
         </div>
-      </div>` : ''}
-  </div>
-  <div class="config-section">
+      </div>
+      <div class="config-field">
+        <div class="config-field-label">URL 别名</div>
+        <input class="config-input" value="${escHtml(node.config?.webhookAlias || '')}" oninput="updateNodeConfig(${node.id}, 'webhookAlias', this.value)" placeholder="如：/order-created，便于识别" />
+        <div class="config-field-help">选填，自定义 URL 路径便于识别和记忆</div>
+      </div>
+      <div class="config-field">
+        <div class="config-field-label">请求方法</div>
+        <select class="config-select" onchange="updateNodeConfig(${node.id}, 'webhookMethod', this.value)">
+          <option value="GET" ${whMethod === 'GET' ? 'selected' : ''}>GET</option>
+          <option value="POST" ${whMethod === 'POST' ? 'selected' : ''}>POST</option>
+          <option value="PUT" ${whMethod === 'PUT' ? 'selected' : ''}>PUT</option>
+          <option value="DELETE" ${whMethod === 'DELETE' ? 'selected' : ''}>DELETE</option>
+        </select>
+      </div>
+      <div class="config-field">
+        <div class="config-field-label">认证方式</div>
+        <select class="config-select" onchange="updateNodeConfig(${node.id}, 'webhookAuth', this.value)">
+          <option value="none" ${whAuth === 'none' ? 'selected' : ''}>无认证</option>
+          <option value="bearer" ${whAuth === 'bearer' ? 'selected' : ''}>Bearer Token</option>
+          <option value="basic" ${whAuth === 'basic' ? 'selected' : ''}>Basic Auth</option>
+          <option value="hmac" ${whAuth === 'hmac' ? 'selected' : ''}>HMAC 签名</option>
+        </select>
+      </div>`;
+  }
+
+  html += `</div>`;
+
+  // Input parameters section (shared across all trigger types)
+  html += `<div class="config-section">
     <div class="config-section-title" style="display:flex;align-items:center;justify-content:space-between">输入参数 <button class="btn btn-ghost btn-sm" style="height:24px;font-size:11px" onclick="addTriggerParam(${node.id})">${icons.plus} 添加</button></div>
     <div class="config-field-help" style="margin-bottom:var(--space-2)">定义触发流程时需要传入的参数，可在后续节点中通过 \${变量名} 引用</div>
     ${inputParams.length === 0 ? '<div style="text-align:center;padding:var(--space-3);color:var(--md-outline);font-size:var(--font-size-xs)">暂无输入参数，点击上方添加按钮</div>' :
@@ -1027,7 +1174,7 @@ function renderTriggerConfig(node) {
           </div>
           <div style="display:flex;align-items:center;gap:6px">
             <label class="trigger-param-required-toggle">
-              <input type="checkbox" ${p.required ? 'checked' : ''} style="accent-color:var(--md-primary);width:12px;height:12px">
+              <input type="checkbox" ${p.required ? 'checked' : ''} onchange="updateTriggerParamField(${node.id},${i},'required',this.checked)" style="accent-color:var(--md-primary);width:12px;height:12px">
               <span>必填</span>
             </label>
             <button class="table-action-btn danger" style="width:20px;height:20px;flex-shrink:0" onclick="removeTriggerParam(${node.id},${i})">${icons.close}</button>
@@ -1066,6 +1213,64 @@ function renderTriggerConfig(node) {
       </div>`;
     }).join('')}
   </div>`;
+  return html;
+}
+
+function toggleTriggerType(nodeId, type, enabled) {
+  const node = designerNodes.find(n => n.id === nodeId);
+  if (!node) return;
+  if (!node.config) node.config = {};
+  if (!node.config.enabledTypes) node.config.enabledTypes = { manual: true, scheduled: false, event: false, webhook: false };
+  node.config.enabledTypes[type] = enabled;
+  // Auto-switch active tab to the one just enabled
+  if (enabled) node.config.activeTriggerTab = type;
+  designerDirty = true;
+  renderDesigner();
+}
+
+function syncSimpleCron(nodeId) {
+  const node = designerNodes.find(n => n.id === nodeId);
+  if (!node?.config) return;
+  const freq = node.config.schedFreq || 'daily';
+  const minute = node.config.schedMinute ?? 0;
+  const hour = node.config.schedHour ?? 0;
+  const days = node.config.schedDays || [1];
+  const monthDay = node.config.schedMonthDay || 1;
+
+  let cron = '';
+  switch (freq) {
+    case 'hourly':
+      cron = `${minute} * * * *`;
+      break;
+    case 'daily':
+      cron = `${minute} ${hour} * * *`;
+      break;
+    case 'weekly':
+      cron = `${minute} ${hour} * * ${days.sort().join(',')}`;
+      break;
+    case 'monthly':
+      cron = `${minute} ${hour} ${monthDay} * *`;
+      break;
+    default:
+      cron = `${minute} ${hour} * * *`;
+  }
+  node.config.cron = cron;
+  designerDirty = true;
+  renderDesigner();
+}
+
+function toggleSchedDay(nodeId, day) {
+  const node = designerNodes.find(n => n.id === nodeId);
+  if (!node?.config) return;
+  if (!node.config.schedDays) node.config.schedDays = [1];
+  const idx = node.config.schedDays.indexOf(day);
+  if (idx >= 0) {
+    // Don't allow removing the last day
+    if (node.config.schedDays.length > 1) node.config.schedDays.splice(idx, 1);
+  } else {
+    node.config.schedDays.push(day);
+  }
+  syncSimpleCron(nodeId);
 }
 
 function addTriggerParam(nodeId) {
@@ -3099,12 +3304,38 @@ function filterQuickSearch(query) {
 }
 
 // --- Variable Management ---
+function renderVarDefaultWidget(type) {
+  const label = `<div class="config-field-label">初始值 <span style="color:var(--md-outline);font-weight:400">（可选）</span></div>`;
+  switch (type) {
+    case 'Integer':
+      return `${label}<input class="config-input" id="newVarDefault" type="number" step="1" placeholder="整数，如 0" />`;
+    case 'Double':
+      return `${label}<input class="config-input" id="newVarDefault" type="number" step="any" placeholder="小数，如 0.0" />`;
+    case 'Boolean':
+      return `${label}<select class="config-select" id="newVarDefault"><option value="">— 不设置 —</option><option value="true">true</option><option value="false">false</option></select>`;
+    case 'DateTime':
+      return `${label}<input class="config-input" id="newVarDefault" type="datetime-local" />`;
+    case 'Object':
+      return `${label}<textarea class="config-input" id="newVarDefault" rows="3" placeholder='JSON 对象，如 {"key":"value"}' style="font-family:var(--font-family-mono);resize:vertical"></textarea>`;
+    case 'File':
+      return `${label}<div style="font-size:var(--font-size-xs);color:var(--md-outline);padding:6px 0">File 类型无初始值</div><input type="hidden" id="newVarDefault" value="" />`;
+    default: // String
+      return `${label}<input class="config-input" id="newVarDefault" type="text" placeholder="字符串，如 hello" />`;
+  }
+}
+
+function updateVarDefaultWidget() {
+  const type = document.getElementById('newVarType').value;
+  const container = document.getElementById('varDefaultContainer');
+  if (container) container.innerHTML = renderVarDefaultWidget(type);
+}
+
 function showAddVariableDialog() {
   showModal(`<div class="modal" style="max-width:420px"><div class="modal-header"><h2 class="modal-title">新增全局变量</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
     <div style="font-size:var(--font-size-xs);color:var(--md-outline);margin-bottom:var(--space-3);line-height:1.5">全局变量独立于节点存在，可在任意节点中读写，适用于跨节点共享状态、计数器、开关等场景。</div>
     <div class="config-field"><div class="config-field-label">变量名 <span class="required">*</span></div><input class="config-input" id="newVarName" placeholder="英文标识符，如 retryCount" style="font-family:var(--font-family-mono)" /></div>
-    <div class="config-field"><div class="config-field-label">数据类型</div><select class="config-select" id="newVarType"><option>String</option><option>Integer</option><option>Double</option><option>Boolean</option><option>DateTime</option><option>Object</option><option>File</option></select></div>
-    <div class="config-field"><div class="config-field-label">初始值 <span style="color:var(--md-outline);font-weight:400">（可选）</span></div><input class="config-input" id="newVarDefault" placeholder="留空则为空值" /></div>
+    <div class="config-field"><div class="config-field-label">数据类型</div><select class="config-select" id="newVarType" onchange="updateVarDefaultWidget()"><option>String</option><option>Integer</option><option>Double</option><option>Boolean</option><option>DateTime</option><option>Object</option><option>File</option></select></div>
+    <div class="config-field" id="varDefaultContainer">${renderVarDefaultWidget('String')}</div>
     <div class="config-field"><div class="config-field-label">描述</div><input class="config-input" id="newVarDesc" placeholder="变量用途描述" /></div>
   </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="addVariable()">添加</button></div></div>`);
 }
