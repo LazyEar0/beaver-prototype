@@ -1475,7 +1475,7 @@ function renderConditionRows(conditions, addFnStr, removeFnPfx, updateFnPfx, nod
               return `<div class="cond-right-wrap" style="position:relative;flex:1">
                 <input id="${rightInputId}" class="cond-right-input" value="${escHtml(cond.right || '')}" placeholder="输入值或引用变量" onchange="${updateFnPfx}${idx},'right',this.value)" style="padding-right:28px;width:100%" />
                 <button class="cond-ref-btn" title="从变量选择器中引用" onclick="showCondVarPicker('${rightInputId}', ${nodeId}, '${updateFnPfx}${idx}')">⊙</button>
-                <div id="${rightInputId}_picker" class="var-picker-dropdown" style="display:none;position:fixed;z-index:9999;max-height:240px;overflow-y:auto;background:var(--md-surface-container-high);border:1px solid var(--md-outline-variant);border-radius:8px;box-shadow:var(--shadow-lg);flex-direction:column;width:280px"></div>
+                <div id="${rightInputId}_picker" class="var-picker-dropdown" style="display:none"></div>
               </div>`;
             })()
         }
@@ -1691,7 +1691,7 @@ function renderDelayConfig(node) {
       <div class="cond-right-wrap" style="position:relative">
         <input id="${targetInputId}" class="config-input" type="text" value="${escHtml(node.config?.delayTarget || '')}" placeholder="输入时间或点击 ⊙ 引用变量" onchange="updateNodeConfig(${node.id}, 'delayTarget', this.value)" style="padding-right:28px;width:100%;font-family:var(--font-family-mono)" />
         <button class="cond-ref-btn" title="引用变量" onclick="showCondVarPicker('${targetInputId}', ${node.id}, 'updateNodeConfig(${node.id},&quot;delayTarget&quot;,')">⊙</button>
-        <div id="${targetInputId}_picker" class="var-picker-dropdown" style="display:none;position:fixed;z-index:9999;max-height:240px;overflow-y:auto;background:var(--md-surface-container-high);border:1px solid var(--md-outline-variant);border-radius:8px;box-shadow:var(--shadow-lg);flex-direction:column;width:280px"></div>
+        <div id="${targetInputId}_picker" class="var-picker-dropdown" style="display:none"></div>
       </div>
       <div class="config-field-help">输入日期时间（如 2025-04-20 18:00）或点击 ⊙ 引用变量，目标时间须大于当前且在 30 天内</div>
     </div>`;
@@ -1761,7 +1761,18 @@ function addAssignment(nodeId) {
   if (!node) return;
   if (!node.config) node.config = {};
   if (!node.config.assignments) node.config.assignments = [];
-  node.config.assignments.push({ target: 'newVar', source: '' });
+  node.config.assignments.push({ target: 'newVar', source: '', type: 'String' });
+  designerDirty = true;
+  renderDesigner();
+}
+
+function removeAssignment(nodeId, index) {
+  const node = designerNodes.find(n => n.id === nodeId);
+  if (!node || !node.config?.assignments) return;
+  node.config.assignments.splice(index, 1);
+  if (node.config.assignments.length === 0) {
+    node.config.assignments = [{ target: 'processedData', source: '', type: 'String' }];
+  }
   designerDirty = true;
   renderDesigner();
 }
@@ -3795,6 +3806,13 @@ function designerKeyHandler(e) {
     return;
   }
 
+  // Alt key for quick-delete mode on connections
+  if (e.key === 'Alt' && !e.repeat) {
+    designerAltDown = true;
+    if (designerHoveredConnId) renderDesigner();
+    return;
+  }
+
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
 
   if (e.key === 'Delete' || e.key === 'Backspace') {
@@ -3823,6 +3841,10 @@ function designerKeyUpHandler(e) {
     designerSpaceDown = false;
     const container = document.getElementById('canvasContainer');
     if (container && !designerIsPanning) container.style.cursor = '';
+  }
+  if (e.key === 'Alt') {
+    designerAltDown = false;
+    if (designerHoveredConnId) renderDesigner();
   }
 }
 
@@ -4492,7 +4514,19 @@ function renderOutputVariablesSection(node) {
       
       ${editableOutputs.length > 0 ? `
         <div class="output-vars-editable">
-          ${editableOutputs.map(o => `
+          ${editableOutputs.map(o => {
+            // 赋值节点的输出变量在赋值规则中编辑，此处只读展示
+            const isAssignNode = node.type === 'assign';
+            const varType = (node.config?.assignments?.find(a => a.target === o.name)?.type) || o.type;
+            return isAssignNode ? `
+            <div class="output-var-item" onclick="copyOutputVarPath('${nodeCode}', '${o.name}')" title="点击复制引用路径">
+              <span class="var-icon type-${varType}" title="${varType}">${varType.charAt(0)}</span>
+              <div class="output-var-info">
+                <div class="output-var-name">${o.name}</div>
+                <div class="output-var-desc-inline">${o.desc}</div>
+              </div>
+              <code class="var-ref-tag">{{${nodeCode}.${o.name}}}</code>
+            </div>` : `
             <div class="output-var-edit-row">
               <div class="output-var-edit-main">
                 <span class="var-icon type-${o.type}" title="${o.type}">${o.type.charAt(0)}</span>
@@ -4506,9 +4540,13 @@ function renderOutputVariablesSection(node) {
                 <code class="var-ref-tag">{{${nodeCode}.${o.name}}}</code>
               </div>
               <div class="output-var-desc">${o.desc}</div>
-            </div>
-          `).join('')}
+            </div>`;
+          }).join('')}
         </div>
+        ${node.type === 'assign' ? `<div class="output-vars-assign-hint">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+          变量名和类型在上方赋值规则中修改
+        </div>` : ''}
       ` : ''}
       
       ${fixedOutputs.length > 0 ? `
@@ -5014,107 +5052,172 @@ function showCondLeftVarPicker(leftInputId, nodeId, updateFnPfx) {
  * 左值选择：路径写入后触发 update 回调（path 是不带 {{}} 的路径）
  */
 function selectCondLeftVar(leftInputId, path, updateFnPfx) {
-  // updateFnPfx 形如 "updateIfCondition(3,0," 
-  // 拼成完整调用：updateIfCondition(3, 0, 'left', 'vars.amount')
   const fn = new Function(`${updateFnPfx}'left',${JSON.stringify(path)})`);
   try { fn(); } catch(e) { console.warn('selectCondLeftVar callback failed', e); }
   const picker = document.getElementById(leftInputId + '_picker');
   if (picker) picker.style.display = 'none';
 }
 
-
 /**
- * 条件行右值的变量选择器（选中后直接替换 input 值，而非光标插入）
- * @param {string} inputId - 目标 input 的 id
- * @param {number} nodeId  - 当前节点 id，用于获取可用变量
- * @param {string} updateFnPfx - 更新回调前缀，选中后自动触发持久化
+ * 内部共用：在 fixed picker 容器里渲染统一变量选择器
+ * @param {HTMLElement} picker      - .var-picker-dropdown 容器
+ * @param {HTMLElement} anchorEl    - 定位锚点元素
+ * @param {Array}       groups      - getAvailableVariables 返回的分组
+ * @param {string}      pickerId    - picker 的 id 前缀（用于 filterVarPicker）
+ * @param {string}      onSelectFn  - 每个 item onclick 调用的全局函数名（字符串）
+ * @param {string}      onSelectArg - 传给该函数的附加参数（字符串，拼接在 ref 后面）
  */
-function showCondVarPicker(inputId, nodeId, updateFnPfx) {
-  const picker = document.getElementById(inputId + '_picker');
-  const input = document.getElementById(inputId);
-  if (!picker || !input) return;
-
-  // 若已打开则关闭
-  if (picker.style.display === 'flex') {
-    picker.style.display = 'none';
-    return;
-  }
-
-  // 计算 input 的屏幕坐标，决定弹出方向
-  const rect = input.getBoundingClientRect();
-  const pickerH = 240;
+function _showCondPickerAt(picker, anchorEl, groups, pickerId, onSelectFn, onSelectArg) {
+  // 智能方向
+  const rect = anchorEl.getBoundingClientRect();
+  const pickerH = 360;
   const spaceBelow = window.innerHeight - rect.bottom;
   const spaceAbove = rect.top;
-
-  picker.style.left = rect.left + 'px';
-  picker.style.width = Math.max(rect.width, 280) + 'px';
-
+  picker.style.left = Math.min(rect.left, window.innerWidth - 360) + 'px';
   if (spaceBelow >= pickerH || spaceBelow >= spaceAbove) {
-    // 向下弹出
     picker.style.top = (rect.bottom + 4) + 'px';
     picker.style.bottom = '';
   } else {
-    // 向上弹出
     picker.style.top = '';
     picker.style.bottom = (window.innerHeight - rect.top + 4) + 'px';
   }
 
-  const groups = getAvailableVariables(nodeId);
+  // 统计来源计数
+  const tabCounts = { all: 0, trigger: 0, node: 0, global: 0, datasource: 0 };
+  groups.forEach(g => {
+    const cnt = g.variables.length;
+    tabCounts.all += cnt;
+    if (tabCounts[g.source] !== undefined) tabCounts[g.source] += cnt;
+  });
+
+  const tabDefs = [
+    { key: 'all',        label: '全部' },
+    { key: 'trigger',    label: '触发器' },
+    { key: 'node',       label: '上游节点' },
+    { key: 'global',     label: '全局变量' },
+    { key: 'datasource', label: '数据源' },
+  ].filter(t => t.key === 'all' || tabCounts[t.key] > 0);
+
+  const tabsHtml = tabDefs.map(t => `
+    <span class="var-picker-tab${t.key === 'all' ? ' active' : ''}"
+          data-tab="${t.key}"
+          onclick="filterVarPickerByTab('${pickerId}', '${t.key}', this)">
+      <span class="tab-dot"></span>${t.label}
+      <span class="tab-count">${tabCounts[t.key]}</span>
+    </span>
+  `).join('');
+
+  // 生成每条 item 的 onclick（直接调用外部传入的选择函数）
+  const groupsForRender = groups.map(group => ({
+    ...group,
+    variables: group.variables.map(v => ({
+      ...v,
+      _selectOnclick: `${onSelectFn}('${pickerId}', '${v.ref.replace(/'/g, "\\'")}' ${onSelectArg ? ', ' + onSelectArg : ''})`
+    }))
+  }));
+
   picker.innerHTML = `
-    <div class="var-picker-search" style="padding:8px;border-bottom:1px solid var(--md-outline-variant)">
-      <input type="text" placeholder="搜索变量..." style="width:100%;padding:4px 8px;border:1px solid var(--md-outline-variant);border-radius:4px;font-size:12px;background:var(--md-surface)" oninput="filterCondVarPicker('${inputId}', this.value)">
+    <div class="var-picker-tabs">${tabsHtml}</div>
+    <div class="var-picker-search">
+      <input type="text" placeholder="搜索变量名或路径..."
+             oninput="filterVarPicker('${pickerId}', this.value)">
     </div>
-    <div id="${inputId}_picker_body" style="overflow-y:auto;max-height:200px">
-      ${groups.length === 0
-        ? '<div style="padding:16px;text-align:center;font-size:12px;color:var(--md-outline)">暂无可用变量</div>'
-        : groups.map(group => `
-          <div class="cond-var-group" data-group="${group.id}">
-            <div style="padding:6px 10px 2px;font-size:10px;font-weight:600;color:var(--md-outline);text-transform:uppercase;letter-spacing:0.05em">${group.name}</div>
-            ${group.variables.map(v => `
-              <div class="cond-var-item" data-ref="${v.ref}" data-path="${v.path}" data-name="${v.name}"
-                   style="padding:5px 10px;cursor:pointer;display:flex;align-items:center;gap:8px;font-size:12px"
-                   onmouseenter="this.style.background='var(--md-surface-container)'"
-                   onmouseleave="this.style.background=''"
-                   onclick="selectCondVar('${inputId}', '${escHtml(v.ref)}', '${updateFnPfx}')">
-                <span style="font-size:10px;font-weight:600;padding:1px 4px;border-radius:3px;background:var(--md-primary-container);color:var(--md-on-primary-container);flex-shrink:0">${v.type.charAt(0)}</span>
-                <div style="flex:1;min-width:0">
-                  <div style="font-weight:500;color:var(--md-on-surface)">${v.name}</div>
-                  <div style="font-size:10px;color:var(--md-outline);font-family:var(--font-family-mono)">${v.path}</div>
-                </div>
-              </div>
-            `).join('')}
-          </div>
-        `).join('')}
+    <div class="var-picker-body" id="${pickerId}_picker_body">
+      ${renderCondPickerGroups(groupsForRender, pickerId)}
     </div>
   `;
   picker.style.display = 'flex';
-  picker.style.flexDirection = 'column';
 
-  // 点击外部关闭
-  const closeOnOutside = (e) => {
-    if (!picker.contains(e.target) && e.target.getAttribute('onclick')?.includes(inputId) === false) {
+  // 聚焦搜索框
+  setTimeout(() => {
+    const s = picker.querySelector('.var-picker-search input');
+    if (s) s.focus();
+  }, 50);
+
+  // 点外部关闭
+  const close = (e) => {
+    if (!picker.contains(e.target)) {
       picker.style.display = 'none';
-      document.removeEventListener('mousedown', closeOnOutside, true);
+      document.removeEventListener('mousedown', close, true);
     }
   };
-  setTimeout(() => document.addEventListener('mousedown', closeOnOutside, true), 0);
+  setTimeout(() => document.addEventListener('mousedown', close, true), 0);
 }
 
-function filterCondVarPicker(inputId, keyword) {
-  const body = document.getElementById(inputId + '_picker_body');
-  if (!body) return;
-  const lowerKw = keyword.toLowerCase();
-  body.querySelectorAll('.cond-var-group').forEach(group => {
-    let hasVisible = false;
-    group.querySelectorAll('.cond-var-item').forEach(item => {
-      const name = (item.dataset.name || '').toLowerCase();
-      const path = (item.dataset.path || '').toLowerCase();
-      const visible = !keyword || name.includes(lowerKw) || path.includes(lowerKw);
-      item.style.display = visible ? '' : 'none';
-      if (visible) hasVisible = true;
-    });
-    group.style.display = hasVisible ? '' : 'none';
-  });
+/**
+ * 为 cond picker 渲染分组（与 renderVarPickerGroups 一致，但 onclick 由外部生成）
+ */
+function renderCondPickerGroups(groups, pickerId) {
+  if (groups.length === 0) {
+    return '<div class="var-picker-empty">暂无可用变量</div>';
+  }
+  const sourceBadgeMap = {
+    trigger:    { label: '触发器', cls: 'source-trigger' },
+    node:       { label: '上游节点', cls: 'source-node' },
+    global:     { label: '全局变量', cls: 'source-global' },
+    datasource: { label: '数据源', cls: 'source-datasource' },
+  };
+  const typeLabel = {
+    String: 'Str', Number: 'Num', Integer: 'Int', Double: 'Dbl',
+    Boolean: 'Bool', Object: 'Obj', Array: 'Arr', File: 'File', DateTime: 'Date'
+  };
+  return groups.map(group => {
+    const badge = sourceBadgeMap[group.source];
+    const badgeHtml = badge
+      ? `<span class="var-picker-source-badge ${badge.cls}">${badge.label}</span>` : '';
+    const chevron = `<svg class="var-picker-group-chevron" viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 6 8 10 12 6"/></svg>`;
+    const itemsHtml = group.variables.map(v => {
+      const tLabel = typeLabel[v.type] || v.type || '?';
+      return `
+        <div class="var-picker-item"
+             data-ref="${v.ref}"
+             data-path="${v.path}"
+             onclick="${v._selectOnclick}">
+          <span class="var-type-tag type-${v.type}" title="${v.type}">${tLabel}</span>
+          <div class="var-info">
+            <div class="var-name">${escHtml(v.name)}</div>
+            <div class="var-path">${escHtml(v.path)}</div>
+            ${v.desc ? `<div class="var-desc">${escHtml(v.desc)}</div>` : ''}
+          </div>
+        </div>`;
+    }).join('');
+    return `
+    <div class="var-picker-group" data-group="${group.id}" data-source="${group.source || ''}">
+      <div class="var-picker-group-header" onclick="toggleVarPickerGroup(this)">
+        <span>${group.name}</span>${badgeHtml}${chevron}
+      </div>
+      <div class="var-picker-items">${itemsHtml}</div>
+    </div>`;
+  }).join('');
+}
+
+/**
+ * 条件行右值变量选择器
+ */
+function showCondVarPicker(inputId, nodeId, updateFnPfx) {
+  const picker = document.getElementById(inputId + '_picker');
+  const input  = document.getElementById(inputId);
+  if (!picker || !input) return;
+
+  if (picker.style.display === 'flex') { picker.style.display = 'none'; return; }
+
+  const groups = getAvailableVariables(nodeId);
+  _showCondPickerAt(picker, input, groups, inputId, 'selectCondVar', JSON.stringify(updateFnPfx));
+}
+
+/**
+ * 条件行左值变量选择器
+ */
+function showCondLeftVarPicker(leftInputId, nodeId, updateFnPfx) {
+  const picker   = document.getElementById(leftInputId + '_picker');
+  const btn      = document.getElementById(leftInputId + '_btn');
+  const anchorEl = btn || document.getElementById(leftInputId);
+  if (!picker || !anchorEl) return;
+
+  if (picker.style.display === 'flex') { picker.style.display = 'none'; return; }
+
+  const groups = getAvailableVariables(nodeId);
+  _showCondPickerAt(picker, anchorEl, groups, leftInputId, 'selectCondLeftVar', JSON.stringify(updateFnPfx));
 }
 
 function selectCondVar(inputId, ref, updateFnPfx) {
@@ -5122,8 +5225,6 @@ function selectCondVar(inputId, ref, updateFnPfx) {
   if (!input) return;
   input.value = ref;
   input.dispatchEvent(new Event('change', { bubbles: true }));
-  // 直接触发持久化回调（updateFnPfx 形如 "updateIfCondition(3,0,'right',"）
-  // 通过 change 事件冒泡已经触发了 onchange，无需额外调用
   const picker = document.getElementById(inputId + '_picker');
   if (picker) picker.style.display = 'none';
 }

@@ -1378,14 +1378,53 @@
   to { stroke-dashoffset: -12; }
 }
 
-/* --- Connection Selected & Hover --- */
+/* --- Connection States --- */
 .connection-selected {
   filter: drop-shadow(0 0 6px rgba(24, 144, 255, 0.4));
 }
 
-.canvas-svg path.connection-selected:hover {
-  stroke-width: 4 !important;
-  filter: drop-shadow(0 0 8px rgba(24, 144, 255, 0.6));
+.connection-hovered {
+  filter: drop-shadow(0 0 4px rgba(24, 144, 255, 0.3));
+}
+
+.connection-alt-delete {
+  stroke-dasharray: 6 4;
+  animation: connectionAltPulse 0.6s ease-in-out infinite;
+  filter: drop-shadow(0 0 6px rgba(220, 38, 38, 0.4));
+}
+
+@keyframes connectionAltPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+/* --- Connection Delete Button (n8n style) --- */
+.conn-delete-btn circle {
+  transition: fill 0.15s, stroke 0.15s;
+}
+
+.conn-delete-btn:hover circle {
+  fill: #fef2f2;
+  stroke: #dc2626;
+}
+
+.conn-delete-btn:hover line {
+  stroke: #b91c1c;
+  stroke-width: 2.5;
+}
+
+/* --- Connection Endpoint Handles (React Flow style) --- */
+.conn-endpoint-handle circle {
+  transition: r 0.15s ease, fill 0.15s ease;
+}
+
+.conn-endpoint-handle:hover circle:first-child {
+  r: 8;
+  fill: #eff6ff;
+}
+
+.conn-endpoint-handle:hover circle:last-child {
+  r: 3.5;
 }
 
 /* --- Connection Context Menu Info --- */
@@ -3473,6 +3512,21 @@
   overflow: hidden;
 }
 
+/* fixed 定位版：用于条件行等无法用 absolute 的场景 */
+.var-picker-dropdown {
+  position: fixed;
+  min-width: 340px;
+  max-width: 420px;
+  max-height: 380px;
+  background: var(--md-surface-container-low);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+  z-index: 9999;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 /* ── 来源 Tab 过滤栏 ── */
 .var-picker-tabs {
   display: flex;
@@ -3926,6 +3980,107 @@
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+/* 赋值节点输出变量只读提示 */
+.output-vars-assign-hint {
+  font-size: 10px;
+  color: var(--md-outline);
+  margin-top: var(--space-2);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px var(--space-2);
+  background: var(--md-surface-container);
+  border-radius: 4px;
+}
+
+/* 赋值规则行 */
+.assign-rule-row {
+  margin-bottom: var(--space-2);
+  padding: var(--space-2);
+  background: var(--md-surface);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 6px;
+  transition: var(--transition-fast);
+}
+
+.assign-rule-row:hover {
+  border-color: var(--md-primary);
+  box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.06);
+}
+
+.assign-rule-main {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.assign-rule-hint {
+  font-size: 10px;
+  color: var(--md-on-surface-variant);
+  margin-top: 4px;
+  padding-left: 4px;
+  opacity: 0.7;
+}
+
+/* 类型选择器 */
+.assign-type-select {
+  height: 30px;
+  padding: 0 4px;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  background: var(--md-surface-container);
+  color: var(--md-primary);
+  outline: none;
+  cursor: pointer;
+  min-width: 68px;
+  transition: var(--transition-fast);
+}
+
+.assign-type-select:hover {
+  border-color: var(--md-primary);
+  background: var(--md-surface-container-high);
+}
+
+.assign-type-select:focus {
+  border-color: var(--md-primary);
+  box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.1);
+}
+
+/* 目标变量名输入框 */
+.assign-target-input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 删除规则按钮 */
+.assign-remove-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  color: var(--md-on-surface-variant);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: var(--transition-fast);
+  opacity: 0.5;
+}
+
+.assign-remove-btn:hover {
+  background: #fee2e2;
+  color: #dc2626;
+  opacity: 1;
+}
+
+.assign-rule-row:hover .assign-remove-btn {
+  opacity: 0.8;
 }
 
 /* Output variable type badges */
