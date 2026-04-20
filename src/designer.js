@@ -872,7 +872,8 @@ function renderRightPanel() {
     content = renderDesignerVersionPanel();
   }
 
-  return `<div class="right-panel ${isOpen ? 'open' : ''}" id="designerRightPanel"><div class="right-panel-resize-handle" id="rightPanelResizeHandle" onmousedown="startRightPanelResize(event)"></div>${content}</div>`;
+  const rpWidthStyle = _rpCurrentWidth !== 360 ? ` style="width:${_rpCurrentWidth}px"` : '';
+  return `<div class="right-panel ${isOpen ? 'open' : ''}" id="designerRightPanel"${rpWidthStyle}><div class="right-panel-resize-handle" id="rightPanelResizeHandle" onmousedown="startRightPanelResize(event)"></div>${content}</div>`;
 }
 
 function renderOverviewPanel() {
@@ -1865,14 +1866,13 @@ function renderCodeConfig(node) {
     </div>
     <div class="config-field">
       <div class="config-field-label">代码</div>
-      ${renderExprEditor({
+      ${renderCodeEditor({
         id: `code_script_${node.id}`,
         value: node.config?.script || '// 处理逻辑\nconst result = input;\nreturn result;',
-        placeholder: '// 在此编写代码，输入 {{ 可快速插入变量',
+        placeholder: '// 在此编写代码，通过 inputs 获取输入数据',
         nodeId: node.id,
         minHeight: 120,
-        label: '代码',
-        hint: '使用 return 返回结果，返回的每个 key 对应一个输出变量',
+        language: node.config?.language || 'JavaScript',
         onChange: `updateNodeConfig(${node.id}, 'script', this.value)`
       })}
       <div class="config-field-help">使用 <code style="background:var(--md-surface-container);padding:0 3px;border-radius:2px">return { key1: val1, key2: val2 }</code> 返回多个输出变量</div>
@@ -3312,6 +3312,7 @@ function deselectNode() {
 
 function closeRightPanel() {
   designerRightPanel = null;
+  _rpCurrentWidth = 360; // reset to default width on close
   renderDesigner();
 }
 
@@ -3834,6 +3835,7 @@ function updateSwitchCondition(nodeId, branchIdx, condIdx, field, value) {
 let _rpResizing = false;
 let _rpStartX = 0;
 let _rpStartWidth = 360;
+let _rpCurrentWidth = 360; // persisted panel width across renders
 
 function startRightPanelResize(e) {
   e.preventDefault();
@@ -3856,6 +3858,7 @@ function _onRpResizeMove(e) {
   if (!panel) return;
   const dx = _rpStartX - e.clientX; // dragging left = wider
   const newWidth = Math.min(720, Math.max(280, _rpStartWidth + dx));
+  _rpCurrentWidth = newWidth; // persist width
   panel.style.width = newWidth + 'px';
   panel.style.transition = 'none';
 }
@@ -4037,19 +4040,99 @@ function exportDesignerJSON() {
 
 function autoLayout() {
   pushUndoState();
-  // Simple auto-layout: arrange nodes left to right
-  let x = 100, y = 120;
-  const sorted = [...designerNodes].sort((a, b) => {
-    if (a.type === 'trigger') return -1;
-    if (b.type === 'trigger') return 1;
-    if (a.type === 'end') return 1;
-    if (b.type === 'end') return -1;
-    return a.id - b.id;
+
+  // --- Hierarchical Layout based on topological sort ---
+  const NODE_W = 200;
+  const NODE_H = 90;
+  const H_GAP = 60;   // horizontal gap between columns
+  const V_GAP = 40;   // vertical gap between rows in the same column
+
+  const nodeMap = {};
+  designerNodes.forEach(n => { nodeMap[n.id] = n; });
+
+  // Build adjacency: successors and predecessors
+  const successors = {};   // nodeId -> [nodeId]
+  const predecessors = {}; // nodeId -> [nodeId]
+  designerNodes.forEach(n => { successors[n.id] = []; predecessors[n.id] = []; });
+  designerConnections.forEach(c => {
+    if (nodeMap[c.from] && nodeMap[c.to]) {
+      successors[c.from].push(c.to);
+      predecessors[c.to].push(c.from);
+    }
   });
 
-  sorted.forEach((node, i) => {
-    node.x = x + (i % 4) * 220;
-    node.y = y + Math.floor(i / 4) * 120;
+  // Kahn's algorithm: assign topological levels (column index)
+  const level = {};
+  const queue = [];
+  const inDegree = {};
+  designerNodes.forEach(n => { inDegree[n.id] = predecessors[n.id].length; });
+  designerNodes.forEach(n => { if (inDegree[n.id] === 0) queue.push(n.id); });
+
+  while (queue.length > 0) {
+    const cur = queue.shift();
+    const curLevel = level[cur] || 0;
+    successors[cur].forEach(nextId => {
+      // Each node's level = max(level of all predecessors) + 1
+      level[nextId] = Math.max(level[nextId] || 0, curLevel + 1);
+      inDegree[nextId]--;
+      if (inDegree[nextId] === 0) queue.push(nextId);
+    });
+  }
+
+  // Fallback for any nodes not yet assigned (isolated / cycles)
+  designerNodes.forEach(n => { if (level[n.id] === undefined) level[n.id] = 0; });
+
+  // Group nodes by level (column)
+  const byLevel = {};
+  designerNodes.forEach(n => {
+    const lv = level[n.id];
+    if (!byLevel[lv]) byLevel[lv] = [];
+    byLevel[lv].push(n);
+  });
+
+  // Sort nodes within each column: put nodes connected from TRUE/main port first
+  Object.values(byLevel).forEach(group => {
+    group.sort((a, b) => {
+      // trigger always first, end always last
+      if (a.type === 'trigger') return -1;
+      if (b.type === 'trigger') return 1;
+      if (a.type === 'end') return 1;
+      if (b.type === 'end') return -1;
+      // prefer nodes whose predecessor connects via 'true' or default port (not 'false')
+      const aFalseParent = predecessors[a.id].some(pid =>
+        designerConnections.some(c => c.from === pid && c.to === a.id && c.fromPort === 'false')
+      );
+      const bFalseParent = predecessors[b.id].some(pid =>
+        designerConnections.some(c => c.from === pid && c.to === b.id && c.fromPort === 'false')
+      );
+      if (aFalseParent && !bFalseParent) return 1;
+      if (!aFalseParent && bFalseParent) return -1;
+      return a.id - b.id;
+    });
+  });
+
+  // Compute x positions per level
+  const levels = Object.keys(byLevel).map(Number).sort((a, b) => a - b);
+  const startX = 80;
+  const startY = 80;
+  const colX = {};
+  let xCursor = startX;
+  levels.forEach(lv => {
+    colX[lv] = xCursor;
+    xCursor += NODE_W + H_GAP;
+  });
+
+  // Assign positions: center the column vertically, branch nodes offset downward
+  levels.forEach(lv => {
+    const group = byLevel[lv];
+    const totalH = group.length * NODE_H + (group.length - 1) * V_GAP;
+    const colCenterY = startY + totalH / 2;
+    let yCursor = colCenterY - totalH / 2;
+    group.forEach(n => {
+      n.x = colX[lv];
+      n.y = yCursor;
+      yCursor += NODE_H + V_GAP;
+    });
   });
 
   renderDesigner();
@@ -6110,8 +6193,268 @@ function renderExprEditor(options) {
 }
 
 /**
- * 处理表达式编辑器输入
+ * 渲染代码节点专用的代码编辑器（非通用表达式编辑器）
+ * 区别于 renderExprEditor：
+ * 1. 没有 {{ 变量引用 }} 的模板语法，而是通过 inputs / getVariable() 访问
+ * 2. 展开弹窗是专用的代码编辑器（左侧变量面板 + 右侧大代码区）
+ * 3. 变量点击插入的是 inputs.xxx 或 getVariable("xxx") 格式
+ * 4. 有行号、等宽字体、代码提示
  */
+function renderCodeEditor(options) {
+  const {
+    id,
+    value = '',
+    placeholder = '',
+    nodeId,
+    minHeight = 100,
+    language = 'JavaScript',
+    onChange = ''
+  } = options;
+  
+  const editorId = `code_${id}_${Date.now()}`;
+  const isJS = language === 'JavaScript';
+  
+  const langTag = isJS 
+    ? '<span class="code-lang-tag js">JS</span>' 
+    : '<span class="code-lang-tag py">PY</span>';
+
+  return `
+    <div class="code-editor-wrapper" data-editor-id="${editorId}">
+      <div class="code-editor-header">
+        ${langTag}
+        <span class="code-editor-lang-label">${language}</span>
+        <button class="code-editor-expand-btn" 
+          onclick="openCodeEditorModal('${editorId}', ${nodeId}, ${JSON.stringify(language).replace(/"/g, '&quot;')})"
+          title="打开代码编辑器">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+            <polyline points="15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+          </svg>
+          展开编辑
+        </button>
+      </div>
+      <textarea 
+        id="${editorId}"
+        class="code-editor-textarea"
+        style="min-height:${minHeight}px"
+        placeholder="${escHtml(placeholder)}"
+        onchange="${onChange}"
+        spellcheck="false"
+      >${escHtml(value)}</textarea>
+    </div>
+  `;
+}
+
+/**
+ * 打开代码节点专用的全屏代码编辑器
+ * 与表达式编辑器 (openExprExpandModal) 的区别：
+ * - 标题显示"代码编辑器"而非"表达式编辑器"
+ * - 变量点击插入 inputs.xxx 格式（JS）或直接用变量名（Python），而非 {{xxx}}
+ * - 左侧面板分为"输入参数"和"可用函数"两部分
+ * - 提示文案面向代码编写
+ */
+function openCodeEditorModal(editorId, nodeId, language) {
+  const origEl = document.getElementById(editorId);
+  const currentValue = origEl ? origEl.value : '';
+
+  const varGroups = getAvailableVariables(nodeId);
+  const isJS = language === 'JavaScript';
+
+  // --- Build variable list ---
+  let varListHtml = '';
+  if (varGroups.length === 0) {
+    varListHtml = '<div style="padding:12px;font-size:11px;color:var(--md-outline)">暂无可用变量</div>';
+  } else {
+    varGroups.forEach(group => {
+      const sourceBadgeMap = {
+        trigger:    { label: '触发器', cls: 'source-trigger' },
+        node:       { label: '上游节点', cls: 'source-node' },
+        global:     { label: '全局变量', cls: 'source-global' },
+        datasource: { label: '数据源', cls: 'source-datasource' },
+      };
+      const badge = sourceBadgeMap[group.source];
+      const badgeHtml = badge
+        ? `<span class="var-picker-source-badge ${badge.cls}" style="margin-left:auto">${badge.label}</span>`
+        : '';
+      varListHtml += `<div class="expr-expand-var-group" data-source="${group.source || ''}">
+        <div class="expr-expand-var-group-label" style="display:flex;align-items:center">${escHtml(group.name)}${badgeHtml}</div>`;
+      group.variables.forEach(v => {
+        // For code editor, clicking inserts the variable in code format
+        // JS: inputs.varName or getVariable("varName") 
+        // Python: inputs["varName"] or get_variable("varName")
+        const codeRef = isJS ? `inputs.${v.path.replace(/^.*\./, '')}` : `inputs["${v.path.replace(/^.*\./, '')}"]`;
+        varListHtml += `<div class="expr-expand-var-item" 
+          onclick="insertCodeVarIntoEditor(${JSON.stringify(codeRef).replace(/"/g, '&quot;')})"
+          title="${escHtml(v.desc || v.path)}">
+          <span class="expr-expand-var-name">${escHtml(v.path)}</span>
+          <span class="expr-expand-var-type">${escHtml(v.type || '')}</span>
+          <span class="expr-expand-var-insert">插入</span>
+        </div>`;
+      });
+      varListHtml += '</div>';
+    });
+  }
+
+  // --- Build available functions list ---
+  const builtinFunctions = isJS ? [
+    { name: 'getVariable(name)', desc: '获取变量', code: 'getVariable("")' },
+    { name: 'setVariable(name, val)', desc: '设置变量', code: 'setVariable("", )' },
+    { name: 'getInput(name)', desc: '获取输入', code: 'getInput("")' },
+    { name: 'getOutputFrom(id, name)', desc: '获取上游输出', code: 'getOutputFrom("", "")' },
+    { name: 'toJson(obj)', desc: '转 JSON 字符串', code: 'toJson()' },
+    { name: 'newGuid()', desc: '生成 GUID', code: 'newGuid()' },
+    { name: 'setOutcome(name)', desc: '设置分支走向', code: 'setOutcome("")' },
+  ] : [
+    { name: 'get_variable(name)', desc: '获取变量', code: 'get_variable("")' },
+    { name: 'set_variable(name, val)', desc: '设置变量', code: 'set_variable("", )' },
+    { name: 'get_input(name)', desc: '获取输入', code: 'get_input("")' },
+    { name: 'to_json(obj)', desc: '转 JSON 字符串', code: 'to_json()' },
+    { name: 'new_guid()', desc: '生成 GUID', code: 'new_guid()' },
+  ];
+
+  let funcListHtml = builtinFunctions.map(fn => `
+    <div class="expr-expand-var-item" 
+      onclick="insertCodeVarIntoEditor(${JSON.stringify(fn.code).replace(/"/g, '&quot;')})"
+      title="${escHtml(fn.desc)}">
+      <span class="expr-expand-var-name" style="color:var(--md-tertiary)">${escHtml(fn.name)}</span>
+      <span class="expr-expand-var-type">${escHtml(fn.desc)}</span>
+      <span class="expr-expand-var-insert">插入</span>
+    </div>
+  `).join('');
+
+  const langTag = isJS 
+    ? '<span class="code-lang-tag js" style="margin-right:8px">JS</span>' 
+    : '<span class="code-lang-tag py" style="margin-right:8px">PY</span>';
+
+  const hintHtml = isJS
+    ? `<span class="expr-expand-editor-hint">通过 <code>inputs</code> 获取输入数据，使用 <code>return</code> 返回结果 · Ctrl+Enter 确认</span>`
+    : `<span class="expr-expand-editor-hint">通过 <code>inputs</code> 获取输入数据，使用 <code>return</code> 返回结果 · Ctrl+Enter 确认</span>`;
+
+  const modalHtml = `
+  <div class="expr-expand-overlay" id="exprExpandOverlay" onclick="handleExpandOverlayClick(event)">
+    <div class="expr-expand-modal" onclick="event.stopPropagation()">
+      <div class="expr-expand-header">
+        <div class="expr-expand-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15">
+            <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>
+          </svg>
+          ${langTag} 代码编辑器
+        </div>
+        <div class="expr-expand-header-actions">
+          <button class="expr-expand-close" onclick="closeCodeEditorModal('${editorId}', false)" title="取消（Esc）">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+      <div class="expr-expand-body">
+        <div class="expr-expand-vars">
+          <div class="expr-expand-vars-header">可用变量</div>
+          <div class="expr-expand-vars-list" id="exprExpandVarList">
+            ${varListHtml}
+          </div>
+          <div class="expr-expand-vars-header" style="margin-top:8px">内置函数</div>
+          <div class="expr-expand-vars-list">
+            ${funcListHtml}
+          </div>
+        </div>
+        <div class="expr-expand-editor-area">
+          <div class="expr-expand-editor-toolbar">
+            ${hintHtml}
+          </div>
+          <textarea 
+            id="codeExpandTextarea"
+            class="expr-expand-textarea code-expand-textarea"
+            placeholder="${isJS ? '// 在此编写 JavaScript 代码' : '# 在此编写 Python 代码'}"
+            onkeydown="handleCodeExpandKeydown(event)"
+            spellcheck="false"
+          >${escHtml(currentValue)}</textarea>
+        </div>
+      </div>
+      <div class="expr-expand-footer">
+        <button class="btn-ghost" onclick="closeCodeEditorModal('${editorId}', false)">取消</button>
+        <button class="btn-primary" onclick="closeCodeEditorModal('${editorId}', true)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="13" height="13">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+          确认
+        </button>
+      </div>
+    </div>
+  </div>`;
+
+  const container = document.createElement('div');
+  container.id = 'codeExpandContainer';
+  container.innerHTML = modalHtml;
+  document.body.appendChild(container);
+
+  const ta = document.getElementById('codeExpandTextarea');
+  if (ta) {
+    ta.focus();
+    ta.setSelectionRange(ta.value.length, ta.value.length);
+  }
+
+  _codeExpandState = { editorId };
+  document.addEventListener('keydown', _onCodeExpandEsc);
+}
+
+/**
+ * 代码编辑器 Esc 关闭
+ */
+let _codeExpandState = null;
+function _onCodeExpandEsc(e) {
+  if (e.key === 'Escape') closeCodeEditorModal(null, false);
+}
+
+/**
+ * 关闭代码编辑器弹窗
+ */
+function closeCodeEditorModal(editorId, confirm) {
+  // If called from Esc handler, use saved state
+  if (!editorId && _codeExpandState) editorId = _codeExpandState.editorId;
+  
+  const container = document.getElementById('codeExpandContainer');
+  if (!container) return;
+
+  if (confirm) {
+    const ta = document.getElementById('codeExpandTextarea');
+    const origEl = document.getElementById(editorId);
+    if (ta && origEl) {
+      origEl.value = ta.value;
+      origEl.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  }
+
+  document.removeEventListener('keydown', _onCodeExpandEsc);
+  container.remove();
+  _codeExpandState = null;
+}
+
+/**
+ * 在代码编辑器中插入变量引用（代码格式）
+ */
+function insertCodeVarIntoEditor(codeRef) {
+  const ta = document.getElementById('codeExpandTextarea');
+  if (!ta) return;
+  const start = ta.selectionStart;
+  const end = ta.selectionEnd;
+  const before = ta.value.substring(0, start);
+  const after = ta.value.substring(end);
+  ta.value = before + codeRef + after;
+  const pos = start + codeRef.length;
+  ta.focus();
+  ta.setSelectionRange(pos, pos);
+}
+
+/**
+ * 代码编辑器键盘事件：Ctrl/Cmd+Enter 确认
+ */
+function handleCodeExpandKeydown(event) {
+  if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+    event.preventDefault();
+    closeCodeEditorModal(null, true);
+  }
+}
 function handleExprInput(event, editorId, nodeId) {
   const editor = event.target;
   const value = editor.value;
@@ -6985,7 +7328,7 @@ function openExprExpandModal(editorId, nodeId, label, hint) {
         <div class="expr-expand-var-group-label" style="display:flex;align-items:center">${escHtml(group.name)}${badgeHtml}</div>`;
       group.variables.forEach(v => {
         varListHtml += `<div class="expr-expand-var-item" 
-          onclick="insertVarIntoExpandModal(${JSON.stringify(v.ref)})"
+          onclick="insertVarIntoExpandModal(${JSON.stringify(v.ref).replace(/"/g, '&quot;')})"
           title="${escHtml(v.desc || v.ref)}">
           <span class="expr-expand-var-name">${escHtml(v.path)}</span>
           <span class="expr-expand-var-type">${escHtml(v.type || '')}</span>
