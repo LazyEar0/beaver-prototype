@@ -933,10 +933,12 @@ function renderNodeConfigPanel() {
   const nt = nodeTypes.find(t => t.type === node.type) || {};
   const hasAdvancedValues = checkHasAdvancedValues(node);
   const isAdvanced = designerActiveConfigTab === 'advanced';
+  const canConvert = node.type !== 'trigger' && node.type !== 'end';
 
   return `
     <div class="right-panel-header">
       <span class="right-panel-title"><span class="canvas-node-icon ${nt.color || ''}" style="width:22px;height:22px;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;font-size:11px">${nt.icon || ''}</span> ${node.name}</span>
+      ${canConvert ? `<button class="node-type-convert-btn" onclick="showConvertNodeMenu(${node.id})" title="切换节点类型">🔄</button>` : ''}
       <button class="right-panel-close" onclick="deselectNode()">${icons.close}</button>
     </div>
     <div class="right-panel-tabs">
@@ -4066,6 +4068,74 @@ function enterDebugMode() {
     return;
   }
 
+  // Check if trigger node has input parameters → show input form first
+  const triggerNode = designerNodes.find(n => n.type === 'trigger');
+  const inputParams = triggerNode?.config?.inputParams || [];
+  if (inputParams.length > 0) {
+    showDebugInputModal(inputParams);
+    return;
+  }
+
+  // No input params → start debug directly
+  startDebugExecution();
+}
+
+// --- Debug Input Parameter Modal ---
+function showDebugInputModal(inputParams) {
+  const wf = designerWf;
+  const fieldTypeToType = { shortText: 'String', longText: 'String', number: 'Integer', toggle: 'Boolean', datetime: 'DateTime', file: 'File', json: 'Object' };
+  // Convert trigger inputParams to the format expected by buildWfInputFormHtml
+  const inputs = inputParams.map(p => ({
+    name: p.name,
+    label: p.label || p.name,
+    type: fieldTypeToType[p.fieldType || 'shortText'] || 'String',
+    required: !!p.required,
+    desc: p.desc || '',
+    placeholder: p.placeholder || ''
+  }));
+  const reqCount = inputs.filter(i => i.required).length;
+  const optCount = inputs.length - reqCount;
+  const formHtml = buildWfInputFormHtml(inputs);
+
+  showModal(`<div class="modal" style="max-width:560px"><div class="modal-header"><h2 class="modal-title">调试工作流</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body" style="padding-bottom:0">
+    <div class="exec-wf-info">
+      <div class="exec-wf-info-icon">${icons.workflow}</div>
+      <div class="exec-wf-info-details">
+        <div class="exec-wf-info-name">${wf?.name || '工作流'}</div>
+        <div class="exec-wf-info-meta">${icons.hash} ${wf?.code || ''} · 草稿 · 模拟触发</div>
+      </div>
+    </div>
+    <div style="height:var(--space-3)"></div>
+    <div class="debug-trigger-notice">
+      <span class="debug-trigger-notice-icon">${icons.alertTriangle}</span>
+      <span>调试模式下，定时/事件/Webhook 触发均为模拟触发，不监听真实外部事件</span>
+    </div>
+    <div style="height:var(--space-3)"></div>
+    <div class="exec-wf-params-header"><span class="exec-wf-params-title">${icons.settings} 输入参数</span><span class="exec-wf-params-count">${reqCount > 0 ? `${reqCount} 项必填` : ''}${reqCount > 0 && optCount > 0 ? '，' : ''}${optCount > 0 ? `${optCount} 项选填` : ''}</span></div>
+    <div class="wf-input-form">${formHtml}</div>
+  </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="confirmDebugWithInputs()">${icons.play} 开始调试</button></div></div>`);
+}
+
+function confirmDebugWithInputs() {
+  const triggerNode = designerNodes.find(n => n.type === 'trigger');
+  const inputParams = triggerNode?.config?.inputParams || [];
+  const fieldTypeToType = { shortText: 'String', longText: 'String', number: 'Integer', toggle: 'Boolean', datetime: 'DateTime', file: 'File', json: 'Object' };
+  const inputs = inputParams.map(p => ({
+    name: p.name,
+    label: p.label || p.name,
+    type: fieldTypeToType[p.fieldType || 'shortText'] || 'String',
+    required: !!p.required,
+    desc: p.desc || ''
+  }));
+  if (inputs.length > 0 && !validateWfInputs(inputs)) {
+    showToast('error', '参数校验失败', '请填写所有必填参数');
+    return;
+  }
+  closeModal();
+  startDebugExecution();
+}
+
+function startDebugExecution() {
   designerDebugMode = true;
   designerDebugLog = [];
 
@@ -4548,11 +4618,12 @@ function renderContextMenu() {
   const node = designerNodes.find(n => n.id === m.nodeId);
   if (!node) return '';
   const isPlaceholder = node.type === 'placeholder';
+  const canConvert = node.type !== 'trigger' && node.type !== 'end';
   return `<div class="designer-context-menu" style="left:${m.x}px;top:${m.y}px" onclick="event.stopPropagation()">
     <div class="context-menu-item" onclick="designerCopyNodes();closeContextMenu()">${icons.copy || icons.clipboard} 复制节点 <span class="context-menu-shortcut">Ctrl+C</span></div>
     <div class="context-menu-item" onclick="duplicateNode(${m.nodeId});closeContextMenu()">${icons.copy || icons.clipboard} 复制为副本</div>
     <div class="context-menu-divider"></div>
-    ${isPlaceholder ? `<div class="context-menu-item" onclick="showConvertNodeMenu(${m.nodeId})">🔄 转换为… <span style="margin-left:auto">▸</span></div><div class="context-menu-divider"></div>` : ''}
+    ${canConvert ? `<div class="context-menu-item" onclick="showConvertNodeMenu(${m.nodeId})">🔄 转换为… <span style="margin-left:auto">▸</span></div><div class="context-menu-divider"></div>` : ''}
     <div class="context-menu-item" onclick="toggleBreakpoint(${m.nodeId});closeContextMenu()">${node._breakpoint ? icons.xCircle : '🔴'} ${node._breakpoint ? '移除断点' : '设置断点'} </div>
     ${designerConnections.filter(c => c.to === m.nodeId).length > 1 && node.type !== 'end' ? `<div class="context-menu-item" onclick="showMergeStrategyConfig(${m.nodeId});closeContextMenu()">🔀 汇合策略</div>` : ''}
     <div class="context-menu-divider"></div>
@@ -4627,26 +4698,319 @@ function duplicateNode(nodeId) {
 }
 
 function showConvertNodeMenu(nodeId) {
-  const convertTypes = nodeTypes.filter(t => t.type !== 'placeholder' && t.type !== 'trigger' && t.type !== 'end');
-  const listHtml = convertTypes.map(t => `<div class="context-menu-item" onclick="convertNodeTo(${nodeId},'${t.type}');closeModal()">${t.icon} ${t.name}</div>`).join('');
-  showModal(`<div class="modal" style="max-width:320px"><div class="modal-header"><h2 class="modal-title">转换节点类型</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body" style="padding:0;max-height:320px;overflow-y:auto">
+  const node = designerNodes.find(n => n.id === nodeId);
+  if (!node) return;
+  const currentType = node.type;
+  // Filter out trigger, end, placeholder, and current type
+  const convertTypes = nodeTypes.filter(t => t.type !== 'placeholder' && t.type !== 'trigger' && t.type !== 'end' && t.type !== currentType);
+
+  // Categorize by same category for better UX
+  const currentNt = nodeTypes.find(t => t.type === currentType) || {};
+  const currentCategory = currentNt.category || '';
+  const sameCategory = convertTypes.filter(t => t.category === currentCategory);
+  const otherCategory = convertTypes.filter(t => t.category !== currentCategory);
+
+  let listHtml = '';
+  if (sameCategory.length > 0) {
+    listHtml += `<div class="convert-category-label">同类节点</div>`;
+    listHtml += sameCategory.map(t => {
+      const migratable = getMigrationHint(currentType, t.type);
+      return `<div class="context-menu-item convert-item" onclick="confirmConvertNode(${nodeId},'${t.type}')">
+        <span class="convert-item-icon ${t.color || ''}">${t.icon}</span>
+        <span class="convert-item-info">
+          <span class="convert-item-name">${t.name}</span>
+          <span class="convert-item-hint">${migratable}</span>
+        </span>
+      </div>`;
+    }).join('');
+  }
+  if (otherCategory.length > 0) {
+    if (sameCategory.length > 0) listHtml += `<div class="convert-category-label">其他类型</div>`;
+    listHtml += otherCategory.map(t => {
+      const migratable = getMigrationHint(currentType, t.type);
+      return `<div class="context-menu-item convert-item" onclick="confirmConvertNode(${nodeId},'${t.type}')">
+        <span class="convert-item-icon ${t.color || ''}">${t.icon}</span>
+        <span class="convert-item-info">
+          <span class="convert-item-name">${t.name}</span>
+          <span class="convert-item-hint">${migratable}</span>
+        </span>
+      </div>`;
+    }).join('');
+  }
+
+  showModal(`<div class="modal" style="max-width:360px"><div class="modal-header"><h2 class="modal-title">🔄 转换节点类型</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div>
+    <div style="padding:8px 16px 0;font-size:11px;color:var(--md-on-surface-variant)">当前类型：${currentNt.icon || ''} ${currentNt.name || currentType}</div>
+    <div class="modal-body" style="padding:4px 0;max-height:360px;overflow-y:auto">
     ${listHtml}
-  </div></div>`);
+  </div></div>`, { allowBackdropClose: true });
   closeContextMenu();
+}
+
+// --- Migration hint for each type pair ---
+function getMigrationHint(fromType, toType) {
+  // Same category — likely partial migration
+  const fromNt = nodeTypes.find(t => t.type === fromType) || {};
+  const toNt = nodeTypes.find(t => t.type === toType) || {};
+  if (fromNt.category === toNt.category && fromNt.category === '流程控制') {
+    if ((fromType === 'if' && toType === 'switch') || (fromType === 'switch' && toType === 'if')) {
+      return '✅ 可保留条件配置';
+    }
+    return '⚠️ 部分配置可保留';
+  }
+  if (fromNt.category === toNt.category) {
+    return '⚠️ 部分配置可保留';
+  }
+  return '❌ 配置将重置';
+}
+
+// --- Smart config migration ---
+function migrateNodeConfig(oldType, oldConfig, newType) {
+  const newConfig = {};
+
+  // IF → Switch: migrate condition to branch
+  if (oldType === 'if' && newType === 'switch') {
+    const mode = oldConfig.mode || 'expr';
+    newConfig.mode = mode;
+    if (mode === 'visual' && oldConfig.conditions) {
+      // Migrate first condition as case0
+      newConfig.branches = [
+        { name: '条件分支', condition: oldConfig.conditions[0] || {} }
+      ];
+    } else {
+      newConfig.branches = [
+        { name: '条件分支', condition: oldConfig.condition || '' }
+      ];
+    }
+    newConfig.matchMode = oldConfig.matchMode || 'first';
+    return { config: newConfig, migratedFields: ['条件配置'], lostFields: [] };
+  }
+
+  // Switch → IF: migrate first branch condition
+  if (oldType === 'switch' && newType === 'if') {
+    const mode = oldConfig.mode || 'expr';
+    newConfig.mode = mode;
+    const branches = oldConfig.branches || [];
+    if (branches.length > 0 && mode === 'visual' && branches[0].condition) {
+      newConfig.conditions = [branches[0].condition];
+    } else {
+      newConfig.condition = branches[0]?.condition || '';
+    }
+    const lost = branches.length > 1 ? [`${branches.length - 1} 个多余分支`] : [];
+    return { config: newConfig, migratedFields: ['首个分支条件'], lostFields: lost };
+  }
+
+  // HTTP → MQ: preserve some generic fields
+  if (oldType === 'http' && newType === 'mq') {
+    if (oldConfig.headers) newConfig.headers = oldConfig.headers;
+    return { config: newConfig, migratedFields: ['请求头'], lostFields: ['URL', '方法', '请求体'] };
+  }
+
+  // Assign → Code: migrate variable assignments as comment hint
+  if (oldType === 'assign' && newType === 'code') {
+    const assignments = oldConfig.assignments || [];
+    if (assignments.length > 0) {
+      const varNames = assignments.map(a => a.name).filter(Boolean);
+      newConfig.language = 'JavaScript';
+      newConfig.script = `// 原赋值变量: ${varNames.join(', ')}\n`;
+      newConfig.outputVars = assignments.map(a => ({ name: a.name || '', type: a.type || 'String', desc: a.desc || '' }));
+      return { config: newConfig, migratedFields: ['变量名', '输出变量'], lostFields: ['赋值表达式'] };
+    }
+    return { config: newConfig, migratedFields: [], lostFields: ['赋值配置'] };
+  }
+
+  // Delay → other logic: preserve nothing specific
+  if (oldType === 'delay') {
+    return { config: newConfig, migratedFields: [], lostFields: ['延迟配置'] };
+  }
+
+  // Loop → IF: condition might be reusable
+  if (oldType === 'loop' && newType === 'if') {
+    if (oldConfig.condition) {
+      newConfig.condition = oldConfig.condition;
+      return { config: newConfig, migratedFields: ['循环条件表达式'], lostFields: ['循环体配置'] };
+    }
+    return { config: newConfig, migratedFields: [], lostFields: ['循环配置'] };
+  }
+
+  // Code → Assign: output vars might be reusable
+  if (oldType === 'code' && newType === 'assign') {
+    const outputVars = oldConfig.outputVars || [];
+    if (outputVars.length > 0) {
+      newConfig.assignments = outputVars.map(v => ({ name: v.name || '', type: v.type || 'String', desc: v.desc || '', source: '' }));
+      return { config: newConfig, migratedFields: ['输出变量'], lostFields: ['脚本代码'] };
+    }
+    return { config: newConfig, migratedFields: [], lostFields: ['代码配置'] };
+  }
+
+  // Default: no migration
+  return { config: newConfig, migratedFields: [], lostFields: ['全部配置'] };
+}
+
+// --- Port remapping when converting node type ---
+function remapConnectionsAfterConvert(nodeId, oldType, newType) {
+  // Port mapping rules:
+  // IF: outputs = true, false
+  // Switch: outputs = case0, case1, ..., caseDefault
+  // Loop: outputs = loop, done
+  // Others: outputs = out
+  // Input is always 'in'
+
+  const outConns = designerConnections.filter(c => c.from === nodeId);
+
+  outConns.forEach(conn => {
+    const fp = conn.fromPort || 'out';
+
+    // Map from specific output ports to generic 'out'
+    if (newType !== 'if' && newType !== 'switch' && newType !== 'loop') {
+      // Target type has only 'out' port
+      if (fp !== 'out') {
+        conn.fromPort = 'out';
+        conn.label = '';
+      }
+    }
+
+    // IF → Switch: true→case0, false→case1
+    if (oldType === 'if' && newType === 'switch') {
+      if (fp === 'true') { conn.fromPort = 'case0'; conn.label = '分支1'; }
+      else if (fp === 'false') { conn.fromPort = 'case1'; conn.label = '分支2'; }
+    }
+
+    // Switch → IF: case0→true, case1→false, others→true
+    if (oldType === 'switch' && newType === 'if') {
+      if (fp === 'case0') { conn.fromPort = 'true'; conn.label = 'TRUE'; }
+      else if (fp === 'case1') { conn.fromPort = 'false'; conn.label = 'FALSE'; }
+      else if (fp.startsWith('case') || fp === 'caseDefault') { conn.fromPort = 'true'; conn.label = 'TRUE'; }
+    }
+
+    // Loop → other: loop→out, done→out (merge into single output)
+    if (oldType === 'loop' && newType !== 'loop') {
+      if (fp === 'loop' || fp === 'done') {
+        conn.fromPort = 'out';
+        conn.label = '';
+      }
+    }
+
+    // Any → Loop: out→done (main flow goes to 'done', user reconnects 'loop' manually)
+    if (newType === 'loop' && oldType !== 'loop') {
+      if (fp === 'out' || fp === 'true' || fp === 'false') {
+        conn.fromPort = 'done';
+        conn.label = '完成';
+      }
+    }
+  });
+}
+
+// --- Confirm conversion dialog ---
+function confirmConvertNode(nodeId, newType) {
+  const node = designerNodes.find(n => n.id === nodeId);
+  if (!node) return;
+  const oldType = node.type;
+  const newNt = nodeTypes.find(t => t.type === newType);
+  if (!newNt) return;
+
+  // Skip confirmation for placeholder (no config to lose)
+  if (oldType === 'placeholder') {
+    convertNodeTo(nodeId, newType);
+    return;
+  }
+
+  const migration = migrateNodeConfig(oldType, node.config || {}, newType);
+  const hasMigrated = migration.migratedFields.length > 0;
+  const hasLost = migration.lostFields.length > 0;
+
+  // Build warning message
+  let warningHtml = '';
+  if (hasMigrated) {
+    warningHtml += `<div class="convert-warn-item convert-warn-keep">✅ 保留: ${migration.migratedFields.join('、')}</div>`;
+  }
+  if (hasLost) {
+    warningHtml += `<div class="convert-warn-item convert-warn-lose">⚠️ 丢失: ${migration.lostFields.join('、')}</div>`;
+  }
+  if (!hasMigrated && !hasLost) {
+    warningHtml += `<div class="convert-warn-item convert-warn-lose">⚠️ 当前节点无配置，转换后需重新配置</div>`;
+  }
+
+  // Check connections that will be affected
+  const affectedConns = designerConnections.filter(c => c.from === nodeId);
+  let connWarningHtml = '';
+  if (affectedConns.length > 0) {
+    const portMap = getPortRemapSummary(oldType, newType);
+    if (portMap) {
+      connWarningHtml = `<div class="convert-warn-section">连线变更</div>${portMap}`;
+    }
+  }
+
+  showModal(`<div class="modal" style="max-width:380px">
+    <div class="modal-header">
+      <h2 class="modal-title">🔄 确认转换</h2>
+      <button class="modal-close" onclick="closeModal()">${icons.close}</button>
+    </div>
+    <div class="modal-body" style="padding:16px">
+      <div style="font-size:13px;color:var(--md-on-surface);margin-bottom:12px">
+        将 <strong>${node.name}</strong> 从
+        <span class="convert-type-badge ${(nodeTypes.find(t=>t.type===oldType)||{}).color||''}">${(nodeTypes.find(t=>t.type===oldType)||{}).icon||''} ${(nodeTypes.find(t=>t.type===oldType)||{}).name||oldType}</span>
+        转换为
+        <span class="convert-type-badge ${newNt.color||''}">${newNt.icon} ${newNt.name}</span>
+      </div>
+      <div class="convert-warn-box">
+        <div class="convert-warn-section">配置迁移</div>
+        ${warningHtml}
+      </div>
+      ${connWarningHtml ? `<div class="convert-warn-box">${connWarningHtml}</div>` : ''}
+      <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end">
+        <button class="btn btn-ghost btn-sm" onclick="closeModal()">取消</button>
+        <button class="btn btn-primary btn-sm" onclick="convertNodeTo(${nodeId},'${newType}');closeModal()">确认转换</button>
+      </div>
+    </div>
+  </div>`, { allowBackdropClose: true });
+}
+
+// --- Port remap summary for confirmation dialog ---
+function getPortRemapSummary(oldType, newType) {
+  const map = [];
+  if (oldType === 'if' && newType === 'switch') {
+    map.push({ from: 'TRUE', to: '分支1 (case0)' });
+    map.push({ from: 'FALSE', to: '分支2 (case1)' });
+  } else if (oldType === 'switch' && newType === 'if') {
+    map.push({ from: 'Case 分支', to: 'TRUE / FALSE' });
+  } else if (oldType === 'loop') {
+    map.push({ from: '循环体 / 完成', to: '输出 (out)' });
+  } else if (newType === 'loop') {
+    map.push({ from: '输出', to: '完成 (done)' });
+  } else if (oldType === 'if' || oldType === 'switch') {
+    map.push({ from: '分支端口', to: '输出 (out)' });
+  }
+
+  if (map.length === 0) return '';
+  return map.map(m => `<div class="convert-warn-item convert-warn-remap">${m.from} → ${m.to}</div>`).join('');
 }
 
 function convertNodeTo(nodeId, newType) {
   const node = designerNodes.find(n => n.id === nodeId);
   const nt = nodeTypes.find(t => t.type === newType);
   if (!node || !nt) return;
+
+  const oldType = node.type;
+  const oldConfig = { ...node.config };
+
+  // Smart config migration
+  const migration = migrateNodeConfig(oldType, oldConfig, newType);
+
   node.type = newType;
   node.name = nt.name;
   node.code = nt.code + '_' + nodeId;
-  node.config = {};
+  node.config = migration.config;
+
+  // Remap connections
+  remapConnectionsAfterConvert(nodeId, oldType, newType);
+
   designerDirty = true;
   closeModal();
   renderDesigner();
-  showToast('success', '节点已转换', `${node.name}`);
+
+  // Show result toast
+  const migratedInfo = migration.migratedFields.length > 0 ? `已保留: ${migration.migratedFields.join('、')}` : '';
+  showToast('success', '节点已转换', `${node.name}${migratedInfo ? ' · ' + migratedInfo : ''}`);
 }
 
 // --- Toggle Functions ---
