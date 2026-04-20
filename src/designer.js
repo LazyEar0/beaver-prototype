@@ -2502,6 +2502,35 @@ function renderSubWfConfig(node) {
   const upstreamPreview = renderUpstreamOutputPreview(node.id);
   const outputVarsSection = renderOutputVariablesSection(node);
 
+  // Workflow output variable declarations (similar to code node)
+  if (!node.config.wfOutputVars) {
+    node.config.wfOutputVars = [{ name: node.config.outputVar || 'wfResult', type: 'Object', desc: '被调用工作流的返回结果' }];
+  }
+  const wfOutputVars = node.config.wfOutputVars;
+  const wfTypeOptions = ['String', 'Number', 'Boolean', 'Object', 'Array', 'DateTime'];
+  
+  const wfOutputDeclHtml = `
+    <div class="config-section" style="margin-top:var(--space-2)">
+      <div class="config-section-title" style="display:flex;align-items:center;justify-content:space-between">
+        输出变量声明
+        <button class="btn btn-ghost btn-sm" style="height:24px;font-size:11px" onclick="addWfOutputVar(${node.id})">${icons.plus} 添加</button>
+      </div>
+      <div class="config-field-help" style="margin-bottom:var(--space-2)">声明目标工作流返回的变量名和类型，下游节点可通过 <code style="background:var(--md-surface-container);padding:0 3px;border-radius:2px">{{${node.code}.变量名}}</code> 引用</div>
+      ${wfOutputVars.map((v, i) => {
+        const curType = v.type || 'Object';
+        return `
+      <div class="code-output-var-row">
+        <span class="var-icon type-${curType}" title="${curType}">${curType.charAt(0)}</span>
+        <input class="config-input" style="flex:1;height:28px;font-size:11px;font-family:var(--font-family-mono)" placeholder="变量名" value="${escHtml(v.name)}" onchange="updateWfOutputVar(${node.id}, ${i}, 'name', this.value); renderDesigner()" />
+        <select class="assign-type-select" title="变量类型" style="height:28px;font-size:11px" onchange="updateWfOutputVar(${node.id}, ${i}, 'type', this.value); renderDesigner()">
+          ${wfTypeOptions.map(t => `<option value="${t}"${curType === t ? ' selected' : ''}>${t}</option>`).join('')}
+        </select>
+        <input class="config-input" style="flex:1;height:28px;font-size:11px" placeholder="描述" value="${escHtml(v.desc || '')}" onchange="updateWfOutputVar(${node.id}, ${i}, 'desc', this.value)" />
+        ${wfOutputVars.length > 1 ? `<button class="table-action-btn danger" style="width:22px;height:22px;flex-shrink:0" onclick="removeWfOutputVar(${node.id}, ${i})">${icons.close}</button>` : ''}
+      </div>`;
+      }).join('')}
+    </div>`;
+
   const inputMappingHtml = targetWf
     ? (inputMapping.length > 0
       ? inputMapping.map((m, i) => {
@@ -2549,11 +2578,7 @@ function renderSubWfConfig(node) {
       <div class="config-field-help" style="margin-bottom:var(--space-2)">将当前流程变量映射为目标工作流的输入参数${targetWf ? '，必填项需提供值' : ''}</div>
       ${inputMappingHtml}
     </div>
-    <div class="config-field">
-      <div class="config-field-label">输出变量名</div>
-      <input class="config-input" value="${node.config?.outputVar || 'wfResult'}" style="font-family:var(--font-family-mono)" onchange="updateNodeConfig(${node.id}, 'outputVar', this.value)" />
-      <div class="config-field-help">目标工作流的执行结果将赋值到此变量</div>
-    </div>
+    ${wfOutputDeclHtml}
     ${upstreamPreview}
   </div>
   ${outputVarsSection}`;
@@ -2578,6 +2603,42 @@ function syncSubWfInputMapping(nodeId) {
     node.config.inputMapping = undefined;
   }
   designerDirty = true;
+}
+
+function updateWfOutputVar(nodeId, index, field, value) {
+  const node = designerNodes.find(n => n.id === nodeId);
+  if (!node?.config?.wfOutputVars?.[index]) return;
+  node.config.wfOutputVars[index][field] = value;
+  // Sync legacy outputVar for backward compatibility
+  if (field === 'name' && index === 0) {
+    node.config.outputVar = value;
+  }
+  designerDirty = true;
+}
+
+function addWfOutputVar(nodeId) {
+  const node = designerNodes.find(n => n.id === nodeId);
+  if (!node) return;
+  if (!node.config) node.config = {};
+  if (!node.config.wfOutputVars) node.config.wfOutputVars = [];
+  node.config.wfOutputVars.push({ name: 'newVar', type: 'String', desc: '' });
+  designerDirty = true;
+  renderDesigner();
+}
+
+function removeWfOutputVar(nodeId, index) {
+  const node = designerNodes.find(n => n.id === nodeId);
+  if (!node?.config?.wfOutputVars) return;
+  node.config.wfOutputVars.splice(index, 1);
+  if (node.config.wfOutputVars.length === 0) {
+    node.config.wfOutputVars = [{ name: 'wfResult', type: 'Object', desc: '被调用工作流的返回结果' }];
+  }
+  // Sync legacy outputVar
+  if (node.config.wfOutputVars.length > 0) {
+    node.config.outputVar = node.config.wfOutputVars[0].name;
+  }
+  designerDirty = true;
+  renderDesigner();
 }
 
 function renderEndConfig(node) {
@@ -5336,14 +5397,29 @@ function getNodeOutputs(node, forPicker = false) {
     }
       
     case 'workflow': {
-      const outputVar = node.config?.outputVar || 'wfResult';
-      outputs.push({ 
-        name: outputVar, 
-        type: 'Object', 
-        desc: '被调用工作流的返回结果',
-        editable: true,
-        configField: 'outputVar'
-      });
+      const wfOutputVars = node.config?.wfOutputVars;
+      if (wfOutputVars && wfOutputVars.length > 0) {
+        wfOutputVars.forEach(v => {
+          if (v.name) {
+            outputs.push({
+              name: v.name,
+              type: v.type || 'Object',
+              desc: v.desc || '被调用工作流的返回结果',
+              editable: true,
+              configField: 'wfOutputVars'
+            });
+          }
+        });
+      } else {
+        const outputVar = node.config?.outputVar || 'wfResult';
+        outputs.push({ 
+          name: outputVar, 
+          type: 'Object', 
+          desc: '被调用工作流的返回结果',
+          editable: true,
+          configField: 'outputVar'
+        });
+      }
       break;
     }
       
@@ -5645,7 +5721,7 @@ function renderExprEditor(options) {
   
   const expandBtn = expandable ? `
     <button class="expr-expand-btn" 
-      onclick="openExprExpandModal('${editorId}', ${nodeId}, ${JSON.stringify(label || id)}, ${JSON.stringify(hint || placeholder)})"
+      onclick="openExprExpandModal('${editorId}', ${nodeId}, ${escAttr(JSON.stringify(label || id))}, ${escAttr(JSON.stringify(hint || placeholder))})"
       title="展开编辑">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
