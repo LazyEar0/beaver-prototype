@@ -1622,18 +1622,28 @@ function renderDelayConfig(node) {
       <div class="config-field-help">范围：1 秒 ~ 30 天，需输入正整数</div>
     </div>`;
 
+  const targetTimeMode = node.config?.targetTimeMode || 'fixed';
+  const isTargetFixed = targetTimeMode === 'fixed';
+
   const targetTimeField = `<div class="config-field">
       <div class="config-field-label">目标时间</div>
-      ${renderExprEditor({
-        id: `delay_target_${node.id}`,
-        value: node.config?.delayTarget || '',
-        placeholder: '输入日期时间表达式，如 {{trigger.scheduledTime}}',
-        nodeId: node.id,
-        singleLine: true,
-        label: '目标时间',
-        hint: '目标时间必须大于当前时间，最大未来 30 天内',
-        onChange: `updateNodeConfig(${node.id}, 'delayTarget', this.value)`
-      })}
+      <div style="display:flex;gap:6px;margin-bottom:6px">
+        <button class="cron-preset-chip${isTargetFixed ? ' active' : ''}" onclick="updateNodeConfig(${node.id}, 'targetTimeMode', 'fixed'); renderDesigner()">固定值</button>
+        <button class="cron-preset-chip${!isTargetFixed ? ' active' : ''}" onclick="updateNodeConfig(${node.id}, 'targetTimeMode', 'variable'); renderDesigner()">变量</button>
+      </div>
+      ${isTargetFixed
+        ? `<input class="config-input" type="datetime-local" value="${node.config?.delayTarget || ''}" onchange="updateNodeConfig(${node.id}, 'delayTarget', this.value)" />`
+        : renderExprEditor({
+            id: `delay_target_${node.id}`,
+            value: node.config?.delayTarget || '',
+            placeholder: '点击 T 按钮选择变量',
+            nodeId: node.id,
+            singleLine: true,
+            label: '目标时间',
+            hint: '目标时间必须大于当前时间，最大未来 30 天内',
+            onChange: `updateNodeConfig(${node.id}, 'delayTarget', this.value)`
+          })
+      }
       <div class="config-field-help">目标时间必须大于当前时间，最大未来 30 天内</div>
     </div>`;
 
