@@ -65,6 +65,7 @@ const nodeTypes = [
   { type: 'if', name: 'IF 条件', icon: '🔀', color: 'node-color-logic', category: '流程控制', desc: '根据条件表达式判断，将流程分为 TRUE / FALSE 两个分支', code: 'if' },
   { type: 'switch', name: 'Switch', icon: '🔃', color: 'node-color-logic', category: '流程控制', desc: '多条件分支路由，支持首次匹配或全部匹配，含 Default 分支', code: 'switch' },
   { type: 'loop', name: '循环', icon: '🔄', color: 'node-color-logic', category: '流程控制', desc: '循环执行，支持 ForEach 遍历、While 条件循环、Break 中断', code: 'loop' },
+  { type: 'break', name: 'Break', icon: '🛑', color: 'node-color-break', category: '流程控制', desc: '跳出当前循环，只能放在循环节点的循环体内', code: 'break' },
   { type: 'delay', name: '延迟', icon: '⏱️', color: 'node-color-logic', category: '流程控制', desc: '延迟执行后续节点，支持固定时长或到达指定时间', code: 'delay' },
   { type: 'assign', name: '赋值', icon: '📝', color: 'node-color-data', category: '数据处理', desc: '变量赋值操作，支持表达式计算和 ${变量名} 引用', code: 'assign' },
   { type: 'output', name: '输出', icon: '📤', color: 'node-color-data', category: '数据处理', desc: '输出数据到下游节点，支持变量模式（结构化输出）和文本模式（模板输出）', code: 'output' },
@@ -276,7 +277,8 @@ function generateLoopExampleNodes(wf) {
         itemVar: 'roomItem',               // 当前元素变量名
         indexVar: 'roomIndex',             // 当前索引变量名
         maxIterations: 500,
-        allowBreak: false,
+        allowBreak: true,
+        breakCondition: 'roomItem.stock === 0',
         outputVar: 'notifyResults',
         collectOutput: true
       }, warnings: 0
@@ -305,6 +307,17 @@ function generateLoopExampleNodes(wf) {
       }, warnings: 0
     },
     {
+      // ⑤ 【Break 中断后】库存为 0 时提前跳出循环，记录紧急事件
+      //    通过"Break"端口连接，仅在 breakCondition 满足时执行一次
+      id: 7, type: 'assign', name: '记录紧急缺货', code: 'assign_2',
+      x: 560, y: 560,
+      config: {
+        assignments: [
+          { target: 'urgentAlert', source: '房型 ${roomItem.name} 已完全缺货，立即采购', type: 'String' }
+        ]
+      }, warnings: 0
+    },
+    {
       id: 6, type: 'end', name: '结束', code: 'end_1',
       x: 1080, y: 260,
       config: {}, warnings: 0
@@ -317,7 +330,10 @@ function generateLoopExampleNodes(wf) {
     { id: 3, from: 3, to: 4, fromPort: 'loop', toPort: 'in', label: '循环体（每轮）' },
     // 完成端口 → 循环全部结束后的下一步
     { id: 4, from: 3, to: 5, fromPort: 'done', toPort: 'in', label: '完成（全部结束后）' },
+    // Break 端口 → 条件满足时跳出循环后执行的节点
+    { id: 6, from: 3, to: 7, fromPort: 'break', toPort: 'in', label: 'Break（stock=0 时中断）' },
     { id: 5, from: 5, to: 6, fromPort: 'out',  toPort: 'in' },
+    { id: 7, from: 7, to: 5, fromPort: 'out',  toPort: 'in' },
     // 注意：节点4（发送飞书预警）没有出口连线 ← 这是正确的！
     // 循环体最后一个节点不需要连出口，执行完引擎自动进入下一轮
   ];
@@ -633,10 +649,14 @@ function renderCanvasNodes() {
       const defPos = totalPorts / (totalPorts + 1) * 100;
       portsHtml += `<div class="canvas-node-port port-switch-default" data-port="caseDefault" data-node="${node.id}" style="bottom:-6px;left:${defPos}%;transform:translateX(-50%)"><span class="canvas-node-port-label" style="bottom:-18px;left:50%;transform:translateX(-50%);color:#94a3b8;white-space:nowrap;font-size:10px">Default</span></div>`;
     } else if (node.type === 'loop') {
-      // Loop node: two output ports — "loop body" (bottom) and "done" (right)
+      // Loop node: "loop body" (bottom-left), optional "break" (bottom-right), "done" (right)
+      const showBreak = node.config?.allowBreak !== false;
       portsHtml += `<div class="canvas-node-port port-loop" data-port="loop" data-node="${node.id}"><span class="canvas-node-port-label" style="bottom:-18px;left:50%;transform:translateX(-50%);color:#7c3aed;white-space:nowrap;font-size:10px">循环体</span></div>`;
+      if (showBreak) {
+        portsHtml += `<div class="canvas-node-port port-break" data-port="break" data-node="${node.id}"><span class="canvas-node-port-label" style="bottom:-18px;left:50%;transform:translateX(-50%);color:#ea580c;white-space:nowrap;font-size:10px">Break</span></div>`;
+      }
       portsHtml += `<div class="canvas-node-port port-done" data-port="done" data-node="${node.id}"><span class="canvas-node-port-label" style="top:50%;right:-34px;transform:translateY(-50%);color:#16a34a;font-size:10px">完成</span></div>`;
-    } else if (node.type !== 'end') {
+    } else if (node.type !== 'end' && node.type !== 'break') {
       portsHtml += `<div class="canvas-node-port port-out" data-port="out" data-node="${node.id}"></div>`;
     }
 
@@ -775,7 +795,7 @@ function renderConnections() {
 
     // Label
     if (conn.label) {
-      const labelColor = conn.label === 'TRUE' ? '#16a34a' : conn.label === 'FALSE' ? '#dc2626' : conn.label === 'Default' ? '#94a3b8' : conn.label === '循环体' ? '#7c3aed' : conn.label === '完成' ? '#16a34a' : '#1890FF';
+      const labelColor = conn.label === 'TRUE' ? '#16a34a' : conn.label === 'FALSE' ? '#dc2626' : conn.label === 'Default' ? '#94a3b8' : conn.label === '循环体' ? '#7c3aed' : conn.label === '完成' ? '#16a34a' : conn.label.startsWith('Break') ? '#ea580c' : '#1890FF';
       html += `<text x="${midX}" y="${midY - 10}" text-anchor="middle" font-size="11" fill="${labelColor}" font-weight="700" font-family="Roboto, sans-serif" paint-order="stroke" stroke="#fff" stroke-width="3" style="pointer-events:none">${conn.label}</text>`;
     }
 
@@ -867,7 +887,15 @@ function getPortPosition(node, port) {
     case 'out': return { x: node.x + w, y: node.y + h / 2 };
     case 'true': return { x: node.x + w * 0.35, y: node.y + h };
     case 'false': return { x: node.x + w * 0.65, y: node.y + h };
-    case 'loop': return { x: node.x + w * 0.35, y: node.y + h };   // 底部偏左，循环体入口
+    case 'loop': {
+      // When allowBreak is enabled, spread loop (left) and break (right) ports at bottom;
+      // otherwise center the loop port at bottom.
+      const hasBreak = node.config?.allowBreak !== false;
+      return hasBreak
+        ? { x: node.x + w * 0.25, y: node.y + h }
+        : { x: node.x + w * 0.35, y: node.y + h };
+    }
+    case 'break': return { x: node.x + w * 0.75, y: node.y + h };  // 底部偏右，Break 中断出口
     case 'done': return { x: node.x + w, y: node.y + h / 2 };       // 右侧中央，循环完成出口
     case 'caseDefault': {
       const branches = node.config?.branches || [{ name: '分支1' }, { name: '分支2' }];
@@ -1035,6 +1063,9 @@ function renderNodeConfigFields(node, nt) {
     case 'end':
       html += renderEndConfig(node);
       break;
+    case 'break':
+      html += renderBreakNodeConfig(node);
+      break;
   }
 
   // Node description with richer content from PRD
@@ -1044,6 +1075,7 @@ function renderNodeConfigFields(node, nt) {
     'if': { scene: '根据数据判断走不同的业务分支，例如「订单金额 > 1000 走审批流」', rules: '必须配置条件表达式；TRUE 和 FALSE 分支都应连接后续节点' },
     'switch': { scene: '当有多个业务分支时使用，例如「根据订单来源渠道分发到不同处理流程」', rules: '至少配置 2 个分支条件；建议配置 Default 分支兜底' },
     loop: { scene: '需要重复处理列表数据或轮询等待时使用，例如「批量处理订单」「遍历用户列表逐条推送」', rules: 'ForEach 模式必须指定列表变量；"循环体"端口（底部）连接循环内的节点，"完成"端口（右侧）连接循环结束后的节点；建议设置最大循环次数防止死循环；循环结果通过输出变量名引用' },
+    break: { scene: '在循环体内满足特定条件时提前跳出循环，例如「找到目标后停止遍历」或「出错超过阈值则中断」', rules: 'Break 节点只能放在循环节点的循环体内；执行后立即跳出当前循环，进入"完成"出口的后续节点；通常配合 IF 条件节点使用' },
     delay: { scene: '需要等待一段时间后再继续执行，例如「等待审批结果」或「定时重试」', rules: '固定时长模式需设置具体时长；到指定时间模式需设置目标时刻' },
     assign: { scene: '对变量进行计算或转换，例如「将接口返回数据映射到业务变量」', rules: '目标变量名不能为空；支持 ${变量名} 引用其他变量' },
     output: { scene: '记录流程执行日志，便于调试和问题排查', rules: 'INFO 级别用于常规记录，ERROR 级别会触发告警' },
@@ -2272,8 +2304,11 @@ function renderLoopConfig(node) {
   // Detect current loop body connection status
   const loopBodyConn = designerConnections.find(c => c.from === node.id && c.fromPort === 'loop');
   const doneConn = designerConnections.find(c => c.from === node.id && c.fromPort === 'done');
+  const breakConn = designerConnections.find(c => c.from === node.id && c.fromPort === 'break');
   const loopBodyNode = loopBodyConn ? designerNodes.find(n => n.id === loopBodyConn.to) : null;
   const doneNode = doneConn ? designerNodes.find(n => n.id === doneConn.to) : null;
+  const breakNode = breakConn ? designerNodes.find(n => n.id === breakConn.to) : null;
+  const showBreak = node.config?.allowBreak !== false;
 
   const loopBodyStatus = loopBodyNode
     ? `<span style="color:#7c3aed;font-weight:600">已连接 → ${loopBodyNode.name}</span>`
@@ -2281,6 +2316,9 @@ function renderLoopConfig(node) {
   const doneStatus = doneNode
     ? `<span style="color:#16a34a;font-weight:600">已连接 → ${doneNode.name}</span>`
     : `<span style="color:var(--md-outline)">未连接 — 从右侧端口拖线到循环完成后的节点</span>`;
+  const breakStatus = breakNode
+    ? `<span style="color:#ea580c;font-weight:600">已连接 → ${breakNode.name}</span>`
+    : `<span style="color:var(--md-outline)">未连接 — 从底部 Break 端口拖线到中断后的节点</span>`;
 
   return `
   <div class="config-section loop-guide-card" style="background:linear-gradient(135deg,#f5f3ff 0%,#fafafa 100%);border:1px solid #ddd6fe;border-radius:var(--radius-md);padding:var(--space-3);margin-bottom:0">
@@ -2306,6 +2344,10 @@ function renderLoopConfig(node) {
         <span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;background:#16a34a;color:#fff;border-radius:50%;font-size:9px;font-weight:700;flex-shrink:0;margin-top:1px">5</span>
         <span>从循环节点<strong>右侧绿色端口</strong>拖线到循环完成后的节点</span>
       </div>
+      ${showBreak ? `<div style="display:flex;gap:6px;align-items:flex-start">
+        <span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;background:#ea580c;color:#fff;border-radius:50%;font-size:9px;font-weight:700;flex-shrink:0;margin-top:1px">6</span>
+        <span>设置 <strong>Break 条件</strong>，从<strong>底部橙色端口</strong>拖线到中断后的节点</span>
+      </div>` : ''}
     </div>
     <div style="margin-top:10px;padding-top:10px;border-top:1px solid #ddd6fe;font-size:var(--font-size-xs);display:flex;flex-direction:column;gap:4px">
       <div style="display:flex;align-items:center;gap:6px">
@@ -2316,6 +2358,10 @@ function renderLoopConfig(node) {
         <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#dcfce7;border:2px solid #16a34a;flex-shrink:0"></span>
         <span style="color:var(--md-on-surface-variant)">完成后：${doneStatus}</span>
       </div>
+      ${showBreak ? `<div style="display:flex;align-items:center;gap:6px">
+        <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#ffedd5;border:2px solid #ea580c;flex-shrink:0"></span>
+        <span style="color:var(--md-on-surface-variant)">Break：${breakStatus}</span>
+      </div>` : ''}
     </div>
   </div>
   <div class="config-section">
@@ -2374,8 +2420,9 @@ function renderLoopConfig(node) {
     </div>
     ${node.config?.allowBreak !== false ? `
       <div class="config-field">
-        <div class="config-field-label">Break 条件</div>
-        <textarea class="expr-editor" style="min-height:36px;font-size:11px" placeholder="errorCount > 5" onchange="updateNodeConfig(${node.id}, 'breakCondition', this.value)">${node.config?.breakCondition || ''}</textarea>
+        <div class="config-field-label">Break 条件 <span class="required">*</span></div>
+        <textarea class="expr-editor" style="min-height:36px;font-size:11px" placeholder="roomItem.stock === 0" onchange="updateNodeConfig(${node.id}, 'breakCondition', this.value)">${node.config?.breakCondition || ''}</textarea>
+        <div class="config-field-help">表达式为 true 时跳出循环，进入"Break"端口连接的后续节点。支持引用循环变量，如 <code style="font-size:10px;font-family:var(--font-family-mono);background:var(--md-surface-container);padding:0 3px;border-radius:2px">\${roomItem.stock} === 0</code>、<code style="font-size:10px;font-family:var(--font-family-mono);background:var(--md-surface-container);padding:0 3px;border-radius:2px">errorCount > 5</code></div>
       </div>
     ` : ''}
   </div>
@@ -2697,6 +2744,31 @@ function renderEndConfig(node) {
   </div>`;
 }
 
+function renderBreakNodeConfig(node) {
+  const ownerLoop = getOwnerLoopNode(node.id);
+  const isInLoop = !!ownerLoop;
+  return `
+  ${!isInLoop ? `<div class="config-section" style="background:#fef2f2;border:1px solid #fca5a5;border-radius:var(--radius-md);padding:var(--space-3)">
+    <div style="font-size:var(--font-size-xs);color:#dc2626;font-weight:600;margin-bottom:4px">⚠️ 位置错误</div>
+    <div style="font-size:var(--font-size-xs);color:#7f1d1d">Break 节点只能放在循环节点的循环体内。请将此节点移入某个循环节点的循环体，或删除此节点。</div>
+  </div>` : `<div class="config-section" style="background:linear-gradient(135deg,#fff7ed 0%,#fafafa 100%);border:1px solid #fed7aa;border-radius:var(--radius-md);padding:var(--space-3)">
+    <div style="font-size:var(--font-size-xs);color:#ea580c;font-weight:600;margin-bottom:4px">Break 中断说明</div>
+    <div style="font-size:var(--font-size-xs);color:var(--md-on-surface-variant);line-height:1.8">
+      <div>此节点位于循环节点「<strong>${ownerLoop.name}</strong>」的循环体内。</div>
+      <div style="margin-top:4px">执行到 Break 节点时，将<strong>立即跳出当前循环</strong>，流程进入循环节点"完成"出口的后续节点。</div>
+      <div style="margin-top:6px;color:#9a3412">💡 通常在 IF 条件判断的 TRUE 分支后放置 Break 节点，实现"满足条件则中断循环"的逻辑。</div>
+    </div>
+  </div>`}
+  <div class="config-section">
+    <div class="config-section-title">Break 配置</div>
+    <div class="config-field">
+      <div class="config-field-label">中断说明</div>
+      <input class="config-input" value="${node.config?.description || ''}" placeholder="例：库存为零时停止遍历" onchange="updateNodeConfig(${node.id}, 'description', this.value)" />
+      <div class="config-field-help">可选，记录此 Break 的业务含义</div>
+    </div>
+  </div>`;
+}
+
 // --- Settings Panel ---
 function renderDesignerSettingsPanel() {
   const wf = designerWf;
@@ -3013,8 +3085,18 @@ function getProblems() {
         if (!hasIn) problems.push({ level: 'error', message: `节点「${node.name}」没有输入连线`, location: node.code, nodeId: node.id });
         const hasLoopOut = designerConnections.some(c => c.from === node.id && c.fromPort === 'loop');
         const hasDoneOut = designerConnections.some(c => c.from === node.id && c.fromPort === 'done');
+        const hasBreakOut = designerConnections.some(c => c.from === node.id && c.fromPort === 'break');
         if (!hasLoopOut) problems.push({ level: 'error', message: `循环节点「${node.name}」未连接循环体（"循环体"端口无连线）`, location: node.code, nodeId: node.id });
         if (!hasDoneOut) problems.push({ level: 'warning', message: `循环节点「${node.name}」没有"完成"出口连线，循环结束后流程无法继续`, location: node.code, nodeId: node.id });
+        // Break validation: if allowBreak is enabled but no break condition set
+        if (node.config?.allowBreak !== false) {
+          if (!node.config?.breakCondition) {
+            problems.push({ level: 'warning', message: `循环节点「${node.name}」已开启 Break 中断但未设置中断条件`, location: node.code, nodeId: node.id });
+          }
+          if (!hasBreakOut) {
+            problems.push({ level: 'warning', message: `循环节点「${node.name}」已开启 Break 中断但"Break"端口未连接后续节点`, location: node.code, nodeId: node.id });
+          }
+        }
         // Detect confusion: loop body and done connecting to the same downstream node
         if (hasLoopOut && hasDoneOut) {
           const loopTarget = designerConnections.find(c => c.from === node.id && c.fromPort === 'loop')?.to;
@@ -3514,10 +3596,10 @@ function completeConnection(fromNodeId, fromPort, targetId) {
   if (designerConnections.some(c => c.from === fromNodeId && c.to === targetId)) {
     showToast('warning', '提示', '该连线已存在'); return;
   }
-  // For loop nodes: each output port (loop / done) can only have one outgoing connection
-  if (fromNode && fromNode.type === 'loop' && (fromPort === 'loop' || fromPort === 'done')) {
+  // For loop nodes: each output port (loop / done / break) can only have one outgoing connection
+  if (fromNode && fromNode.type === 'loop' && (fromPort === 'loop' || fromPort === 'done' || fromPort === 'break')) {
     if (designerConnections.some(c => c.from === fromNodeId && c.fromPort === fromPort)) {
-      const portName = fromPort === 'loop' ? '循环体' : '完成';
+      const portName = fromPort === 'loop' ? '循环体' : fromPort === 'done' ? '完成' : 'Break';
       showToast('warning', '提示', `"${portName}"端口已连接，请先删除原有连线再重新连接`); return;
     }
   }
@@ -3568,6 +3650,10 @@ function completeConnection(fromNodeId, fromPort, targetId) {
   }
   if (fromNode && fromNode.type === 'loop' && fromPort === 'done') {
     connLabel = '完成';
+  }
+  if (fromNode && fromNode.type === 'loop' && fromPort === 'break') {
+    const breakCond = fromNode.config?.breakCondition;
+    connLabel = breakCond ? `Break（${breakCond}）` : 'Break';
   }
 
   designerConnections.push({
@@ -4082,100 +4168,42 @@ function exportDesignerJSON() {
 }
 
 function autoLayout() {
+  if (typeof dagre === 'undefined') {
+    showToast('error', '布局引擎未加载', '请检查网络连接后重试');
+    return;
+  }
   pushUndoState();
 
-  // --- Hierarchical Layout based on topological sort ---
+  // --- Dagre LR hierarchical layout (same algorithm as n8n / Dify) ---
   const NODE_W = 200;
   const NODE_H = 90;
-  const H_GAP = 60;   // horizontal gap between columns
-  const V_GAP = 40;   // vertical gap between rows in the same column
 
-  const nodeMap = {};
-  designerNodes.forEach(n => { nodeMap[n.id] = n; });
+  const g = new dagre.graphlib.Graph();
+  g.setGraph({ rankdir: 'LR', nodesep: 50, ranksep: 80, marginx: 80, marginy: 80 });
+  g.setDefaultEdgeLabel(() => ({}));
 
-  // Build adjacency: successors and predecessors
-  const successors = {};   // nodeId -> [nodeId]
-  const predecessors = {}; // nodeId -> [nodeId]
-  designerNodes.forEach(n => { successors[n.id] = []; predecessors[n.id] = []; });
-  designerConnections.forEach(c => {
-    if (nodeMap[c.from] && nodeMap[c.to]) {
-      successors[c.from].push(c.to);
-      predecessors[c.to].push(c.from);
-    }
-  });
-
-  // Kahn's algorithm: assign topological levels (column index)
-  const level = {};
-  const queue = [];
-  const inDegree = {};
-  designerNodes.forEach(n => { inDegree[n.id] = predecessors[n.id].length; });
-  designerNodes.forEach(n => { if (inDegree[n.id] === 0) queue.push(n.id); });
-
-  while (queue.length > 0) {
-    const cur = queue.shift();
-    const curLevel = level[cur] || 0;
-    successors[cur].forEach(nextId => {
-      // Each node's level = max(level of all predecessors) + 1
-      level[nextId] = Math.max(level[nextId] || 0, curLevel + 1);
-      inDegree[nextId]--;
-      if (inDegree[nextId] === 0) queue.push(nextId);
-    });
-  }
-
-  // Fallback for any nodes not yet assigned (isolated / cycles)
-  designerNodes.forEach(n => { if (level[n.id] === undefined) level[n.id] = 0; });
-
-  // Group nodes by level (column)
-  const byLevel = {};
+  // Register all nodes
   designerNodes.forEach(n => {
-    const lv = level[n.id];
-    if (!byLevel[lv]) byLevel[lv] = [];
-    byLevel[lv].push(n);
+    g.setNode(String(n.id), { width: NODE_W, height: NODE_H });
   });
 
-  // Sort nodes within each column: put nodes connected from TRUE/main port first
-  Object.values(byLevel).forEach(group => {
-    group.sort((a, b) => {
-      // trigger always first, end always last
-      if (a.type === 'trigger') return -1;
-      if (b.type === 'trigger') return 1;
-      if (a.type === 'end') return 1;
-      if (b.type === 'end') return -1;
-      // prefer nodes whose predecessor connects via 'true' or default port (not 'false')
-      const aFalseParent = predecessors[a.id].some(pid =>
-        designerConnections.some(c => c.from === pid && c.to === a.id && c.fromPort === 'false')
-      );
-      const bFalseParent = predecessors[b.id].some(pid =>
-        designerConnections.some(c => c.from === pid && c.to === b.id && c.fromPort === 'false')
-      );
-      if (aFalseParent && !bFalseParent) return 1;
-      if (!aFalseParent && bFalseParent) return -1;
-      return a.id - b.id;
-    });
+  // Register all edges; give main-path edges higher weight so dagre keeps them straight
+  const mainPorts = new Set(['true', 'done', 'default', null, undefined, '']);
+  designerConnections.forEach(c => {
+    if (!g.hasNode(String(c.from)) || !g.hasNode(String(c.to))) return;
+    const isMain = mainPorts.has(c.fromPort);
+    g.setEdge(String(c.from), String(c.to), { weight: isMain ? 3 : 1 });
   });
 
-  // Compute x positions per level
-  const levels = Object.keys(byLevel).map(Number).sort((a, b) => a - b);
-  const startX = 80;
-  const startY = 80;
-  const colX = {};
-  let xCursor = startX;
-  levels.forEach(lv => {
-    colX[lv] = xCursor;
-    xCursor += NODE_W + H_GAP;
-  });
+  dagre.layout(g);
 
-  // Assign positions: center the column vertically, branch nodes offset downward
-  levels.forEach(lv => {
-    const group = byLevel[lv];
-    const totalH = group.length * NODE_H + (group.length - 1) * V_GAP;
-    const colCenterY = startY + totalH / 2;
-    let yCursor = colCenterY - totalH / 2;
-    group.forEach(n => {
-      n.x = colX[lv];
-      n.y = yCursor;
-      yCursor += NODE_H + V_GAP;
-    });
+  // Apply computed positions (dagre returns center coords; our canvas uses top-left)
+  designerNodes.forEach(n => {
+    const pos = g.node(String(n.id));
+    if (pos) {
+      n.x = pos.x - NODE_W / 2;
+      n.y = pos.y - NODE_H / 2;
+    }
   });
 
   renderDesigner();

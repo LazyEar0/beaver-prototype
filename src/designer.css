@@ -391,6 +391,7 @@
 .node-color-trigger { background: #E8F5E9; color: #2E7D32; }
 .node-color-end { background: #FFEBEE; color: #C62828; }
 .node-color-logic { background: #FFF3E0; color: #E65100; }
+.node-color-break { background: #FFF7ED; color: #EA580C; }
 .node-color-data { background: #E3F2FD; color: #1565C0; }
 .node-color-integration { background: #F3E5F5; color: #6A1B9A; }
 .node-color-flow { background: #E0F2F1; color: #00695C; }
@@ -3433,7 +3434,7 @@
 /* --- Loop Node Ports --- */
 .canvas-node-port.port-loop {
   bottom: -7px;
-  left: 35%;
+  left: 25%;
   transform: translateX(-50%);
   background: var(--md-surface);
   border-color: #7c3aed;
@@ -3445,6 +3446,22 @@
   transform: translateX(-50%) scale(1.3);
   background: #ede9fe;
   border-color: #7c3aed;
+}
+
+.canvas-node-port.port-break {
+  bottom: -7px;
+  left: 75%;
+  transform: translateX(-50%);
+  background: var(--md-surface);
+  border-color: #ea580c;
+  width: 12px;
+  height: 12px;
+}
+
+.canvas-node-port.port-break:hover {
+  transform: translateX(-50%) scale(1.3);
+  background: #ffedd5;
+  border-color: #ea580c;
 }
 
 .canvas-node-port.port-done {
@@ -4659,4 +4676,109 @@
 .var-ref-tag:hover {
   background: var(--md-primary);
   color: white;
+}
+
+/* ===== Code Node: Dedicated Code Editor ===== */
+
+/* Inline code editor wrapper (in config panel) */
+.code-editor-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.code-editor-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  background: var(--md-surface-container);
+  border: 1px solid var(--md-outline-variant);
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+}
+
+.code-lang-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  font-family: var(--font-family-mono);
+  letter-spacing: -0.02em;
+}
+
+.code-lang-tag.js {
+  background: rgba(247, 223, 30, 0.2);
+  color: #b8a600;
+}
+
+.code-lang-tag.py {
+  background: rgba(55, 118, 171, 0.2);
+  color: #4b8bbe;
+}
+
+.code-editor-lang-label {
+  font-size: 11px;
+  color: var(--md-on-surface-variant);
+  font-weight: 500;
+}
+
+.code-editor-expand-btn {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--md-primary);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.code-editor-expand-btn:hover {
+  background: var(--md-primary-container);
+}
+
+.code-editor-textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--md-outline-variant);
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  outline: none;
+  resize: vertical;
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--md-on-surface);
+  background: var(--md-surface);
+  tab-size: 2;
+  white-space: pre;
+  overflow-x: auto;
+}
+
+.code-editor-textarea:focus {
+  border-color: var(--md-primary);
+  box-shadow: 0 0 0 1px var(--md-primary);
+}
+
+.code-editor-textarea::placeholder {
+  color: var(--md-outline);
+  font-style: italic;
+}
+
+/* Full-screen code editor textarea (inherits expr-expand-textarea base + overrides) */
+.code-expand-textarea {
+  font-size: 13px;
+  line-height: 1.8;
+  tab-size: 2;
+  white-space: pre;
 }
