@@ -3060,6 +3060,25 @@
   border-left: 3px solid #7c3aed;
 }
 
+/* Nodes inside a loop body — subtle purple dashed left border to signal scope membership */
+.canvas-node.loop-body-node {
+  border-left: 3px dashed #a78bfa;
+}
+
+/* Loop body membership badge — small indicator in top-left corner of the node card */
+.loop-body-badge {
+  position: absolute;
+  top: 4px;
+  left: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #7c3aed;
+  opacity: 0.65;
+  line-height: 1;
+  pointer-events: none;
+  user-select: none;
+}
+
 
 /* --- Space Pan Cursor --- */
 .canvas-container.space-panning {
