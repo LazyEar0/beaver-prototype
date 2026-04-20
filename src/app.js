@@ -225,7 +225,7 @@ let wsFolders = {
 // Workflows per workspace
 let wsWorkflows = {
   1: [
-    { id: 1, name: '酒店搜索', code: 'HTL_SEARCH', desc: '根据条件搜索可用酒店列表', type: 'app', allowRef: true, status: 'published', version: 5, creator: 'Sukey Wu', owners: [101, 103], folderId: 2, wsId: 1, createdAt: '2025-01-20', editedAt: '2025-04-13 14:30', lastRun: 'success', runningCount: 0, execCount: 45, debugPassed: true, inputs: [
+    { id: 1, name: '酒店搜索', code: 'HTL_SEARCH', desc: '根据条件搜索可用酒店列表', type: 'app', allowRef: true, status: 'published', version: 5, creator: 'Sukey Wu', lastEditor: '张三', owners: [101, 103], folderId: 2, wsId: 1, createdAt: '2025-01-20', editedAt: '2025-04-13 14:30', lastRun: 'success', runningCount: 0, execCount: 45, debugPassed: true, inputs: [
       { name: 'city', label: '目标城市', type: 'String', required: true, desc: '搜索的目标城市名称' },
       { name: 'checkInDate', label: '入住日期', type: 'DateTime', required: true, desc: '预期入住日期时间' },
       { name: 'checkOutDate', label: '退房日期', type: 'DateTime', required: true, desc: '预期退房日期时间' },
@@ -263,7 +263,7 @@ let wsWorkflows = {
       { v: 1, status: 'history', publishedAt: '2025-03-10 09:00', publisher: 'Admin', note: '', tags: [] },
     ] },
     { id: 7, name: '预订数据报表', code: 'HTL_REPORT', desc: '每日酒店预订统计报表', type: 'app', allowRef: false, status: 'published', version: 1, creator: '钱七', owners: [107], folderId: null, wsId: 1, createdAt: '2025-03-25', editedAt: '2025-04-09 08:00', lastRun: 'success', runningCount: 0, execCount: 15, debugPassed: true, versions: [{ v: 1, status: 'current', publishedAt: '2025-04-01 10:00', publisher: '钱七', note: '初始版本', tags: [] }] },
-    { id: 8, name: '库存预警通知', code: 'HTL_STOCK_ALERT', desc: '酒店库存不足自动预警', type: 'app', allowRef: false, status: 'draft', version: 0, creator: '李四', owners: [104], folderId: null, wsId: 1, createdAt: '2025-04-10', editedAt: '2025-04-13 09:30', lastRun: null, runningCount: 0, execCount: 0, debugPassed: false, versions: [] },
+    { id: 8, name: '库存预警通知', code: 'HTL_STOCK_ALERT', desc: '酒店库存不足自动预警', type: 'app', allowRef: false, status: 'draft', version: 0, creator: '李四', lastEditor: 'Sukey Wu', owners: [104], folderId: null, wsId: 1, createdAt: '2025-04-10', editedAt: '2025-04-13 09:30', lastRun: null, runningCount: 0, execCount: 0, debugPassed: false, versions: [] },
   ],
   2: [
     { id: 20, name: '航班信息拉取', code: 'FLT_PULL', desc: '从供应商API拉取航班数据', type: 'app', allowRef: true, status: 'published', version: 4, creator: 'Admin', owners: [102], folderId: 10, wsId: 2, createdAt: '2025-02-05', editedAt: '2025-04-12 09:15', lastRun: 'success', runningCount: 0, execCount: 200, debugPassed: true, versions: [
