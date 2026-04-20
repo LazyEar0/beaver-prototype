@@ -957,7 +957,7 @@ function renderNodeConfigFields(node, nt) {
     output: { scene: '记录流程执行日志，便于调试和问题排查', rules: 'INFO 级别用于常规记录，ERROR 级别会触发告警' },
     code: { scene: '标准节点无法满足的复杂数据处理逻辑', rules: '代码中可通过 input 获取输入数据，通过 return 返回处理结果' },
     http: { scene: '调用外部 REST API 接口，例如「查询订单状态」「推送通知」', rules: '请求 URL 为必填项；建议配置超时和重试策略' },
-    mq: { scene: '与消息队列系统交互，例如「发布订单创建事件」「消费支付回调消息」', rules: 'Topic 为必填项；消费模式需关注消息幂等处理' },
+    mq: { scene: '向消息队列发送消息，例如「发布订单创建事件」「推送数据变更通知」', rules: 'Topic 和消息内容为必填项；消息 Key 用于分区路由；消息属性可传递元数据' },
     workflow: { scene: '复用已有流程能力，例如「调用通用的审批流程」「复用数据校验流程」', rules: '只能调用已发布、开启了「允许被引用」、且授权了当前空间的工作流' },
     placeholder: { scene: '规划流程时的临时占位，标记待实现的部分', rules: '发布前需转换为具体节点类型或删除' },
   };
@@ -1687,6 +1687,36 @@ function renderCodeConfig(node) {
   const upstreamPreview = renderUpstreamOutputPreview(node.id);
   const outputVarsSection = renderOutputVariablesSection(node);
   
+  // Code node output variable declarations (similar to output node)
+  if (!node.config) node.config = {};
+  if (!node.config.codeOutputVars) {
+    node.config.codeOutputVars = [{ name: 'result', type: 'Object', desc: '代码 return 返回的结果' }];
+  }
+  const codeOutputVars = node.config.codeOutputVars;
+  const typeOptions = ['String', 'Number', 'Boolean', 'Object', 'Array', 'DateTime'];
+  
+  const outputDeclHtml = `
+    <div class="config-section" style="margin-top:var(--space-2)">
+      <div class="config-section-title" style="display:flex;align-items:center;justify-content:space-between">
+        输出变量声明
+        <button class="btn btn-ghost btn-sm" style="height:24px;font-size:11px" onclick="addCodeOutputVar(${node.id})">${icons.plus} 添加</button>
+      </div>
+      <div class="config-field-help" style="margin-bottom:var(--space-2)">声明代码 <code style="background:var(--md-surface-container);padding:0 3px;border-radius:2px">return</code> 中返回的变量名和类型，下游节点可通过 <code style="background:var(--md-surface-container);padding:0 3px;border-radius:2px">{{${node.code}.变量名}}</code> 引用</div>
+      ${codeOutputVars.map((v, i) => {
+        const curType = v.type || 'Object';
+        return `
+      <div class="code-output-var-row">
+        <span class="var-icon type-${curType}" title="${curType}">${curType.charAt(0)}</span>
+        <input class="config-input" style="flex:1;height:28px;font-size:11px;font-family:var(--font-family-mono)" placeholder="变量名" value="${escHtml(v.name)}" onchange="updateCodeOutputVar(${node.id}, ${i}, 'name', this.value); renderDesigner()" />
+        <select class="assign-type-select" title="变量类型" style="height:28px;font-size:11px" onchange="updateCodeOutputVar(${node.id}, ${i}, 'type', this.value); renderDesigner()">
+          ${typeOptions.map(t => `<option value="${t}"${curType === t ? ' selected' : ''}>${t}</option>`).join('')}
+        </select>
+        <input class="config-input" style="flex:1;height:28px;font-size:11px" placeholder="描述" value="${escHtml(v.desc || '')}" onchange="updateCodeOutputVar(${node.id}, ${i}, 'desc', this.value)" />
+        ${codeOutputVars.length > 1 ? `<button class="table-action-btn danger" style="width:22px;height:22px;flex-shrink:0" onclick="removeCodeOutputVar(${node.id}, ${i})">${icons.close}</button>` : ''}
+      </div>`;
+      }).join('')}
+    </div>`;
+  
   return `<div class="config-section">
     <div class="config-section-title">代码配置</div>
     <div class="config-field">
@@ -1705,14 +1735,43 @@ function renderCodeConfig(node) {
         nodeId: node.id,
         minHeight: 120,
         label: '代码',
-        hint: '使用 return 返回结果，返回值将作为 result 输出变量',
+        hint: '使用 return 返回结果，返回的每个 key 对应一个输出变量',
         onChange: `updateNodeConfig(${node.id}, 'script', this.value)`
       })}
-      <div class="config-field-help">使用 <code style="background:var(--md-surface-container);padding:0 3px;border-radius:2px">return</code> 返回结果，返回值将作为 <code style="background:var(--md-surface-container);padding:0 3px;border-radius:2px">result</code> 输出变量</div>
+      <div class="config-field-help">使用 <code style="background:var(--md-surface-container);padding:0 3px;border-radius:2px">return { key1: val1, key2: val2 }</code> 返回多个输出变量</div>
     </div>
+    ${outputDeclHtml}
     ${upstreamPreview}
   </div>
   ${outputVarsSection}`;
+}
+
+function updateCodeOutputVar(nodeId, index, field, value) {
+  const node = designerNodes.find(n => n.id === nodeId);
+  if (!node?.config?.codeOutputVars?.[index]) return;
+  node.config.codeOutputVars[index][field] = value;
+  designerDirty = true;
+}
+
+function addCodeOutputVar(nodeId) {
+  const node = designerNodes.find(n => n.id === nodeId);
+  if (!node) return;
+  if (!node.config) node.config = {};
+  if (!node.config.codeOutputVars) node.config.codeOutputVars = [];
+  node.config.codeOutputVars.push({ name: 'newVar', type: 'String', desc: '' });
+  designerDirty = true;
+  renderDesigner();
+}
+
+function removeCodeOutputVar(nodeId, index) {
+  const node = designerNodes.find(n => n.id === nodeId);
+  if (!node?.config?.codeOutputVars) return;
+  node.config.codeOutputVars.splice(index, 1);
+  if (node.config.codeOutputVars.length === 0) {
+    node.config.codeOutputVars = [{ name: 'result', type: 'Object', desc: '代码 return 返回的结果' }];
+  }
+  designerDirty = true;
+  renderDesigner();
 }
 
 function renderDelayConfig(node) {
@@ -2120,21 +2179,104 @@ function renderLoopConfig(node) {
 }
 
 function renderMqConfig(node) {
+  const upstreamPreview = renderUpstreamOutputPreview(node.id);
+  const outputVarsSection = renderOutputVariablesSection(node);
+  const properties = node.config?.properties || [];
+  
   return `<div class="config-section">
-    <div class="config-section-title">MQ 消息配置</div>
-    <div class="config-field">
-      <div class="config-field-label">操作模式</div>
-      <select class="config-select"><option>发送消息</option><option>消费消息</option></select>
-    </div>
+    <div class="config-section-title">MQ 发送配置</div>
     <div class="config-field">
       <div class="config-field-label">Topic <span class="required">*</span></div>
-      <input class="config-input" placeholder="输入 Topic" />
+      ${renderExprEditor({
+        id: `mq_topic_${node.id}`,
+        value: node.config?.topic || '',
+        placeholder: 'order_events 或 {{input.topicName}}',
+        nodeId: node.id,
+        singleLine: true,
+        label: 'Topic',
+        onChange: `updateNodeConfig(${node.id}, 'topic', this.value)`
+      })}
+      <div class="config-field-help">消息发送的目标队列或 Topic 名称</div>
     </div>
     <div class="config-field">
-      <div class="config-field-label">消息内容</div>
-      <textarea class="expr-editor" placeholder='{"event": "order_created"}'></textarea>
+      <div class="config-field-label">消息 Key</div>
+      ${renderExprEditor({
+        id: `mq_key_${node.id}`,
+        value: node.config?.messageKey || '',
+        placeholder: '可选，如 {{input.orderId}}（Kafka 分区键 / RabbitMQ routing key）',
+        nodeId: node.id,
+        singleLine: true,
+        label: '消息 Key',
+        onChange: `updateNodeConfig(${node.id}, 'messageKey', this.value)`
+      })}
+      <div class="config-field-help">选填。Kafka 场景控制分区路由，RabbitMQ 场景作为 routing key</div>
     </div>
-  </div>`;
+    <div class="config-field">
+      <div class="config-field-label">消息内容 <span class="required">*</span></div>
+      ${renderExprEditor({
+        id: `mq_body_${node.id}`,
+        value: node.config?.body || '',
+        placeholder: '{"event": "order_created", "orderId": "{{input.orderId}}"}',
+        nodeId: node.id,
+        minHeight: 80,
+        label: '消息内容',
+        hint: 'JSON 格式，支持 {{变量}} 引用',
+        onChange: `updateNodeConfig(${node.id}, 'body', this.value)`
+      })}
+      <div class="config-field-help">JSON 格式，支持 {{变量}} 引用上游节点输出</div>
+    </div>
+  </div>
+  <div class="config-section">
+    <div class="config-section-title">消息属性</div>
+    <div class="config-field-help" style="margin-bottom:6px">可选，Key-Value 形式的消息属性（如 contentType、correlationId），随消息一起发送</div>
+    ${properties.map((p, i) => `
+    <div class="assign-rule-row" style="margin-bottom:6px">
+      <div class="assign-rule-main" style="gap:6px">
+        <input class="config-input" placeholder="属性名" value="${escHtml(p.key || '')}" style="flex:1;font-family:var(--font-family-mono)" onchange="updateMqProperty(${node.id}, ${i}, 'key', this.value)" />
+        <span class="condition-op">=</span>
+        ${renderExprEditor({
+          id: `mq_prop_val_${node.id}_${i}`,
+          value: p.value || '',
+          placeholder: '属性值，支持 {{变量}}',
+          nodeId: node.id,
+          singleLine: true,
+          onChange: `updateMqProperty(${node.id}, ${i}, 'value', this.value)`
+        })}
+        ${properties.length > 1 ? `<button class="assign-remove-btn" title="删除此属性" onclick="removeMqProperty(${node.id}, ${i})">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>` : ''}
+      </div>
+    </div>`).join('')}
+    <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;margin-top:var(--space-2)" onclick="addMqProperty(${node.id})">${icons.plus} 添加属性</button>
+  </div>
+  ${upstreamPreview}
+  ${outputVarsSection}`;
+}
+
+// --- MQ Property Helpers ---
+function addMqProperty(nodeId) {
+  const node = designerNodes.find(n => n.id === nodeId);
+  if (!node) return;
+  if (!node.config) node.config = {};
+  if (!node.config.properties) node.config.properties = [];
+  node.config.properties.push({ key: '', value: '' });
+  designerDirty = true;
+  renderDesigner();
+}
+
+function removeMqProperty(nodeId, index) {
+  const node = designerNodes.find(n => n.id === nodeId);
+  if (!node || !node.config?.properties) return;
+  node.config.properties.splice(index, 1);
+  designerDirty = true;
+  renderDesigner();
+}
+
+function updateMqProperty(nodeId, index, field, value) {
+  const node = designerNodes.find(n => n.id === nodeId);
+  if (!node || !node.config?.properties?.[index]) return;
+  node.config.properties[index][field] = value;
+  designerDirty = true;
 }
 
 function renderSubWfConfig(node) {
@@ -2144,11 +2286,85 @@ function renderSubWfConfig(node) {
     wf.allowRef && wf.status === 'published' && wf.id !== designerWfId &&
     (!wf.authorizedSpaces || wf.authorizedSpaces.length === 0 || wf.authorizedSpaces.includes(currentWsId))
   );
+
+  // Find the selected target workflow to read its input definitions
+  const targetWf = availableWfs.find(wf => wf.id == node.config?.targetWfId);
+  const targetInputs = targetWf?.inputs || [];
+
+  // Ensure inputMapping is an array of { name, value } objects
+  if (!node.config) node.config = {};
+  if (!node.config.inputMapping || typeof node.config.inputMapping === 'string') {
+    // Migrate from old JSON string format or initialize
+    let existingMap = {};
+    if (typeof node.config.inputMapping === 'string' && node.config.inputMapping.trim()) {
+      try { existingMap = JSON.parse(node.config.inputMapping); } catch(e) { /* ignore */ }
+    }
+    if (targetInputs.length > 0) {
+      node.config.inputMapping = targetInputs.map(inp => ({
+        name: inp.name,
+        label: inp.label || inp.name,
+        type: inp.type || 'String',
+        required: inp.required || false,
+        desc: inp.desc || '',
+        value: existingMap[inp.name] || ''
+      }));
+    } else {
+      node.config.inputMapping = [];
+    }
+  }
+
+  // Sync inputMapping with target workflow's inputs when target changes
+  if (targetWf && node.config.inputMapping) {
+    const existingByName = {};
+    node.config.inputMapping.forEach(m => { existingByName[m.name] = m.value; });
+    node.config.inputMapping = targetInputs.map(inp => ({
+      name: inp.name,
+      label: inp.label || inp.name,
+      type: inp.type || 'String',
+      required: inp.required || false,
+      desc: inp.desc || '',
+      value: existingByName[inp.name] !== undefined ? existingByName[inp.name] : ''
+    }));
+  }
+
+  const inputMapping = node.config.inputMapping || [];
+  const upstreamPreview = renderUpstreamOutputPreview(node.id);
+  const outputVarsSection = renderOutputVariablesSection(node);
+
+  const inputMappingHtml = targetWf
+    ? (inputMapping.length > 0
+      ? inputMapping.map((m, i) => {
+          const typeBadgeMap = { String: 'S', Integer: 'I', Double: 'D', Boolean: 'B', DateTime: 'T', Object: 'O', File: 'F', 'Array[String]': 'A', 'Array[Object]': 'A' };
+          const badge = typeBadgeMap[m.type] || 'S';
+          return `
+        <div class="subwf-param-row">
+          <div class="subwf-param-left">
+            <span class="var-icon type-${m.type}" title="${m.type}">${badge}</span>
+            <div class="subwf-param-info">
+              <div class="subwf-param-name">${escHtml(m.label || m.name)}${m.required ? ' <span style="color:var(--md-error)">*</span>' : ''}</div>
+              <div class="subwf-param-desc">${escHtml(m.name)}${m.desc ? ' · ' + escHtml(m.desc) : ''}</div>
+            </div>
+          </div>
+          <div class="subwf-param-right">
+            ${renderExprEditor({
+              id: `subwf_input_${node.id}_${i}`,
+              value: m.value,
+              placeholder: `{{节点.变量}} 或固定值`,
+              nodeId: node.id,
+              singleLine: true,
+              onChange: `updateSubWfInputMapping(${node.id}, ${i}, this.value)`
+            })}
+          </div>
+        </div>`;
+      }).join('')
+      : `<div style="text-align:center;padding:var(--space-3);color:var(--md-outline);font-size:var(--font-size-xs)">目标工作流无需输入参数</div>`)
+    : `<div style="text-align:center;padding:var(--space-3);color:var(--md-outline);font-size:var(--font-size-xs)">请先选择目标工作流</div>`;
+
   return `<div class="config-section">
     <div class="config-section-title">工作流调用配置</div>
     <div class="config-field">
       <div class="config-field-label">选择工作流 <span class="required">*</span></div>
-      <select class="config-select" onchange="updateNodeConfig(${node.id}, 'targetWfId', this.value)"><option value="">请选择...</option>
+      <select class="config-select" onchange="updateNodeConfig(${node.id}, 'targetWfId', this.value); syncSubWfInputMapping(${node.id}); renderDesigner()"><option value="">请选择...</option>
         ${availableWfs.map(wf => {
           const wsName = workspaces.find(ws => ws.id === wf.wsId)?.name || '';
           return `<option value="${wf.id}" ${node.config?.targetWfId == wf.id ? 'selected' : ''}>${wf.name} (${wf.code})${wsName ? ' - ' + wsName : ''}</option>`;
@@ -2157,17 +2373,40 @@ function renderSubWfConfig(node) {
       <div class="config-field-help">仅显示已发布、允许引用、且授权当前空间的工作流</div>
     </div>
     ${availableWfs.length === 0 ? `<div style="padding:var(--space-3);background:var(--md-surface-container);border-radius:var(--radius-sm);font-size:var(--font-size-xs);color:var(--md-outline);text-align:center">暂无可调用的工作流。请确认目标工作流已发布、开启"允许被引用"、并授权了当前空间。</div>` : ''}
-    <div class="config-field">
-      <div class="config-field-label">输入参数映射</div>
-      <textarea class="expr-editor" style="min-height:50px" placeholder='{"param1": "\${variable1}", "param2": "\${variable2}"}' onchange="updateNodeConfig(${node.id}, 'inputMapping', this.value)">${node.config?.inputMapping || ''}</textarea>
-      <div class="config-field-help">将当前流程变量映射为目标工作流的输入参数</div>
+    <div class="config-section" style="margin-top:var(--space-2)">
+      <div class="config-section-title" style="display:flex;align-items:center;justify-content:space-between">输入参数映射 ${targetWf && inputMapping.length > 0 ? `<span style="font-size:10px;font-weight:400;color:var(--md-outline)">来自 ${escHtml(targetWf.name)}</span>` : ''}</div>
+      <div class="config-field-help" style="margin-bottom:var(--space-2)">将当前流程变量映射为目标工作流的输入参数${targetWf ? '，必填项需提供值' : ''}</div>
+      ${inputMappingHtml}
     </div>
     <div class="config-field">
       <div class="config-field-label">输出变量名</div>
       <input class="config-input" value="${node.config?.outputVar || 'wfResult'}" style="font-family:var(--font-family-mono)" onchange="updateNodeConfig(${node.id}, 'outputVar', this.value)" />
       <div class="config-field-help">目标工作流的执行结果将赋值到此变量</div>
     </div>
-  </div>`;
+    ${upstreamPreview}
+  </div>
+  ${outputVarsSection}`;
+}
+
+function updateSubWfInputMapping(nodeId, index, value) {
+  const node = designerNodes.find(n => n.id === nodeId);
+  if (!node?.config?.inputMapping?.[index]) return;
+  node.config.inputMapping[index].value = value;
+  designerDirty = true;
+}
+
+function syncSubWfInputMapping(nodeId) {
+  const node = designerNodes.find(n => n.id === nodeId);
+  if (!node) return;
+  // Force re-migration on next render by resetting to undefined
+  const oldValue = node.config.inputMapping;
+  if (typeof oldValue === 'string' || !oldValue) {
+    node.config.inputMapping = undefined;
+  } else {
+    // Keep existing values but let renderSubWfConfig re-sync
+    node.config.inputMapping = undefined;
+  }
+  designerDirty = true;
 }
 
 function renderEndConfig(node) {
@@ -4220,7 +4459,6 @@ function checkHasAdvancedValues(node) {
       if (c.suspendCallback || c.callbackTimeout) return true;
       break;
     case 'mq':
-      if (c.consumeTimeout) return true;
       break;
     case 'loop':
       if (c.iterationTimeout || c.iterationErrorBehavior) return true;
@@ -4452,7 +4690,6 @@ function renderHttpAdvancedConfig(node) {
 // --- MQ Advanced Config ---
 function renderMqAdvancedConfig(node) {
   const timeout = node.config?._timeout || 30;
-  const consumeTimeout = node.config?.consumeTimeout || 30;
 
   let html = `
     <div class="config-section">
@@ -4460,11 +4697,7 @@ function renderMqAdvancedConfig(node) {
       <div class="config-field">
         <div class="config-field-label">节点超时 (秒)</div>
         <input class="config-input" type="number" value="${timeout}" min="1" max="3600" onchange="updateNodeConfig(${node.id}, '_timeout', parseInt(this.value))" />
-      </div>
-      <div class="config-field">
-        <div class="config-field-label">消费超时 (秒)</div>
-        <input class="config-input" type="number" value="${consumeTimeout}" min="1" max="3600" onchange="updateNodeConfig(${node.id}, 'consumeTimeout', parseInt(this.value))" />
-        <div class="config-field-help">消费模式下等待消息的最长时间，与节点超时取较小值生效（默认 30 秒）</div>
+        <div class="config-field-help">消息发送的最大等待时间（默认 30 秒）</div>
       </div>
       ${renderMergeStrategyField(node)}
     </div>`;
@@ -4849,14 +5082,30 @@ function getNodeOutputs(node, forPicker = false) {
       break;
     }
       
-    case 'code':
-      outputs.push({ 
-        name: 'result', 
-        type: 'Object', 
-        desc: '代码 return 返回的结果',
-        editable: false
-      });
+    case 'code': {
+      const codeOutputVars = node.config?.codeOutputVars;
+      if (codeOutputVars && codeOutputVars.length > 0) {
+        codeOutputVars.forEach(v => {
+          if (v.name) {
+            outputs.push({
+              name: v.name,
+              type: v.type || 'Object',
+              desc: v.desc || '代码输出变量',
+              editable: true,
+              configField: 'codeOutputVars'
+            });
+          }
+        });
+      } else {
+        outputs.push({ 
+          name: 'result', 
+          type: 'Object', 
+          desc: '代码 return 返回的结果',
+          editable: false
+        });
+      }
       break;
+    }
       
     case 'assign': {
       const assignments = node.config?.assignments || [{ target: 'processedData', source: '', type: 'String' }];
@@ -4916,14 +5165,10 @@ function getNodeOutputs(node, forPicker = false) {
     }
       
     case 'mq': {
-      const msgVar = node.config?.messageVar || 'message';
-      outputs.push({ 
-        name: msgVar, 
-        type: 'Object', 
-        desc: '消费的消息内容',
-        editable: true,
-        configField: 'messageVar'
-      });
+      outputs.push(
+        { name: 'messageId', type: 'String', desc: '消息发送后返回的唯一标识', editable: false },
+        { name: 'success', type: 'Boolean', desc: '消息是否发送成功', editable: false }
+      );
       break;
     }
           
@@ -5909,8 +6154,25 @@ function generateSampleOutput(node) {
           return acc;
         }, {}) || {})
       };
-    case 'code':
+    case 'code': {
+      const codeOutputVars = node.config?.codeOutputVars;
+      if (codeOutputVars && codeOutputVars.length > 0) {
+        const sample = {};
+        codeOutputVars.forEach(v => {
+          if (v.name) {
+            switch (v.type) {
+              case 'Number': sample[v.name] = 0; break;
+              case 'Boolean': sample[v.name] = false; break;
+              case 'Array': sample[v.name] = []; break;
+              case 'Object': sample[v.name] = {}; break;
+              default: sample[v.name] = '示例值';
+            }
+          }
+        });
+        return sample;
+      }
       return { result: { data: '代码执行结果' } };
+    }
     case 'loop':
       return {
         index: 0,

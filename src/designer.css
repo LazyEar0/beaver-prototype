@@ -3967,6 +3967,80 @@
   background: var(--md-primary-container);
 }
 
+/* ========== Sub-Workflow Input Mapping (子工作流输入参数映射) ========== */
+
+.subwf-param-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  background: var(--md-surface);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 6px;
+  margin-bottom: var(--space-2);
+  transition: var(--transition-fast);
+}
+
+.subwf-param-row:hover {
+  border-color: var(--md-primary);
+  background: var(--md-surface-container);
+}
+
+.subwf-param-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 120px;
+  max-width: 160px;
+  flex-shrink: 0;
+}
+
+.subwf-param-info {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.subwf-param-name {
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  color: var(--md-on-surface);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.subwf-param-desc {
+  font-size: 10px;
+  color: var(--md-on-surface-variant);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.subwf-param-right {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ========== Code Output Variable Declaration (代码节点输出变量声明) ========== */
+
+.code-output-var-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px var(--space-2);
+  background: var(--md-surface);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 6px;
+  margin-bottom: 6px;
+  transition: var(--transition-fast);
+}
+
+.code-output-var-row:hover {
+  border-color: #16a34a;
+  background: #f0fdf4;
+}
+
 /* ========== Output Variables Section (输出变量区域) ========== */
 
 .output-vars-section {
