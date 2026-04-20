@@ -666,6 +666,38 @@ function renderCanvasNodes() {
         ${node.config?.condition ? `<div style="margin-top:4px;font-size:10px;color:var(--md-on-surface-variant)">${truncate(node.config.condition, 30)}</div>` : ''}
         ${node.config?.url ? `<div style="margin-top:4px;font-size:10px;color:var(--md-on-surface-variant)">${truncate(node.config.url, 30)}</div>` : ''}
         ${node.type === 'loop' ? `<div style="margin-top:4px;font-size:10px;color:var(--md-on-surface-variant)">${node.config?.loopMode === 'while' ? `While: ${truncate(node.config?.whileCondition || '未配置条件', 22)}` : `ForEach: ${truncate(node.config?.listVar || '未配置列表', 22)}`}</div>` : ''}
+        ${node.type === 'switch' ? (() => {
+          const branches = node.config?.branches || [];
+          const matchLabel = node.config?.matchMode === 'all' ? '全部匹配' : '首次匹配';
+          return `<div style="margin-top:4px;font-size:10px;color:var(--md-on-surface-variant)">${branches.length} 个分支 · ${matchLabel}</div>`;
+        })() : ''}
+        ${node.type === 'code' ? (() => {
+          const lang = node.config?.language || 'JavaScript';
+          const vars = node.config?.codeOutputVars || [];
+          const varNames = vars.map(v => v.name).filter(Boolean);
+          return `<div style="margin-top:4px;font-size:10px;color:var(--md-on-surface-variant)">${lang}${varNames.length ? ' → ' + truncate(varNames.join(', '), 18) : ''}</div>`;
+        })() : ''}
+        ${node.type === 'delay' ? (() => {
+          const isFixed = node.config?.delayMode !== '到指定时间';
+          return isFixed
+            ? `<div style="margin-top:4px;font-size:10px;color:var(--md-on-surface-variant)">延迟 ${node.config?.delayValue || 5} ${node.config?.delayUnit || '秒'}</div>`
+            : `<div style="margin-top:4px;font-size:10px;color:var(--md-on-surface-variant)">到 ${truncate(node.config?.delayTarget || '未配置时间', 22)}</div>`;
+        })() : ''}
+        ${node.type === 'assign' ? (() => {
+          const assignments = node.config?.assignments || [];
+          const targets = assignments.map(a => a.target).filter(Boolean);
+          return targets.length ? `<div style="margin-top:4px;font-size:10px;color:var(--md-on-surface-variant)">${truncate(targets.join(', '), 30)}</div>` : '';
+        })() : ''}
+        ${node.type === 'output' ? (() => {
+          const mode = node.config?.outputMode === 'text' ? '文本模式' : '变量模式';
+          const vars = node.config?.outputVars || [];
+          return `<div style="margin-top:4px;font-size:10px;color:var(--md-on-surface-variant)">${mode}${vars.length ? ' · ' + vars.length + ' 个' : ''}</div>`;
+        })() : ''}
+        ${node.type === 'mq' && node.config?.topic ? `<div style="margin-top:4px;font-size:10px;color:var(--md-on-surface-variant)">Topic: ${truncate(node.config.topic, 24)}</div>` : ''}
+        ${node.type === 'workflow' ? (() => {
+          const targetWf = Object.values(wsWorkflows).flat().find(wf => wf.id == node.config?.targetWfId);
+          return targetWf ? `<div style="margin-top:4px;font-size:10px;color:var(--md-on-surface-variant)">${truncate(targetWf.name, 28)}</div>` : '';
+        })() : ''}
       </div>
       ${portsHtml}
     </div>`;
@@ -3570,7 +3602,11 @@ function onConnectionClick(e, connId) {
   renderDesigner();
 }
 
+let _connLeaveTimer = null;
+
 function onConnectionHover(e, connId) {
+  // Cancel any pending leave to prevent flicker when moving to overlay button
+  if (_connLeaveTimer) { clearTimeout(_connLeaveTimer); _connLeaveTimer = null; }
   if (designerHoveredConnId === connId) return;
   designerHoveredConnId = connId;
   renderDesigner();
@@ -3578,8 +3614,14 @@ function onConnectionHover(e, connId) {
 
 function onConnectionLeave(e, connId) {
   if (designerHoveredConnId !== connId) return;
-  designerHoveredConnId = null;
-  renderDesigner();
+  // Delay slightly so that entering the overlay button (which sits on top) cancels this
+  if (_connLeaveTimer) clearTimeout(_connLeaveTimer);
+  _connLeaveTimer = setTimeout(() => {
+    _connLeaveTimer = null;
+    if (designerHoveredConnId !== connId) return;
+    designerHoveredConnId = null;
+    renderDesigner();
+  }, 80);
 }
 
 function onConnectionContextMenu(e, connId) {
@@ -3597,6 +3639,7 @@ function onConnectionContextMenu(e, connId) {
 function deleteConnectionById(e, connId) {
   if (e) e.stopPropagation();
   if (designerReadonly) return;
+  if (_connLeaveTimer) { clearTimeout(_connLeaveTimer); _connLeaveTimer = null; }
   const conn = designerConnections.find(c => c.id === connId);
   if (!conn) return;
   const fromNode = designerNodes.find(n => n.id === conn.from);
@@ -4590,13 +4633,26 @@ function onMinimapDrag(e, minimapRect) {
 }
 
 // --- Keyboard Shortcuts ---
+function _designerWindowBlurHandler() {
+  // When window loses focus, modifier keys may not fire keyup — reset them
+  if (designerAltDown || designerSpaceDown) {
+    designerAltDown = false;
+    designerSpaceDown = false;
+    const container = document.getElementById('canvasContainer');
+    if (container && !designerIsPanning) container.style.cursor = '';
+    if (designerHoveredConnId) renderDesigner();
+  }
+}
+
 function setupDesignerKeys() {
   // Remove previous listeners
   document.removeEventListener('keydown', designerKeyHandler);
   document.removeEventListener('keyup', designerKeyUpHandler);
+  window.removeEventListener('blur', _designerWindowBlurHandler);
   if (designerActive) {
     document.addEventListener('keydown', designerKeyHandler);
     document.addEventListener('keyup', designerKeyUpHandler);
+    window.addEventListener('blur', _designerWindowBlurHandler);
   }
 }
 
