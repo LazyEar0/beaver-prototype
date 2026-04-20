@@ -1435,6 +1435,72 @@
   r: 3.5;
 }
 
+/* --- Connection HTML Overlay (replaces SVG buttons) --- */
+.conn-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10;
+  overflow: hidden;
+}
+
+/* Delete button — shown at midpoint of hovered/selected connection */
+.conn-overlay-delete {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 1.5px solid #bbb;
+  background: #fff;
+  cursor: pointer;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+  padding: 0;
+}
+
+.conn-overlay-delete:hover {
+  background: #fef2f2;
+  border-color: #dc2626;
+  box-shadow: 0 2px 8px rgba(220,38,38,0.2);
+}
+
+.conn-overlay-delete.selected {
+  border-color: #1890FF;
+  box-shadow: 0 1px 6px rgba(24,144,255,0.2);
+}
+
+.conn-overlay-delete.selected:hover {
+  background: #fef2f2;
+  border-color: #dc2626;
+}
+
+/* Endpoint handle — shown at both ends of selected connection */
+.conn-overlay-handle {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 2px solid #1890FF;
+  background: #fff;
+  cursor: grab;
+  pointer-events: auto;
+  padding: 0;
+  box-shadow: 0 1px 4px rgba(24,144,255,0.25);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.conn-overlay-handle:hover {
+  transform: translate(-50%, -50%) scale(1.3);
+  box-shadow: 0 2px 8px rgba(24,144,255,0.4);
+  background: #eff6ff;
+}
+
 /* --- Connection Context Menu Info --- */
 .context-menu-info {
   font-size: 12px;

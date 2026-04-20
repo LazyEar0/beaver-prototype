@@ -505,6 +505,9 @@ function renderDesigner() {
           <div class="canvas-nodes" id="canvasNodes" style="transform: translate(${designerPanX}px, ${designerPanY}px) scale(${designerZoom})">
             ${renderCanvasNodes()}
           </div>
+          <div class="conn-overlay" id="connOverlay">
+            ${renderConnOverlay()}
+          </div>
         </div>
         <div class="canvas-controls">
           <button class="canvas-control-btn" onclick="designerZoomOut()" title="缩小视图">${icons.arrowDown}</button>
@@ -744,32 +747,73 @@ function renderConnections() {
       html += `<text x="${midX}" y="${midY - 10}" text-anchor="middle" font-size="11" fill="${labelColor}" font-weight="700" font-family="Roboto, sans-serif" paint-order="stroke" stroke="#fff" stroke-width="3" style="pointer-events:none">${conn.label}</text>`;
     }
 
-    // Hovered or selected: show delete button at midpoint (n8n style)
-    if (isHovered || isSelected) {
-      if (!isAltDelete) {
-        html += `<g class="conn-delete-btn" onclick="deleteConnectionById(event, ${conn.id})" style="cursor:pointer">
-          <circle cx="${midX}" cy="${midY}" r="10" fill="#fff" stroke="${isSelected ? '#1890FF' : '#bbb'}" stroke-width="1.5" />
-          <line x1="${midX - 4}" y1="${midY - 4}" x2="${midX + 4}" y2="${midY + 4}" stroke="#dc2626" stroke-width="2" stroke-linecap="round" />
-          <line x1="${midX + 4}" y1="${midY - 4}" x2="${midX - 4}" y2="${midY + 4}" stroke="#dc2626" stroke-width="2" stroke-linecap="round" />
-        </g>`;
-      }
-
-      // Endpoint handles (draggable circles) when selected
-      if (isSelected) {
-        html += `<g class="conn-endpoint-handle" onmousedown="onEndpointDragStart(event, ${conn.id}, 'from')" style="cursor:grab">
-          <circle cx="${fromPos.x}" cy="${fromPos.y}" r="6" fill="#fff" stroke="#1890FF" stroke-width="2" />
-          <circle cx="${fromPos.x}" cy="${fromPos.y}" r="2.5" fill="#1890FF" />
-        </g>`;
-        html += `<g class="conn-endpoint-handle" onmousedown="onEndpointDragStart(event, ${conn.id}, 'to')" style="cursor:grab">
-          <circle cx="${toPos.x}" cy="${toPos.y}" r="6" fill="#fff" stroke="#1890FF" stroke-width="2" />
-          <circle cx="${toPos.x}" cy="${toPos.y}" r="2.5" fill="#1890FF" />
-        </g>`;
-      }
-    }
-
     html += '</g>';
     return html;
   }).join('');
+}
+
+// --- Connection HTML Overlay (delete btn + endpoint handles as HTML elements) ---
+// This avoids SVG pointer-events inheritance issues entirely.
+function renderConnOverlay() {
+  if (designerDebugMode) return '';
+  const parts = [];
+
+  designerConnections.forEach(conn => {
+    const fromNode = designerNodes.find(n => n.id === conn.from);
+    const toNode = designerNodes.find(n => n.id === conn.to);
+    if (!fromNode || !toNode) return;
+
+    const fromPos = getPortPosition(fromNode, conn.fromPort || 'out');
+    const toPos = getPortPosition(toNode, conn.toPort || 'in');
+
+    const midX = (fromPos.x + toPos.x) / 2;
+    const midY = (fromPos.y + toPos.y) / 2;
+
+    const isSelected = designerSelectedConnId === conn.id;
+    const isHovered = designerHoveredConnId === conn.id;
+    const isAltDelete = isHovered && designerAltDown;
+
+    // Convert canvas coords → screen coords
+    const sx = midX * designerZoom + designerPanX;
+    const sy = midY * designerZoom + designerPanY;
+
+    // Delete button (shown on hover or selected, not in alt-delete mode)
+    if ((isHovered || isSelected) && !isAltDelete) {
+      const btnColor = isSelected ? '#1890FF' : '#bbb';
+      parts.push(`
+        <button class="conn-overlay-delete${isSelected ? ' selected' : ''}"
+          style="left:${sx}px;top:${sy}px;border-color:${btnColor}"
+          onclick="deleteConnectionById(event,${conn.id})"
+          title="删除连线">
+          <svg width="10" height="10" viewBox="0 0 10 10">
+            <line x1="2" y1="2" x2="8" y2="8" stroke="#dc2626" stroke-width="1.8" stroke-linecap="round"/>
+            <line x1="8" y1="2" x2="2" y2="8" stroke="#dc2626" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+        </button>`);
+    }
+
+    // Endpoint handles (shown when selected)
+    if (isSelected) {
+      const sfx = fromPos.x * designerZoom + designerPanX;
+      const sfy = fromPos.y * designerZoom + designerPanY;
+      const stx = toPos.x * designerZoom + designerPanX;
+      const sty = toPos.y * designerZoom + designerPanY;
+
+      parts.push(`
+        <button class="conn-overlay-handle"
+          style="left:${sfx}px;top:${sfy}px"
+          onmousedown="onEndpointDragStart(event,${conn.id},'from')"
+          title="拖拽重连起点">
+        </button>
+        <button class="conn-overlay-handle"
+          style="left:${stx}px;top:${sty}px"
+          onmousedown="onEndpointDragStart(event,${conn.id},'to')"
+          title="拖拽重连终点">
+        </button>`);
+    }
+  });
+
+  return parts.join('');
 }
 
 function getPortPosition(node, port) {
