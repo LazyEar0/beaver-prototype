@@ -628,7 +628,7 @@ function renderCanvasNodes() {
     // (loop body and done never fire simultaneously, so merging makes no sense)
     const loopPortInputs = inputConns.filter(c => {
       const src = designerNodes.find(n => n.id === c.from);
-      return src && src.type === 'loop' && (c.fromPort === 'loop' || c.fromPort === 'done');
+      return src && src.type === 'loop' && (c.fromPort === 'loop' || c.fromPort === 'done' || c.fromPort === 'break');
     });
     const showMerge = inputConns.length > 1 && node.type !== 'end' && loopPortInputs.length < inputConns.length;
     const mergeIndicator = showMerge ? `<div class="merge-strategy-badge" onclick="event.stopPropagation();showMergeStrategyConfig(${node.id})" title="汇合策略: ${node.config?._mergeStrategy === 'any' ? '任一完成' : '等待全部'}">${node.config?._mergeStrategy === 'any' ? '任一' : '全部'}</div>` : '';
@@ -651,7 +651,9 @@ function renderCanvasNodes() {
     } else if (node.type === 'loop') {
       // Loop node: "loop body" (bottom-left), optional "break" (bottom-right), "done" (right)
       const showBreak = node.config?.allowBreak !== false;
-      portsHtml += `<div class="canvas-node-port port-loop" data-port="loop" data-node="${node.id}"><span class="canvas-node-port-label" style="bottom:-18px;left:50%;transform:translateX(-50%);color:#7c3aed;white-space:nowrap;font-size:10px">循环体</span></div>`;
+      // When Break is disabled, center the loop port; otherwise shift it left to 25%
+      const loopPortStyle = showBreak ? '' : 'style="left:50%"';
+      portsHtml += `<div class="canvas-node-port port-loop" data-port="loop" data-node="${node.id}" ${loopPortStyle}><span class="canvas-node-port-label" style="bottom:-18px;left:50%;transform:translateX(-50%);color:#7c3aed;white-space:nowrap;font-size:10px">循环体</span></div>`;
       if (showBreak) {
         portsHtml += `<div class="canvas-node-port port-break" data-port="break" data-node="${node.id}"><span class="canvas-node-port-label" style="bottom:-18px;left:50%;transform:translateX(-50%);color:#ea580c;white-space:nowrap;font-size:10px">Break</span></div>`;
       }
@@ -2033,15 +2035,18 @@ function renderDelayConfig(node) {
       <div class="config-field-help">范围：1 秒 ~ 30 天，需输入正整数</div>
     </div>`;
 
-  const targetInputId = `delay_target_${node.id}_${Date.now()}`;
+  const targetInputId = `delay_target_${node.id}`;
+  const dtPickerId = `delay_dt_${node.id}`;
   const targetTimeField = `<div class="config-field">
       <div class="config-field-label">目标时间</div>
       <div class="cond-right-wrap" style="position:relative">
-        <input id="${targetInputId}" class="config-input" type="text" value="${escHtml(node.config?.delayTarget || '')}" placeholder="输入时间或点击 ⊙ 引用变量" onchange="updateNodeConfig(${node.id}, 'delayTarget', this.value)" style="padding-right:28px;width:100%;font-family:var(--font-family-mono)" />
+        <input id="${targetInputId}" class="config-input" type="text" value="${escHtml(node.config?.delayTarget || '')}" placeholder="选择或输入日期时间" onchange="updateNodeConfig(${node.id}, 'delayTarget', this.value)" style="padding-right:54px;width:100%;font-family:var(--font-family-mono)" />
+        <button class="cond-ref-btn" style="right:26px" title="选择日期时间" onclick="(function(){var p=document.getElementById('${dtPickerId}');if(p.showPicker)p.showPicker();else p.click()})()">📅</button>
         <button class="cond-ref-btn" title="引用变量" onclick="showCondVarPicker('${targetInputId}', ${node.id}, 'updateNodeConfig(${node.id},&quot;delayTarget&quot;,')">⊙</button>
+        <input id="${dtPickerId}" type="datetime-local" style="position:absolute;opacity:0;pointer-events:none;width:1px;height:1px;top:0;right:0" onchange="(function(v){var d=new Date(v);var pad=function(n){return String(n).padStart(2,'0')};var fmt=d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+' '+pad(d.getHours())+':'+pad(d.getMinutes());var inp=document.getElementById('${targetInputId}');inp.value=fmt;updateNodeConfig(${node.id},'delayTarget',fmt)})(this.value)" />
         <div id="${targetInputId}_picker" class="var-picker-dropdown" style="display:none"></div>
       </div>
-      <div class="config-field-help">输入日期时间（如 2025-04-20 18:00）或点击 ⊙ 引用变量，目标时间须大于当前且在 30 天内</div>
+      <div class="config-field-help">点击 📅 选择日期时间，或手动输入（如 2025-04-20 18:00）；点击 ⊙ 引用变量；目标时间须大于当前且在 30 天内</div>
     </div>`;
 
   return `<div class="config-section">
@@ -3048,6 +3053,11 @@ function getLoopBodyDescendants(loopNodeId) {
       .filter(c => c.from === nid && c.to !== loopNodeId)
       .forEach(c => { if (!visited.has(c.to)) stack.push(c.to); });
   }
+  // Also include nodes connected via the 'break' port as part of the loop's scope
+  const breakConn = designerConnections.find(c => c.from === loopNodeId && c.fromPort === 'break');
+  if (breakConn && !visited.has(breakConn.to)) {
+    bodySet.add(breakConn.to);
+  }
   return bodySet;
 }
 
@@ -3122,7 +3132,8 @@ function getProblems() {
           const owner = getOwnerLoopNode(node.id);
           return owner != null;
         })();
-        if (!hasOut && !isLoopBodyTail) {
+        const isBreakNode = node.type === 'break';
+        if (!hasOut && !isLoopBodyTail && !isBreakNode) {
           problems.push({ level: 'warning', message: `节点「${node.name}」没有输出连线`, location: node.code, nodeId: node.id });
         }
         // Detect loop body boundary escape: a node inside a loop body connects to a node outside
@@ -5926,6 +5937,10 @@ function getNodeOutputs(node, forPicker = false) {
       });
       break;
     }
+
+    case 'break':
+      // Break nodes have no outputs — they just signal the loop to stop
+      break;
       
     case 'workflow': {
       const wfOutputVars = node.config?.wfOutputVars;
