@@ -1629,10 +1629,10 @@
   pointer-events: auto;
   white-space: nowrap;
   z-index: 20;
-  animation: fadeInUp 0.15s ease;
+  animation: connToolbarFadeIn 0.15s ease;
 }
 
-@keyframes fadeInUp {
+@keyframes connToolbarFadeIn {
   from { opacity: 0; transform: translate(-50%, -90%); }
   to   { opacity: 1; transform: translate(-50%, -100%); }
 }
