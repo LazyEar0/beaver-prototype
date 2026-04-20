@@ -225,7 +225,7 @@ let wsFolders = {
 // Workflows per workspace
 let wsWorkflows = {
   1: [
-    { id: 1, name: '酒店搜索', code: 'HTL_SEARCH', desc: '根据条件搜索可用酒店列表', type: 'app', allowRef: true, status: 'published', version: 3, creator: 'Sukey Wu', owners: [101, 103], folderId: 2, wsId: 1, createdAt: '2025-01-20', editedAt: '2025-04-13 14:30', lastRun: 'success', runningCount: 0, execCount: 45, debugPassed: true, inputs: [
+    { id: 1, name: '酒店搜索', code: 'HTL_SEARCH', desc: '根据条件搜索可用酒店列表', type: 'app', allowRef: true, status: 'published', version: 5, creator: 'Sukey Wu', owners: [101, 103], folderId: 2, wsId: 1, createdAt: '2025-01-20', editedAt: '2025-04-13 14:30', lastRun: 'success', runningCount: 0, execCount: 45, debugPassed: true, inputs: [
       { name: 'city', label: '目标城市', type: 'String', required: true, desc: '搜索的目标城市名称' },
       { name: 'checkInDate', label: '入住日期', type: 'DateTime', required: true, desc: '预期入住日期时间' },
       { name: 'checkOutDate', label: '退房日期', type: 'DateTime', required: true, desc: '预期退房日期时间' },
@@ -233,41 +233,54 @@ let wsWorkflows = {
       { name: 'maxPrice', label: '最高价格', type: 'Double', required: false, desc: '每晚最高价格限制（元），不填则不限' },
       { name: 'includeFullBooked', label: '包含满房酒店', type: 'Boolean', required: false, desc: '是否在结果中包含当前已满房的酒店' },
     ], versions: [
-      { v: 3, status: 'current', publishedAt: '2025-04-13 14:00', publisher: 'Sukey Wu', note: '优化搜索性能' },
-      { v: 2, status: 'history', publishedAt: '2025-03-20 10:00', publisher: 'Admin', note: '增加价格筛选' },
-      { v: 1, status: 'history', publishedAt: '2025-02-01 09:00', publisher: 'Sukey Wu', note: '初始版本' },
+      { v: 5, status: 'current', publishedAt: '2025-04-13 14:00', publisher: 'Sukey Wu', note: '回滚至v3', tags: ['rollback'], rollbackFrom: 3 },
+      { v: 4, status: 'history', publishedAt: '2025-04-10 09:00', publisher: 'Admin', note: '增加多城市联合搜索', tags: [] },
+      { v: 3, status: 'history', publishedAt: '2025-03-20 10:00', publisher: 'Admin', note: '增加价格筛选', tags: [] },
+      { v: 2, status: 'history', publishedAt: '2025-02-15 14:00', publisher: 'Sukey Wu', note: '强制发布紧急修复', tags: ['unverified'] },
+      { v: 1, status: 'history', publishedAt: '2025-02-01 09:00', publisher: 'Sukey Wu', note: '初始版本', tags: [] },
     ] },
     { id: 2, name: '酒店预订确认', code: 'HTL_CONFIRM', desc: '处理酒店预订确认和通知', type: 'app', allowRef: false, status: 'published', version: 2, creator: 'Admin', owners: [102], folderId: 1, wsId: 1, createdAt: '2025-01-25', editedAt: '2025-04-12 10:30', lastRun: 'running', runningCount: 2, execCount: 32, debugPassed: true, inputs: [
       { name: 'orderId', label: '订单编号', type: 'String', required: true, desc: '需要确认的订单唯一编号' },
       { name: 'notifyGuest', label: '通知客人', type: 'Boolean', required: false, desc: '确认后是否自动发送通知给客人' },
     ], versions: [
-      { v: 2, status: 'current', publishedAt: '2025-04-10 16:00', publisher: 'Admin', note: '增加短信通知' },
-      { v: 1, status: 'history', publishedAt: '2025-02-05 14:00', publisher: 'Admin', note: '' },
+      { v: 2, status: 'current', publishedAt: '2025-04-10 16:00', publisher: 'Admin', note: '增加短信通知', tags: [] },
+      { v: 1, status: 'history', publishedAt: '2025-02-05 14:00', publisher: 'Admin', note: '', tags: [] },
     ] },
     { id: 3, name: '订单取消处理', code: 'HTL_CANCEL', desc: '自动化处理客户取消订单请求', type: 'app', allowRef: true, status: 'published', version: 1, creator: 'Sukey Wu', owners: [101], folderId: 3, wsId: 1, createdAt: '2025-02-15', editedAt: '2025-04-08 09:15', lastRun: 'failed', runningCount: 0, execCount: 18, debugPassed: true, inputs: [
       { name: 'orderId', label: '订单编号', type: 'String', required: true, desc: '需要取消的订单编号' },
       { name: 'reason', label: '取消原因', type: 'String', required: true, desc: '客户取消订单的原因说明' },
       { name: 'refundConfig', label: '退款配置', type: 'Object', required: false, desc: '自定义退款参数，JSON格式，如 {"ratio": 0.8, "method": "original"}' },
       { name: 'attachments', label: '附件材料', type: 'File', required: false, desc: '客户提供的相关证明材料' },
-    ], versions: [{ v: 1, status: 'current', publishedAt: '2025-03-01 11:00', publisher: 'Sukey Wu', note: '初始发布' }] },
+    ], versions: [{ v: 1, status: 'current', publishedAt: '2025-03-01 11:00', publisher: 'Sukey Wu', note: '初始发布', tags: [] }] },
     { id: 4, name: '退款流程', code: 'HTL_REFUND', desc: '客户退款申请审批与执行', type: 'app', allowRef: false, status: 'draft', version: 0, creator: '张三', owners: [103], folderId: 3, wsId: 1, createdAt: '2025-03-20', editedAt: '2025-04-07 15:45', lastRun: null, runningCount: 0, execCount: 0, debugPassed: false, versions: [] },
-    { id: 5, name: '智能客服对话', code: 'HTL_CHAT', desc: '基于AI的酒店预订智能客服', type: 'chat', allowRef: false, status: 'published', version: 2, creator: 'Sukey Wu', owners: [101, 107], folderId: null, wsId: 1, createdAt: '2025-02-28', editedAt: '2025-04-11 11:20', lastRun: 'success', runningCount: 1, execCount: 120, debugPassed: true, versions: [
-      { v: 2, status: 'current', publishedAt: '2025-04-05 09:30', publisher: 'Sukey Wu', note: '优化对话逻辑' },
-      { v: 1, status: 'history', publishedAt: '2025-03-10 14:00', publisher: 'Sukey Wu', note: '' },
+    { id: 5, name: '智能客服对话', code: 'HTL_CHAT', desc: '基于AI的酒店预订智能客服', type: 'chat', allowRef: false, status: 'published', version: 3, creator: 'Sukey Wu', owners: [101, 107], folderId: null, wsId: 1, createdAt: '2025-02-28', editedAt: '2025-04-11 11:20', lastRun: 'success', runningCount: 1, execCount: 120, debugPassed: true, versions: [
+      { v: 3, status: 'current', publishedAt: '2025-04-11 09:30', publisher: 'Sukey Wu', note: '回滚至v1', tags: ['rollback'], rollbackFrom: 1 },
+      { v: 2, status: 'history', publishedAt: '2025-04-05 09:30', publisher: 'Sukey Wu', note: '优化对话逻辑', tags: [] },
+      { v: 1, status: 'history', publishedAt: '2025-03-10 14:00', publisher: 'Sukey Wu', note: '', tags: [] },
     ] },
     { id: 6, name: '供应商价格同步', code: 'SUPPLIER_PRICE', desc: '定时同步各供应商最新价格', type: 'app', allowRef: false, status: 'disabled', version: 2, creator: 'Admin', owners: [102], folderId: 4, wsId: 1, createdAt: '2025-03-05', editedAt: '2025-04-06 16:00', lastRun: 'success', runningCount: 0, execCount: 60, debugPassed: true, versions: [
-      { v: 2, status: 'current', publishedAt: '2025-03-25 10:00', publisher: 'Admin', note: '增加Agoda接入' },
-      { v: 1, status: 'history', publishedAt: '2025-03-10 09:00', publisher: 'Admin', note: '' },
+      { v: 2, status: 'current', publishedAt: '2025-03-25 10:00', publisher: 'Admin', note: '增加Agoda接入', tags: [] },
+      { v: 1, status: 'history', publishedAt: '2025-03-10 09:00', publisher: 'Admin', note: '', tags: [] },
     ] },
-    { id: 7, name: '预订数据报表', code: 'HTL_REPORT', desc: '每日酒店预订统计报表', type: 'app', allowRef: false, status: 'published', version: 1, creator: '钱七', owners: [107], folderId: null, wsId: 1, createdAt: '2025-03-25', editedAt: '2025-04-09 08:00', lastRun: 'success', runningCount: 0, execCount: 15, debugPassed: true, versions: [{ v: 1, status: 'current', publishedAt: '2025-04-01 10:00', publisher: '钱七', note: '初始版本' }] },
+    { id: 7, name: '预订数据报表', code: 'HTL_REPORT', desc: '每日酒店预订统计报表', type: 'app', allowRef: false, status: 'published', version: 1, creator: '钱七', owners: [107], folderId: null, wsId: 1, createdAt: '2025-03-25', editedAt: '2025-04-09 08:00', lastRun: 'success', runningCount: 0, execCount: 15, debugPassed: true, versions: [{ v: 1, status: 'current', publishedAt: '2025-04-01 10:00', publisher: '钱七', note: '初始版本', tags: [] }] },
     { id: 8, name: '库存预警通知', code: 'HTL_STOCK_ALERT', desc: '酒店库存不足自动预警', type: 'app', allowRef: false, status: 'draft', version: 0, creator: '李四', owners: [104], folderId: null, wsId: 1, createdAt: '2025-04-10', editedAt: '2025-04-13 09:30', lastRun: null, runningCount: 0, execCount: 0, debugPassed: false, versions: [] },
   ],
   2: [
-    { id: 20, name: '航班信息拉取', code: 'FLT_PULL', desc: '从供应商API拉取航班数据', type: 'app', allowRef: true, status: 'published', version: 4, creator: 'Admin', owners: [102], folderId: 10, wsId: 2, createdAt: '2025-02-05', editedAt: '2025-04-12 09:15', lastRun: 'success', runningCount: 0, execCount: 200, debugPassed: true, versions: [] },
-    { id: 21, name: '库存更新', code: 'FLT_INVENTORY', desc: '实时更新机票库存', type: 'app', allowRef: false, status: 'published', version: 2, creator: 'Sukey Wu', owners: [101], folderId: 10, wsId: 2, createdAt: '2025-02-10', editedAt: '2025-04-11 15:30', lastRun: 'running', runningCount: 1, execCount: 150, debugPassed: true, versions: [] },
+    { id: 20, name: '航班信息拉取', code: 'FLT_PULL', desc: '从供应商API拉取航班数据', type: 'app', allowRef: true, status: 'published', version: 4, creator: 'Admin', owners: [102], folderId: 10, wsId: 2, createdAt: '2025-02-05', editedAt: '2025-04-12 09:15', lastRun: 'success', runningCount: 0, execCount: 200, debugPassed: true, versions: [
+      { v: 4, status: 'current', publishedAt: '2025-04-12 09:15', publisher: 'Admin', note: '增加航司代码映射', tags: [] },
+      { v: 3, status: 'history', publishedAt: '2025-04-01 10:00', publisher: 'Admin', note: '紧急修复超时问题', tags: ['unverified'] },
+      { v: 2, status: 'history', publishedAt: '2025-03-15 14:00', publisher: 'Admin', note: '增加多供应商轮询', tags: [] },
+      { v: 1, status: 'history', publishedAt: '2025-02-10 09:00', publisher: 'Admin', note: '初始版本', tags: [] },
+    ] },
+    { id: 21, name: '库存更新', code: 'FLT_INVENTORY', desc: '实时更新机票库存', type: 'app', allowRef: false, status: 'published', version: 2, creator: 'Sukey Wu', owners: [101], folderId: 10, wsId: 2, createdAt: '2025-02-10', editedAt: '2025-04-11 15:30', lastRun: 'running', runningCount: 1, execCount: 150, debugPassed: true, versions: [
+      { v: 2, status: 'current', publishedAt: '2025-04-11 15:30', publisher: 'Sukey Wu', note: '增加库存预警阈值', tags: [] },
+      { v: 1, status: 'history', publishedAt: '2025-02-20 10:00', publisher: 'Sukey Wu', note: '初始版本', tags: [] },
+    ] },
     { id: 22, name: '价格计算', code: 'FLT_PRICE_CALC', desc: '动态计算机票价格', type: 'app', allowRef: true, status: 'draft', version: 0, creator: '张三', owners: [103], folderId: null, wsId: 2, createdAt: '2025-03-20', editedAt: '2025-04-08 11:00', lastRun: null, runningCount: 0, execCount: 0, debugPassed: false, versions: [] },
   ],
-  3: [{ id: 30, name: '数据格式校验', code: 'DC_VALIDATE', desc: '校验上游数据格式', type: 'app', allowRef: true, status: 'published', version: 1, creator: 'Sukey Wu', owners: [101], folderId: null, wsId: 3, createdAt: '2025-02-25', editedAt: '2025-04-11 16:45', lastRun: 'success', runningCount: 0, execCount: 80, debugPassed: true, versions: [] }],
+  3: [{ id: 30, name: '数据格式校验', code: 'DC_VALIDATE', desc: '校验上游数据格式', type: 'app', allowRef: true, status: 'published', version: 1, creator: 'Sukey Wu', owners: [101], folderId: null, wsId: 3, createdAt: '2025-02-25', editedAt: '2025-04-11 16:45', lastRun: 'success', runningCount: 0, execCount: 80, debugPassed: true, versions: [
+      { v: 1, status: 'current', publishedAt: '2025-04-11 16:45', publisher: 'Sukey Wu', note: '初始版本', tags: [] },
+    ] }],
   4: [], 5: [], 6: [],
 };
 
@@ -1074,7 +1087,7 @@ function renderWsListPage() {
       const cc = wsCardColors[ws.id % wsCardColors.length];
       const rl = { admin: '管理员', member: '成员', viewer: '只读查看者' };
       const rc = { admin: 'role-badge-admin', member: 'role-badge-member', viewer: 'role-badge-viewer' };
-      return `<div class="workspace-card spotlight-card glare-hover" onclick="wsNavigateTo('detail', ${ws.id})"><div class="workspace-card-header"><div class="workspace-card-icon" style="background:${cc.bg};color:${cc.color}">${ws.name.charAt(0)}</div><div class="workspace-card-title-group"><div class="workspace-card-name">${ws.name}</div><span class="workspace-card-code">${icons.hash} ${ws.code}</span></div><div class="workspace-card-actions" onclick="event.stopPropagation()">${ws.myRole === 'admin' ? `<button class="table-action-btn" title="编辑" onclick="showEditWsModal(${ws.id})">${icons.edit}</button>` : ''}</div></div><div class="workspace-card-desc" title="${ws.desc}">${ws.desc || '暂无描述'}</div><div class="workspace-card-stats"><span class="ws-stat-item">${icons.users} <span class="ws-stat-value" data-count-up="${ws.members.length}">${ws.members.length}</span> 成员</span><span class="ws-stat-item">${icons.workflow} <span class="ws-stat-value" data-count-up="${ws.workflowCount}">${ws.workflowCount}</span> 工作流</span>${ws.runningInstances > 0 ? `<span class="ws-stat-item ws-stat-running">${icons.sync} <span class="ws-stat-value" data-count-up="${ws.runningInstances}">${ws.runningInstances}</span> 运行中</span>` : `<span class="ws-stat-item ws-stat-idle">${icons.sync} <span class="ws-stat-value">0</span> 运行中</span>`}</div><div class="workspace-card-footer"><span class="role-badge ${rc[ws.myRole]}">${icons.shield} ${rl[ws.myRole]}</span><span class="workspace-card-time">${icons.clock} 活跃于 ${ws.lastActiveAt}</span></div></div>`;
+      return `<div class="workspace-card spotlight-card glare-hover" onclick="wsNavigateTo('detail', ${ws.id})"><div class="workspace-card-header"><div class="workspace-card-icon" style="background:${cc.bg};color:${cc.color}">${ws.name.charAt(0)}</div><div class="workspace-card-title-group"><div class="workspace-card-name">${ws.name}</div><span class="workspace-card-code">${icons.hash} ${ws.code}</span></div><div class="workspace-card-actions" onclick="event.stopPropagation()">${ws.myRole === 'admin' ? `<button class="table-action-btn" title="编辑" onclick="showEditWsModal(${ws.id})">${icons.edit}</button>` : ''}</div></div><div class="workspace-card-desc" title="${ws.desc}">${ws.desc || '暂无描述'}</div><div class="workspace-card-stats"><span class="ws-stat-item">${icons.users} <span class="ws-stat-value" data-count-up="${ws.members.length}">${ws.members.length}</span> 成员</span><span class="ws-stat-item">${icons.workflow} <span class="ws-stat-value" data-count-up="${ws.workflowCount}">${ws.workflowCount}</span> 工作流</span></div><div class="workspace-card-footer"><span class="role-badge ${rc[ws.myRole]}">${icons.shield} ${rl[ws.myRole]}</span><span class="workspace-card-time">${icons.clock} 活跃于 ${ws.lastActiveAt}</span></div></div>`;
     }).join('')}</div>
     ${totalPages > 1 || total > 12 ? `<div class="pagination"><div class="pagination-info">第 ${start + 1}-${Math.min(start + wsListState.pageSize, total)} 条，共 ${total} 条</div><div class="pagination-controls">${wsListState.page > 1 ? `<button class="pagination-btn" onclick="wsListState.page--;render()">${icons.chevronLeft}</button>` : `<button class="pagination-btn disabled">${icons.chevronLeft}</button>`}${Array.from({length: totalPages}, (_, i) => `<button class="pagination-btn ${wsListState.page === i + 1 ? 'active' : ''}" onclick="wsListState.page=${i + 1};render()">${i + 1}</button>`).join('')}${wsListState.page < totalPages ? `<button class="pagination-btn" onclick="wsListState.page++;render()">${icons.chevronRight}</button>` : `<button class="pagination-btn disabled">${icons.chevronRight}</button>`}</div><div class="pagination-size"><span>每页</span><select onchange="wsListState.pageSize=parseInt(this.value);wsListState.page=1;render()"><option value="12" ${wsListState.pageSize === 12 ? 'selected' : ''}>12</option><option value="24" ${wsListState.pageSize === 24 ? 'selected' : ''}>24</option><option value="48" ${wsListState.pageSize === 48 ? 'selected' : ''}>48</option></select><span>条</span></div></div>` : ''}`}`;
 }
@@ -1319,6 +1332,7 @@ function renderWsWorkflowsTab(ws) {
             <div class="more-menu-wrapper"><button class="table-action-btn" title="更多" onclick="event.stopPropagation();toggleMoreMenu(this)">${icons.chevronDown}</button><div class="more-menu-panel hidden">
               ${isMemberOrAbove ? `<div class="more-menu-item" onclick="showCopyWfModal(${wf.id})">${icons.copy}<span>复制</span></div>` : ''}
               ${isMemberOrAbove ? `<div class="more-menu-item" onclick="showMoveWfModal(${wf.id})">${icons.move}<span>移动</span></div>` : ''}
+              ${wf.versions && wf.versions.length > 0 ? `<div class="more-menu-item" onclick="showVersionHistory(${wf.id})">${icons.history}<span>版本历史</span></div>` : ''}
               ${isAdmin ? `<div style="border-top:1px solid var(--md-outline-variant);margin:4px 0"></div><div class="more-menu-item danger" onclick="showDeleteWfModal(${wf.id})">${icons.trash}<span>删除</span></div>` : ''}
             </div></div>
           </div></td></tr>`;
@@ -1959,22 +1973,109 @@ function confirmExecuteWf(wfId) {
   wf.runningCount++; wf.lastRun = 'running';
   closeModal(); showToast('success', '工作流已启动', `实例 ID: ${execId}`); render();
 }
+function viewVersionReadonly(wfId, version) {
+  closeModal();
+  setTimeout(() => {
+    const wf = (wsWorkflows[wsCurrentId] || []).find(x => x.id === wfId); if (!wf) return;
+    const ver = (wf.versions || []).find(v => v.v === version); if (!ver) return;
+    const tagHtml = (ver.tags || []).map(t => {
+      if (t === 'rollback') return `<span class="version-tag version-tag-rollback">${icons.redo} 回滚${ver.rollbackFrom ? `自 v${ver.rollbackFrom}` : ''}</span>`;
+      if (t === 'unverified') return `<span class="version-tag version-tag-unverified">${icons.alertTriangle} 未调试</span>`;
+      return `<span class="version-tag">${t}</span>`;
+    }).join('');
+    showModal(`<div class="modal" style="max-width:560px"><div class="modal-header"><h2 class="modal-title">${icons.eye} 查看历史版本</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
+      <div style="display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-4);padding:var(--space-3);background:var(--md-surface-container);border-radius:var(--radius-md)">
+        <div class="content-item-icon wf-icon" style="width:36px;height:36px">${icons.workflow}</div>
+        <div><div style="font-weight:500">${wf.name}</div><div style="font-size:var(--font-size-xs);color:var(--md-outline)">${wf.code}</div></div>
+        <div style="margin-left:auto;display:flex;align-items:center;gap:var(--space-2)"><span class="version-item-badge">v${ver.v}</span>${tagHtml}</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3);margin-bottom:var(--space-3)">
+        <div style="padding:var(--space-2) var(--space-3);background:var(--md-surface-container-low);border-radius:var(--radius-sm)"><div style="font-size:var(--font-size-xs);color:var(--md-outline)">发布人</div><div style="font-size:var(--font-size-sm);font-weight:500">${ver.publisher}</div></div>
+        <div style="padding:var(--space-2) var(--space-3);background:var(--md-surface-container-low);border-radius:var(--radius-sm)"><div style="font-size:var(--font-size-xs);color:var(--md-outline)">发布时间</div><div style="font-size:var(--font-size-sm);font-weight:500">${ver.publishedAt}</div></div>
+      </div>
+      ${ver.note ? `<div style="padding:var(--space-2) var(--space-3);background:var(--md-surface-container-low);border-radius:var(--radius-sm);margin-bottom:var(--space-3)"><div style="font-size:var(--font-size-xs);color:var(--md-outline)">版本说明</div><div style="font-size:var(--font-size-sm)">${ver.note}</div></div>` : ''}
+      <div style="padding:var(--space-4);background:var(--md-surface-container-low);border-radius:var(--radius-md);text-align:center">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="40" height="40" style="color:var(--md-outline);margin-bottom:var(--space-2)"><rect x="3" y="3" width="6" height="6" rx="1"/><rect x="15" y="3" width="6" height="6" rx="1"/><rect x="9" y="15" width="6" height="6" rx="1"/><path d="M6 9v3a1 1 0 0 0 1 1h4"/><path d="M18 9v3a1 1 0 0 1-1 1h-4"/><path d="M12 13v2"/></svg>
+        <div style="font-size:var(--font-size-sm);color:var(--md-outline)">此为历史版本只读视图</div>
+        <div style="font-size:var(--font-size-xs);color:var(--md-outline);margin-top:4px">如需编辑，请进入设计器编辑当前草稿</div>
+      </div>
+    </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">关闭</button><button class="btn btn-primary" onclick="closeModal();openDesigner(${wf.wsId}, ${wf.id})">进入设计器</button></div></div>`);
+  }, 250);
+}
+
 function showVersionHistory(wfId) {
   const wf = (wsWorkflows[wsCurrentId] || []).find(x => x.id === wfId); if (!wf) return;
-  showModal(`<div class="modal" style="max-width:600px"><div class="modal-header"><h2 class="modal-title">版本历史 - ${wf.name}</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
-  <div class="version-list">${wf.versions.length === 0 ? '<p style="text-align:center;color:var(--md-outline);padding:var(--space-8)">暂无发布版本</p>' : wf.versions.map(ver => `
-    <div class="version-item"><div style="display:flex;align-items:center;gap:var(--space-3);flex:1"><span class="version-item-badge ${ver.status === 'current' ? 'version-current' : ''}">v${ver.v}</span><div><div style="font-size:var(--font-size-sm);font-weight:500">${ver.status === 'current' ? '当前生效版本' : ver.status === 'draft' ? '草稿' : '历史版本'}</div><div style="font-size:var(--font-size-xs);color:var(--md-outline)">${ver.publishedAt} · ${ver.publisher}${ver.note ? ` · ${ver.note}` : ''}</div></div></div>
-    ${ver.status === 'history' ? `<button class="btn btn-secondary btn-sm" onclick="showRollbackModal(${wfId}, ${ver.v})">${icons.redo}<span>回滚</span></button>` : ''}</div>`).join('')}</div></div></div>`);
+  const versions = wf.versions || [];
+  const renderVersionTags = (ver) => {
+    const tags = ver.tags || [];
+    if (tags.length === 0) return '';
+    return tags.map(t => {
+      if (t === 'rollback') return `<span class="version-tag version-tag-rollback">${icons.redo} 回滚${ver.rollbackFrom ? `自 v${ver.rollbackFrom}` : ''}</span>`;
+      if (t === 'unverified') return '<span class="version-tag version-tag-unverified">' + icons.alertTriangle + ' 未调试</span>';
+      return `<span class="version-tag">${t}</span>`;
+    }).join('');
+  };
+  showModal(`<div class="modal" style="max-width:640px"><div class="modal-header"><h2 class="modal-title">${icons.history} 版本历史 - ${wf.name}</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body" style="padding:0">
+  <div class="version-history-list">${versions.length === 0 ? '<div style="text-align:center;color:var(--md-outline);padding:var(--space-8);font-size:var(--font-size-sm)">暂无发布版本</p>' :
+  versions.map((ver, idx) => `
+    <div class="version-history-item ${ver.status === 'current' ? 'version-history-current' : ''}" onclick="viewVersionReadonly(${wfId}, ${ver.v})" style="cursor:pointer">
+      <div class="version-history-timeline">
+        <div class="version-timeline-dot ${ver.status === 'current' ? 'active' : ''}"></div>
+        ${idx < versions.length - 1 ? '<div class="version-timeline-line"></div>' : ''}
+      </div>
+      <div class="version-history-content">
+        <div class="version-history-row">
+          <div class="version-history-info">
+            <span class="version-item-badge ${ver.status === 'current' ? 'version-current' : ''}">v${ver.v}</span>
+            ${ver.status === 'current' ? '<span class="version-status-current">当前生效</span>' : ''}
+            ${renderVersionTags(ver)}
+          </div>
+          <div class="version-history-actions">
+            ${ver.status === 'history' ? `<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();viewVersionReadonly(${wfId}, ${ver.v})" title="查看此版本流程图">${icons.eye}<span>查看</span></button><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();showRollbackModal(${wfId}, ${ver.v})" title="回滚到此版本">${icons.redo}<span>回滚</span></button>` : ''}
+          </div>
+        </div>
+        <div class="version-history-meta">${ver.publishedAt} · ${ver.publisher}</div>
+        ${ver.note ? `<div class="version-history-note">${ver.note}</div>` : ''}
+      </div>
+    </div>`).join('')}</div></div></div>`);
 }
 function showRollbackModal(wfId, targetVersion) {
   closeModal();
+  const wf = (wsWorkflows[wsCurrentId] || []).find(x => x.id === wfId); if (!wf) return;
+  const nextV = wf.version + 1;
   setTimeout(() => {
-    showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">确认回滚</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body"><p style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant)">确定回滚到 v${targetVersion} 吗？将基于 v${targetVersion} 创建一个新的草稿版本，当前发布的版本不受影响，您可以在编辑确认后重新发布。</p></div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="rollbackWf(${wfId}, ${targetVersion})">确认回滚</button></div></div>`);
+    showModal(`<div class="modal" style="max-width:480px"><div class="modal-header"><h2 class="modal-title">${icons.redo} 确认回滚</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
+      <div style="display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-4);padding:var(--space-3);background:var(--md-surface-container);border-radius:var(--radius-md)">
+        <span class="version-item-badge">v${targetVersion}</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="color:var(--md-outline)"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+        <span class="version-item-badge version-current">v${nextV}</span>
+        <span style="font-size:var(--font-size-xs);color:var(--md-outline)">新版本</span>
+      </div>
+      <p style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant);margin-bottom:var(--space-3)">确定回滚到 v${targetVersion} 吗？系统将基于 v${targetVersion} 创建新版本 v${nextV}，当前已发布版本不受影响。</p>
+      <div class="form-group"><label class="form-label">版本说明</label><textarea class="form-textarea" id="rollbackNote" rows="2" maxlength="200" placeholder="简要描述回滚原因">回滚至v${targetVersion}</textarea></div>
+      <div style="padding:var(--space-2) var(--space-3);background:rgba(0,90,193,0.06);border-radius:var(--radius-sm);border-left:3px solid var(--md-info)">
+        <div style="font-size:var(--font-size-xs);color:var(--md-info);font-weight:500">回滚后说明</div>
+        <ul style="font-size:var(--font-size-xs);color:var(--md-on-surface-variant);margin:4px 0 0;padding-left:16px;line-height:1.6">
+          <li>新版本 v${nextV} 将标记「回滚自 v${targetVersion}」标签</li>
+          <li>当前草稿内容不受影响</li>
+          <li>运行中实例不受影响，继续使用启动时版本</li>
+        </ul>
+      </div>
+    </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="rollbackWf(${wfId}, ${targetVersion})">确认回滚</button></div></div>`);
   }, 250);
 }
 function rollbackWf(wfId, targetVersion) {
   const wf = (wsWorkflows[wsCurrentId] || []).find(x => x.id === wfId); if (!wf) return;
-  closeModal(); showToast('success', '回滚成功', `已基于 v${targetVersion} 创建新草稿版本`); render();
+  const rollbackNote = document.getElementById('rollbackNote')?.value?.trim() || `回滚至v${targetVersion}`;
+  const now = new Date().toISOString();
+  // Mark existing current version as history
+  if (wf.versions) wf.versions.forEach(v => { if (v.status === 'current') v.status = 'history'; });
+  wf.version++;
+  const newVersion = { v: wf.version, status: 'current', publishedAt: now.slice(0, 16).replace('T', ' '), publisher: 'Sukey Wu', note: rollbackNote, tags: ['rollback'], rollbackFrom: targetVersion };
+  if (!wf.versions) wf.versions = [];
+  wf.versions.unshift(newVersion);
+  wf.editedAt = now.slice(0, 16).replace('T', ' ');
+  closeModal(); showToast('success', '回滚成功', `已基于 v${targetVersion} 创建新版本 v${wf.version}，版本标记「回滚自 v${targetVersion}」`); render();
 }
 
 // --- Publish Workflow from list ---
