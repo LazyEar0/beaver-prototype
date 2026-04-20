@@ -505,9 +505,9 @@ function renderDesigner() {
           <div class="canvas-nodes" id="canvasNodes" style="transform: translate(${designerPanX}px, ${designerPanY}px) scale(${designerZoom})">
             ${renderCanvasNodes()}
           </div>
-          <div class="conn-overlay" id="connOverlay">
-            ${renderConnOverlay()}
-          </div>
+        </div>
+        <div class="conn-overlay" id="connOverlay">
+          ${renderConnOverlay()}
         </div>
         <div class="canvas-controls">
           <button class="canvas-control-btn" onclick="designerZoomOut()" title="缩小视图">${icons.arrowDown}</button>
@@ -752,8 +752,8 @@ function renderConnections() {
   }).join('');
 }
 
-// --- Connection HTML Overlay (delete btn + endpoint handles as HTML elements) ---
-// This avoids SVG pointer-events inheritance issues entirely.
+// --- Connection HTML Overlay (delete btn + toolbar as HTML elements) ---
+// Placed outside canvasContainer to avoid mousedown event interception.
 function renderConnOverlay() {
   if (designerDebugMode) return '';
   const parts = [];
@@ -773,16 +773,15 @@ function renderConnOverlay() {
     const isHovered = designerHoveredConnId === conn.id;
     const isAltDelete = isHovered && designerAltDown;
 
-    // Convert canvas coords → screen coords
+    // Canvas coords → screen coords (conn-overlay is inside canvas-area, same as canvasContainer)
     const sx = midX * designerZoom + designerPanX;
     const sy = midY * designerZoom + designerPanY;
 
-    // Delete button (shown on hover or selected, not in alt-delete mode)
-    if ((isHovered || isSelected) && !isAltDelete) {
-      const btnColor = isSelected ? '#1890FF' : '#bbb';
+    // --- Hover: show × delete button at midpoint ---
+    if (isHovered && !isSelected && !isAltDelete) {
       parts.push(`
-        <button class="conn-overlay-delete${isSelected ? ' selected' : ''}"
-          style="left:${sx}px;top:${sy}px;border-color:${btnColor}"
+        <button class="conn-overlay-delete"
+          style="left:${sx}px;top:${sy}px"
           onclick="deleteConnectionById(event,${conn.id})"
           title="删除连线">
           <svg width="10" height="10" viewBox="0 0 10 10">
@@ -792,23 +791,36 @@ function renderConnOverlay() {
         </button>`);
     }
 
-    // Endpoint handles (shown when selected)
+    // --- Selected: show floating toolbar above midpoint ---
     if (isSelected) {
-      const sfx = fromPos.x * designerZoom + designerPanX;
-      const sfy = fromPos.y * designerZoom + designerPanY;
+      const fromName = fromNode.name || '起点';
+      const toName = toNode.name || '终点';
+      parts.push(`
+        <div class="conn-toolbar" style="left:${sx}px;top:${sy - 48 * designerZoom}px" onclick="event.stopPropagation()">
+          <span class="conn-toolbar-label">${fromName} → ${toName}</span>
+          <div class="conn-toolbar-sep"></div>
+          <button class="conn-toolbar-btn" onclick="onEndpointDragStart(event,${conn.id},'to')" title="重新连接到另一节点">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M17 3l4 4-4 4M21 7H9a4 4 0 000 8h3"/><path d="M7 17l-4-4 4-4"/>
+            </svg>
+            重连
+          </button>
+          <button class="conn-toolbar-btn danger" onclick="deleteConnectionById(event,${conn.id})" title="删除连线 (Delete)">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/>
+            </svg>
+            删除
+          </button>
+        </div>`);
+
+      // Endpoint handle at TARGET end only (to reconnect where it goes)
       const stx = toPos.x * designerZoom + designerPanX;
       const sty = toPos.y * designerZoom + designerPanY;
-
       parts.push(`
-        <button class="conn-overlay-handle"
-          style="left:${sfx}px;top:${sfy}px"
-          onmousedown="onEndpointDragStart(event,${conn.id},'from')"
-          title="拖拽重连起点">
-        </button>
         <button class="conn-overlay-handle"
           style="left:${stx}px;top:${sty}px"
           onmousedown="onEndpointDragStart(event,${conn.id},'to')"
-          title="拖拽重连终点">
+          title="拖拽到新节点重连">
         </button>`);
     }
   });
@@ -4526,8 +4538,7 @@ function renderContextMenu() {
     return `<div class="designer-context-menu" style="left:${m.x}px;top:${m.y}px" onclick="event.stopPropagation()">
     <div class="context-menu-item context-menu-info">${icons.workflow || '🔗'} ${fromName} → ${toName}</div>
     <div class="context-menu-divider"></div>
-    <div class="context-menu-item" onclick="reconnectConnectionFrom(${m.connId});closeContextMenu()">🔄 重连起点</div>
-    <div class="context-menu-item" onclick="reconnectConnectionTo(${m.connId});closeContextMenu()">🔄 重连终点</div>
+    <div class="context-menu-item" onclick="reconnectConnectionTo(${m.connId});closeContextMenu()">🔄 重新连接到其他节点</div>
     <div class="context-menu-divider"></div>
     <div class="context-menu-item danger" onclick="deleteSelectedConnection();closeContextMenu()">${icons.trash} 删除连线 <span class="context-menu-shortcut">Delete</span></div>
   </div>`;
@@ -5721,7 +5732,7 @@ function renderExprEditor(options) {
   
   const expandBtn = expandable ? `
     <button class="expr-expand-btn" 
-      onclick="openExprExpandModal('${editorId}', ${nodeId}, ${escAttr(JSON.stringify(label || id))}, ${escAttr(JSON.stringify(hint || placeholder))})"
+      onclick="openExprExpandModal('${editorId}', ${nodeId}, ${JSON.stringify(label || id).replace(/"/g, '&quot;')}, ${JSON.stringify(hint || placeholder).replace(/"/g, '&quot;')})"
       title="展开编辑">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
