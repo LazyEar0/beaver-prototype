@@ -49,7 +49,7 @@
           <div class="d-flex align-center ga-4 mb-3">
             <span class="text-caption d-flex align-center ga-1"><v-icon size="14">mdi-account-group-outline</v-icon><strong>{{ ws.members.length }}</strong> 成员</span>
             <span class="text-caption d-flex align-center ga-1"><v-icon size="14">mdi-sitemap-outline</v-icon><strong>{{ ws.workflowCount }}</strong> 工作流</span>
-            <span v-if="ws.runningInstances > 0" class="text-caption d-flex align-center ga-1" style="color:#16A34A"><v-icon size="14" color="success">mdi-sync</v-icon><strong>{{ ws.runningInstances }}</strong> 运行中</span>
+
           </div>
           <div class="d-flex align-center justify-space-between">
             <v-chip :color="roleColors[ws.myRole]" size="x-small" variant="tonal" label>

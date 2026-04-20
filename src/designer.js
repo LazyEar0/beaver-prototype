@@ -3021,6 +3021,16 @@ function toggleAuthorizedSpace(wsId, checked) {
 }
 
 // --- Version Panel ---
+function renderVersionTagHtml(ver) {
+  const tags = ver.tags || [];
+  if (tags.length === 0) return '';
+  return tags.map(t => {
+    if (t === 'rollback') return `<span class="version-tag version-tag-rollback">${icons.redo} 回滚${ver.rollbackFrom ? `自 v${ver.rollbackFrom}` : ''}</span>`;
+    if (t === 'unverified') return `<span class="version-tag version-tag-unverified">${icons.alertTriangle} 未调试</span>`;
+    return `<span class="version-tag">${t}</span>`;
+  }).join('');
+}
+
 function renderDesignerVersionPanel() {
   const wf = designerWf;
   const versions = wf.versions || [];
@@ -3031,21 +3041,93 @@ function renderDesignerVersionPanel() {
     </div>
     <div class="right-panel-body">
       ${versions.length === 0 ? '<div style="text-align:center;color:var(--md-outline);padding:var(--space-8);font-size:var(--font-size-sm)">暂无版本历史</div>' :
-      versions.map(ver => `
-        <div style="padding:var(--space-3);margin-bottom:var(--space-2);background:var(--md-surface-container);border-radius:var(--radius-sm)${ver.status === 'current' ? ';border-left:3px solid var(--md-primary)' : ''}">
-          <div style="display:flex;align-items:center;gap:var(--space-2);margin-bottom:4px">
-            <span class="version-badge" style="${ver.status === 'current' ? 'background:var(--md-primary);color:white' : ''}">v${ver.v}</span>
-            <span style="font-size:var(--font-size-xs);font-weight:500;color:var(--md-on-surface)">${ver.status === 'current' ? '当前生效' : '历史版本'}</span>
+      `<div class="version-history-list">${versions.map((ver, idx) => `
+        <div class="version-history-item ${ver.status === 'current' ? 'version-history-current' : ''}" onclick="viewDesignerVersion(${ver.v})" style="cursor:pointer">
+          <div class="version-history-timeline">
+            <div class="version-timeline-dot ${ver.status === 'current' ? 'active' : ''}"></div>
+            ${idx < versions.length - 1 ? '<div class="version-timeline-line"></div>' : ''}
           </div>
-          <div style="font-size:11px;color:var(--md-outline)">${ver.publishedAt} · ${ver.publisher}</div>
-          ${ver.note ? `<div style="font-size:11px;color:var(--md-on-surface-variant);margin-top:4px">${ver.note}</div>` : ''}
-          ${ver.status === 'history' ? `<div style="margin-top:6px;display:flex;gap:4px">
-            <button class="btn btn-ghost btn-sm" style="height:24px;font-size:11px" onclick="showToast('info','提示','查看此版本')">${icons.eye}<span>查看</span></button>
-            <button class="btn btn-ghost btn-sm" style="height:24px;font-size:11px" onclick="showToast('info','提示','回滚到此版本')">${icons.redo}<span>回滚</span></button>
-          </div>` : ''}
-        </div>
-      `).join('')}
+          <div class="version-history-content">
+            <div class="version-history-row">
+              <div class="version-history-info">
+                <span class="version-item-badge ${ver.status === 'current' ? 'version-current' : ''}">v${ver.v}</span>
+                ${ver.status === 'current' ? '<span class="version-status-current">当前生效</span>' : ''}
+                ${renderVersionTagHtml(ver)}
+              </div>
+              <div class="version-history-actions">
+                ${ver.status === 'history' ? `<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();viewDesignerVersion(${ver.v})" title="查看此版本">${icons.eye}<span>查看</span></button><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();showDesignerRollbackModal(${ver.v})" title="回滚到此版本">${icons.redo}<span>回滚</span></button>` : ''}
+              </div>
+            </div>
+            <div class="version-history-meta">${ver.publishedAt} · ${ver.publisher}</div>
+            ${ver.note ? `<div class="version-history-note">${ver.note}</div>` : ''}
+          </div>
+        </div>`).join('')}</div>`}
     </div>`;
+}
+
+function viewDesignerVersion(version) {
+  const wf = designerWf;
+  const ver = (wf.versions || []).find(v => v.v === version);
+  if (!ver) return;
+  const tagHtml = renderVersionTagHtml(ver);
+  showModal(`<div class="modal" style="max-width:560px"><div class="modal-header"><h2 class="modal-title">${icons.eye} 查看历史版本</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
+    <div style="display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-4);padding:var(--space-3);background:var(--md-surface-container);border-radius:var(--radius-md)">
+      <div class="content-item-icon wf-icon" style="width:36px;height:36px">${icons.workflow}</div>
+      <div><div style="font-weight:500">${wf.name}</div><div style="font-size:var(--font-size-xs);color:var(--md-outline)">${wf.code}</div></div>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:var(--space-2)"><span class="version-item-badge">v${ver.v}</span>${tagHtml}</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3);margin-bottom:var(--space-3)">
+      <div style="padding:var(--space-2) var(--space-3);background:var(--md-surface-container-low);border-radius:var(--radius-sm)"><div style="font-size:var(--font-size-xs);color:var(--md-outline)">发布人</div><div style="font-size:var(--font-size-sm);font-weight:500">${ver.publisher}</div></div>
+      <div style="padding:var(--space-2) var(--space-3);background:var(--md-surface-container-low);border-radius:var(--radius-sm)"><div style="font-size:var(--font-size-xs);color:var(--md-outline)">发布时间</div><div style="font-size:var(--font-size-sm);font-weight:500">${ver.publishedAt}</div></div>
+    </div>
+    ${ver.note ? `<div style="padding:var(--space-2) var(--space-3);background:var(--md-surface-container-low);border-radius:var(--radius-sm);margin-bottom:var(--space-3)"><div style="font-size:var(--font-size-xs);color:var(--md-outline)">版本说明</div><div style="font-size:var(--font-size-sm)">${ver.note}</div></div>` : ''}
+    <div style="padding:var(--space-4);background:var(--md-surface-container-low);border-radius:var(--radius-md);text-align:center">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="40" height="40" style="color:var(--md-outline);margin-bottom:var(--space-2)"><rect x="3" y="3" width="6" height="6" rx="1"/><rect x="15" y="3" width="6" height="6" rx="1"/><rect x="9" y="15" width="6" height="6" rx="1"/><path d="M6 9v3a1 1 0 0 0 1 1h4"/><path d="M18 9v3a1 1 0 0 1-1 1h-4"/><path d="M12 13v2"/></svg>
+      <div style="font-size:var(--font-size-sm);color:var(--md-outline)">此为历史版本只读视图</div>
+      <div style="font-size:var(--font-size-xs);color:var(--md-outline);margin-top:4px">不可编辑历史版本，如需修改请编辑当前草稿</div>
+    </div>
+  </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">关闭</button></div></div>`);
+}
+
+function showDesignerRollbackModal(targetVersion) {
+  const wf = designerWf;
+  if (!wf) return;
+  const nextV = wf.version + 1;
+  showModal(`<div class="modal" style="max-width:480px"><div class="modal-header"><h2 class="modal-title">${icons.redo} 确认回滚</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
+    <div style="display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-4);padding:var(--space-3);background:var(--md-surface-container);border-radius:var(--radius-md)">
+      <span class="version-item-badge">v${targetVersion}</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="color:var(--md-outline)"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+      <span class="version-item-badge version-current">v${nextV}</span>
+      <span style="font-size:var(--font-size-xs);color:var(--md-outline)">新版本</span>
+    </div>
+    <p style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant);margin-bottom:var(--space-3)">确定回滚到 v${targetVersion} 吗？系统将基于 v${targetVersion} 创建新版本 v${nextV}，当前已发布版本不受影响。</p>
+    <div class="form-group"><label class="form-label">版本说明</label><textarea class="form-textarea" id="designerRollbackNote" rows="2" maxlength="200" placeholder="简要描述回滚原因">回滚至v${targetVersion}</textarea></div>
+    <div style="padding:var(--space-2) var(--space-3);background:rgba(0,90,193,0.06);border-radius:var(--radius-sm);border-left:3px solid var(--md-info)">
+      <div style="font-size:var(--font-size-xs);color:var(--md-info);font-weight:500">回滚后说明</div>
+      <ul style="font-size:var(--font-size-xs);color:var(--md-on-surface-variant);margin:4px 0 0;padding-left:16px;line-height:1.6">
+        <li>新版本 v${nextV} 将标记「回滚自 v${targetVersion}」标签</li>
+        <li>当前草稿内容不受影响</li>
+        <li>运行中实例不受影响，继续使用启动时版本</li>
+      </ul>
+    </div>
+  </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="rollbackDesignerWf(${targetVersion})">确认回滚</button></div></div>`);
+}
+
+function rollbackDesignerWf(targetVersion) {
+  const wf = designerWf;
+  if (!wf) return;
+  const rollbackNote = document.getElementById('designerRollbackNote')?.value?.trim() || `回滚至v${targetVersion}`;
+  const now = new Date().toISOString();
+  // Mark existing current version as history
+  if (wf.versions) wf.versions.forEach(v => { if (v.status === 'current') v.status = 'history'; });
+  wf.version++;
+  const newVersion = { v: wf.version, status: 'current', publishedAt: now.slice(0, 16).replace('T', ' '), publisher: 'Sukey Wu', note: rollbackNote, tags: ['rollback'], rollbackFrom: targetVersion };
+  if (!wf.versions) wf.versions = [];
+  wf.versions.unshift(newVersion);
+  wf.editedAt = now.slice(0, 16).replace('T', ' ');
+  closeModal();
+  showToast('success', '回滚成功', `已基于 v${targetVersion} 创建新版本 v${wf.version}，版本标记「回滚自 v${targetVersion}」`);
+  renderDesigner();
 }
 
 // --- Bottom Panel ---
