@@ -861,6 +861,119 @@
   background: rgba(0, 0, 0, 0.06);
 }
 
+/* --- Node Type Convert Button (in right panel header) --- */
+.node-type-convert-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-full);
+  border: none;
+  background: transparent;
+  color: var(--md-on-surface-variant);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  transition: var(--transition-fast);
+}
+.node-type-convert-btn:hover {
+  background: var(--md-primary-container);
+  color: var(--md-on-primary-container);
+}
+
+/* --- Convert Node Type Modal Styles --- */
+.convert-category-label {
+  padding: 6px 14px 2px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--md-outline);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.convert-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px !important;
+}
+
+.convert-item-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.convert-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.convert-item-name {
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--md-on-surface);
+}
+
+.convert-item-hint {
+  font-size: 10px;
+  color: var(--md-outline);
+}
+
+/* --- Convert Confirmation Dialog --- */
+.convert-type-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.convert-warn-box {
+  background: var(--md-surface-container);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+}
+
+.convert-warn-section {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--md-outline);
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.convert-warn-item {
+  font-size: 12px;
+  padding: 3px 0;
+  color: var(--md-on-surface);
+}
+
+.convert-warn-keep {
+  color: var(--md-success, #16a34a);
+}
+
+.convert-warn-lose {
+  color: var(--md-error, #dc2626);
+}
+
+.convert-warn-remap {
+  color: var(--md-primary);
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+}
+
 .right-panel-close svg {
   width: 16px;
   height: 16px;
