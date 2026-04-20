@@ -432,16 +432,19 @@
   pointer-events: none;
 }
 
-/* Connection hover/selection is handled via JS rendering.
-   The transparent hit-area path inside .conn-group has pointer-events set inline.
-   The .canvas-svg itself is pointer-events:none so it doesn't block canvas panning. */
+/* SVG pointer-events 继承规则与 HTML 不同，需要用 SVG 专属值 `all` 覆盖父元素的 none */
 .canvas-svg .conn-group {
-  pointer-events: auto;
+  pointer-events: all;
+}
+
+/* 只让透明 hit-area path 接收事件，可见 path 不接收 */
+.canvas-svg .conn-group > path:first-child {
+  pointer-events: stroke;
 }
 
 .canvas-svg .conn-delete-btn,
 .canvas-svg .conn-endpoint-handle {
-  pointer-events: auto;
+  pointer-events: all;
 }
 
 .canvas-nodes {

@@ -54,6 +54,7 @@ let designerUndoStack = []; // Undo state stack (max 50)
 let designerRedoStack = []; // Redo state stack
 let designerMoreMenuOpen = false; // "More" dropdown menu state
 let designerDirty = false; // Track unsaved changes
+let designerActiveConfigTab = 'basic'; // 'basic' | 'advanced' — persists across renderDesigner()
 let designerVarPickerOpen = null; // Active variable picker: { editorId, position }
 let designerVarPickerHighlighted = -1; // Keyboard navigation highlight index
 
@@ -725,10 +726,9 @@ function renderConnections() {
 
     // Interaction group
     let html = '';
-    html += `<g class="conn-group" data-conn="${conn.id}" onmouseenter="onConnectionHover(event, ${conn.id})" onmouseleave="onConnectionLeave(event, ${conn.id})">`;
-
-    // Invisible wider path for easier hover detection
-    html += `<path d="${path}" fill="none" stroke="transparent" stroke-width="14" style="cursor:pointer" onclick="onConnectionClick(event, ${conn.id})" oncontextmenu="onConnectionContextMenu(event, ${conn.id})" />`;
+    html += `<g class="conn-group" data-conn="${conn.id}" style="pointer-events:all" onmouseenter="onConnectionHover(event, ${conn.id})" onmouseleave="onConnectionLeave(event, ${conn.id})">`;
+    // Invisible wider path for easier hover - also set pointer-events inline for SVG compatibility
+    html += `<path d="${path}" fill="none" stroke="transparent" stroke-width="14" style="pointer-events:stroke;cursor:pointer" onclick="onConnectionClick(event, ${conn.id})" oncontextmenu="onConnectionContextMenu(event, ${conn.id})" />`;
 
     // Glow path for selected/hovered state
     if (isSelected || isHovered) {
@@ -876,6 +876,7 @@ function renderNodeConfigPanel() {
   if (!node) { designerRightPanel = 'overview'; return renderOverviewPanel(); }
   const nt = nodeTypes.find(t => t.type === node.type) || {};
   const hasAdvancedValues = checkHasAdvancedValues(node);
+  const isAdvanced = designerActiveConfigTab === 'advanced';
 
   return `
     <div class="right-panel-header">
@@ -883,11 +884,11 @@ function renderNodeConfigPanel() {
       <button class="right-panel-close" onclick="deselectNode()">${icons.close}</button>
     </div>
     <div class="right-panel-tabs">
-      <div class="right-panel-tab active" id="rpTabBasic" onclick="switchNodeConfigTab('basic')">基础配置</div>
-      <div class="right-panel-tab" id="rpTabAdvanced" onclick="switchNodeConfigTab('advanced')">高级配置${hasAdvancedValues ? '<span class="advanced-dot"></span>' : ''}</div>
+      <div class="right-panel-tab ${!isAdvanced ? 'active' : ''}" id="rpTabBasic" onclick="switchNodeConfigTab('basic')">基础配置</div>
+      <div class="right-panel-tab ${isAdvanced ? 'active' : ''}" id="rpTabAdvanced" onclick="switchNodeConfigTab('advanced')">高级配置${hasAdvancedValues ? '<span class="advanced-dot"></span>' : ''}</div>
     </div>
     <div class="right-panel-body" id="nodeConfigBody">
-      ${renderNodeConfigFields(node, nt)}
+      ${isAdvanced ? renderAdvancedConfig(node) : renderNodeConfigFields(node, nt)}
     </div>`;
 }
 
@@ -1626,18 +1627,106 @@ function renderSwitchConfig(node) {
 
 function renderHttpConfig(node) {
   const upstreamPreview = renderUpstreamOutputPreview(node.id);
-  const outputVarsSection = renderOutputVariablesSection(node);
-  
+  const outputVarsSection = renderHttpOutputVariablesSection(node);
+  const method = node.config?.method || 'GET';
+  const bodyType = node.config?.bodyType || 'json'; // 'json' | 'form' | 'raw' | 'none'
+  const hasBody = ['POST', 'PUT', 'PATCH'].includes(method);
+  const queryParams = node.config?.queryParams || [];
+  const successConditions = node.config?.successConditions || [];
+
+  // Body placeholder & hint by type
+  const bodyPlaceholders = {
+    json: '{"key": "value", "userId": "{{input.userId}}"}',
+    form: 'field1=value1&field2={{input.field2}}',
+    raw: '任意文本内容，支持 {{变量}} 引用',
+    none: ''
+  };
+  const bodyHints = {
+    json: 'JSON 格式，支持 {{变量}} 引用',
+    form: 'URL 编码格式，支持 {{变量}} 引用',
+    raw: '原始文本，支持 {{变量}} 引用',
+    none: ''
+  };
+
+  // Query Params section
+  const queryParamsHtml = `
+    <div class="config-field">
+      <div class="config-field-label" style="display:flex;align-items:center;justify-content:space-between">
+        Query 参数
+        <button class="btn btn-ghost btn-sm" style="height:22px;font-size:11px" onclick="addHttpQueryParam(${node.id})">${icons.plus} 添加</button>
+      </div>
+      ${queryParams.length === 0 ? `<div class="config-field-help" style="padding:6px 0">暂无参数，点击添加 — 也可直接在 URL 中拼接 ?key=value</div>` : ''}
+      ${queryParams.map((p, i) => `
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+        <input class="config-input" style="flex:1;height:28px;font-size:11px" placeholder="参数名" value="${escHtml(p.key || '')}" oninput="updateHttpQueryParam(${node.id},${i},'key',this.value)" />
+        <span style="color:var(--md-outline);font-size:12px">=</span>
+        <input class="config-input" style="flex:2;height:28px;font-size:11px;font-family:var(--font-family-mono)" placeholder="参数值，支持 {{变量}}" value="${escHtml(p.value || '')}" oninput="updateHttpQueryParam(${node.id},${i},'value',this.value)" />
+        <button class="table-action-btn danger" style="width:22px;height:22px;flex-shrink:0" onclick="removeHttpQueryParam(${node.id},${i})">${icons.close}</button>
+      </div>`).join('')}
+      ${queryParams.length > 0 ? `<div class="config-field-help">参数将自动附加到 URL，如已有 URL 参数则合并</div>` : ''}
+    </div>`;
+
+  // Body type selector (only for methods with body)
+  const bodyTypeHtml = hasBody ? `
+    <div class="config-field">
+      <div class="config-field-label" style="display:flex;align-items:center;justify-content:space-between">
+        请求体
+        <div class="cond-mode-tabs" style="gap:2px">
+          <button class="cond-mode-tab ${bodyType === 'json' ? 'active' : ''}" onclick="updateNodeConfig(${node.id},'bodyType','json');renderDesigner()">JSON</button>
+          <button class="cond-mode-tab ${bodyType === 'form' ? 'active' : ''}" onclick="updateNodeConfig(${node.id},'bodyType','form');renderDesigner()">Form</button>
+          <button class="cond-mode-tab ${bodyType === 'raw' ? 'active' : ''}" onclick="updateNodeConfig(${node.id},'bodyType','raw');renderDesigner()">Raw</button>
+          <button class="cond-mode-tab ${bodyType === 'none' ? 'active' : ''}" onclick="updateNodeConfig(${node.id},'bodyType','none');renderDesigner()">无</button>
+        </div>
+      </div>
+      ${bodyType !== 'none' ? renderExprEditor({
+        id: `http_body_${node.id}`,
+        value: node.config?.body || '',
+        placeholder: bodyPlaceholders[bodyType] || '',
+        nodeId: node.id,
+        minHeight: 60,
+        label: '请求体',
+        hint: bodyHints[bodyType] || '',
+        onChange: `updateNodeConfig(${node.id}, 'body', this.value)`
+      }) : '<div class="config-field-help" style="padding:4px 0">此请求无请求体</div>'}
+    </div>` : '';
+
+  // Success conditions
+  const successHtml = `
+    <div class="config-section">
+      <div class="config-section-title" style="display:flex;align-items:center;justify-content:space-between">
+        响应成功条件
+        <button class="btn btn-ghost btn-sm" style="height:22px;font-size:11px" onclick="addHttpSuccessCondition(${node.id})">${icons.plus} 添加</button>
+      </div>
+      ${successConditions.length === 0 ? `<div class="config-field-help">默认 HTTP 2xx 视为成功；添加条件可自定义判断逻辑，不满足则触发错误处理策略</div>` : `
+      <div class="config-field-help" style="margin-bottom:4px">满足以下全部条件视为成功</div>
+      ${successConditions.map((sc, i) => `
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+        <select class="config-select" style="flex:1;height:28px;font-size:11px" onchange="updateHttpSuccessCondition(${node.id},${i},'field',this.value)">
+          <option value="status" ${(sc.field||'status')==='status'?'selected':''}>状态码</option>
+          <option value="body" ${sc.field==='body'?'selected':''}>响应体字段</option>
+        </select>
+        <select class="config-select" style="width:72px;height:28px;font-size:11px" onchange="updateHttpSuccessCondition(${node.id},${i},'op',this.value)">
+          <option value="eq" ${(sc.op||'eq')==='eq'?'selected':''}>等于</option>
+          <option value="ne" ${sc.op==='ne'?'selected':''}>不等于</option>
+          <option value="in" ${sc.op==='in'?'selected':''}>包含于</option>
+          <option value="range" ${sc.op==='range'?'selected':''}>范围</option>
+        </select>
+        <input class="config-input" style="flex:1.5;height:28px;font-size:11px;font-family:var(--font-family-mono)" placeholder="${(sc.field||'status')==='status' ? '200 或 200,201 或 200-299' : '字段路径 = 期望值'}" value="${escHtml(sc.value||'')}" oninput="updateHttpSuccessCondition(${node.id},${i},'value',this.value)" />
+        <button class="table-action-btn danger" style="width:22px;height:22px;flex-shrink:0" onclick="removeHttpSuccessCondition(${node.id},${i})">${icons.close}</button>
+      </div>`).join('')}
+      `}
+    </div>`;
+
   return `<div class="config-section">
     <div class="config-section-title">HTTP 请求配置</div>
     <div class="config-field">
       <div class="config-field-label">请求方法 <span class="required">*</span></div>
-      <select class="config-select" onchange="updateNodeConfig(${node.id}, 'method', this.value)">
-        <option ${node.config?.method === 'GET' ? 'selected' : ''}>GET</option>
-        <option ${node.config?.method === 'POST' ? 'selected' : ''}>POST</option>
-        <option ${node.config?.method === 'PUT' ? 'selected' : ''}>PUT</option>
-        <option ${node.config?.method === 'DELETE' ? 'selected' : ''}>DELETE</option>
-        <option ${node.config?.method === 'PATCH' ? 'selected' : ''}>PATCH</option>
+      <select class="config-select" onchange="updateNodeConfig(${node.id}, 'method', this.value); renderDesigner()">
+        <option ${method === 'GET' ? 'selected' : ''}>GET</option>
+        <option ${method === 'POST' ? 'selected' : ''}>POST</option>
+        <option ${method === 'PUT' ? 'selected' : ''}>PUT</option>
+        <option ${method === 'DELETE' ? 'selected' : ''}>DELETE</option>
+        <option ${method === 'PATCH' ? 'selected' : ''}>PATCH</option>
       </select>
     </div>
     <div class="config-field">
@@ -1652,6 +1741,7 @@ function renderHttpConfig(node) {
         onChange: `updateNodeConfig(${node.id}, 'url', this.value)`
       })}
     </div>
+    ${queryParamsHtml}
     <div class="config-field">
       <div class="config-field-label">请求头</div>
       ${renderExprEditor({
@@ -1665,21 +1755,10 @@ function renderHttpConfig(node) {
         onChange: `updateNodeConfig(${node.id}, 'headers', this.value)`
       })}
     </div>
-    <div class="config-field">
-      <div class="config-field-label">请求体</div>
-      ${renderExprEditor({
-        id: `http_body_${node.id}`,
-        value: node.config?.body || '',
-        placeholder: '{"key": "value", "userId": "{{input.userId}}"}',
-        nodeId: node.id,
-        minHeight: 60,
-        label: '请求体',
-        hint: 'JSON 格式，支持 {{变量}} 引用',
-        onChange: `updateNodeConfig(${node.id}, 'body', this.value)`
-      })}
-    </div>
+    ${bodyTypeHtml}
     ${upstreamPreview}
   </div>
+  ${successHtml}
   ${outputVarsSection}`;
 }
 
@@ -1751,6 +1830,54 @@ function updateCodeOutputVar(nodeId, index, field, value) {
   if (!node?.config?.codeOutputVars?.[index]) return;
   node.config.codeOutputVars[index][field] = value;
   designerDirty = true;
+}
+
+// --- HTTP Query Params helpers ---
+function addHttpQueryParam(nodeId) {
+  const node = designerNodes.find(n => n.id === nodeId);
+  if (!node) return;
+  if (!node.config) node.config = {};
+  if (!node.config.queryParams) node.config.queryParams = [];
+  node.config.queryParams.push({ key: '', value: '' });
+  designerDirty = true;
+  renderDesigner();
+}
+function updateHttpQueryParam(nodeId, index, field, value) {
+  const node = designerNodes.find(n => n.id === nodeId);
+  if (!node?.config?.queryParams?.[index]) return;
+  node.config.queryParams[index][field] = value;
+  designerDirty = true;
+}
+function removeHttpQueryParam(nodeId, index) {
+  const node = designerNodes.find(n => n.id === nodeId);
+  if (!node?.config?.queryParams) return;
+  node.config.queryParams.splice(index, 1);
+  designerDirty = true;
+  renderDesigner();
+}
+
+// --- HTTP Success Conditions helpers ---
+function addHttpSuccessCondition(nodeId) {
+  const node = designerNodes.find(n => n.id === nodeId);
+  if (!node) return;
+  if (!node.config) node.config = {};
+  if (!node.config.successConditions) node.config.successConditions = [];
+  node.config.successConditions.push({ field: 'status', op: 'eq', value: '200' });
+  designerDirty = true;
+  renderDesigner();
+}
+function updateHttpSuccessCondition(nodeId, index, field, value) {
+  const node = designerNodes.find(n => n.id === nodeId);
+  if (!node?.config?.successConditions?.[index]) return;
+  node.config.successConditions[index][field] = value;
+  designerDirty = true;
+}
+function removeHttpSuccessCondition(nodeId, index) {
+  const node = designerNodes.find(n => n.id === nodeId);
+  if (!node?.config?.successConditions) return;
+  node.config.successConditions.splice(index, 1);
+  designerDirty = true;
+  renderDesigner();
 }
 
 function addCodeOutputVar(nodeId) {
@@ -3052,6 +3179,7 @@ function onNodeClick(e, nodeId) {
 
 function selectNode(nodeId) {
   designerSelectedNodeId = nodeId;
+  designerActiveConfigTab = 'basic'; // reset to basic tab when switching nodes
   designerRightPanel = 'node';
   renderDesigner();
 }
@@ -4476,6 +4604,7 @@ function checkHasAdvancedValues(node) {
 
 // --- Node Config Tab Switch ---
 function switchNodeConfigTab(tab) {
+  designerActiveConfigTab = tab; // persist so renderDesigner() restores correct tab
   const basicTab = document.getElementById('rpTabBasic');
   const advTab = document.getElementById('rpTabAdvanced');
   const body = document.getElementById('nodeConfigBody');
@@ -4655,6 +4784,8 @@ function renderHttpAdvancedConfig(node) {
   const timeout = node.config?._timeout || 30;
   const suspendCallback = node.config?.suspendCallback || false;
   const callbackTimeout = node.config?.callbackTimeout || 24;
+  // mock callback URL for prototype
+  const callbackUrl = `https://beaver.example.com/api/v1/workflow/callback/{{instanceId}}`;
 
   let html = `
     <div class="config-section">
@@ -4662,7 +4793,7 @@ function renderHttpAdvancedConfig(node) {
       <div class="config-field">
         <div class="config-field-label">超时时间 (秒)</div>
         <input class="config-input" type="number" value="${timeout}" min="1" max="3600" onchange="updateNodeConfig(${node.id}, '_timeout', parseInt(this.value))" />
-        <div class="config-field-help">HTTP 请求的最大等待时间（默认 30 秒）</div>
+        <div class="config-field-help">${suspendCallback ? 'HTTP 请求发送阶段的最大等待时间（开启挂起后，响应等待改为回调超时控制）' : 'HTTP 请求的最大等待时间（默认 30 秒）'}</div>
       </div>
       ${renderMergeStrategyField(node)}
     </div>
@@ -4679,6 +4810,14 @@ function renderHttpAdvancedConfig(node) {
         <div class="config-field-label">回调超时 (小时)</div>
         <input class="config-input" type="number" value="${callbackTimeout}" min="1" max="720" onchange="updateNodeConfig(${node.id}, 'callbackTimeout', parseInt(this.value))" />
         <div class="config-field-help">等待回调的最长时间，超时未收到回调触发异常策略（默认 24 小时）</div>
+      </div>
+      <div class="config-field">
+        <div class="config-field-label">回调 URL <span style="font-size:10px;color:var(--md-outline);font-weight:400;margin-left:4px">只读 · 复制给外部系统</span></div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <input class="config-input" readonly value="${callbackUrl}" style="font-family:var(--font-family-mono);font-size:11px;color:var(--md-on-surface-variant);cursor:pointer;background:var(--md-surface-container)" onclick="navigator.clipboard.writeText('${callbackUrl}').then(()=>showToast('回调 URL 已复制'))" title="点击复制" />
+          <button class="btn btn-ghost btn-sm" style="flex-shrink:0;height:32px" onclick="navigator.clipboard.writeText('${callbackUrl}').then(()=>showToast('回调 URL 已复制'))" title="复制">${icons.copy || '📋'}</button>
+        </div>
+        <div class="config-field-help">外部系统调用此 URL 并传入 <code style="background:var(--md-surface-container);padding:0 3px;border-radius:2px">{"success":true,"data":{...}}</code> 以恢复流程</div>
       </div>
       ` : ''}
     </div>`;
@@ -5287,6 +5426,138 @@ function renderOutputVariablesSection(node) {
           <path d="M12 16v-4M12 8h.01"/>
         </svg>
         点击变量行或引用路径可复制，下游节点通过此路径引用输出值
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * HTTP 节点专用输出变量区域（含响应结构展开浏览）
+ */
+function renderHttpOutputVariablesSection(node) {
+  const nodeCode = node.code;
+  const varPrefix = node.config?.responseVar || 'response';
+  const expanded = node.config?._responsePreviewExpanded || false;
+
+  // Mock response structure for browsing
+  const mockResponse = {
+    status: 200,
+    data: {
+      id: 12345,
+      name: "示例数据",
+      createdAt: "2026-04-20T10:00:00Z",
+      items: [{ id: 1, label: "item1" }]
+    },
+    headers: {
+      "content-type": "application/json",
+      "x-request-id": "abc-123"
+    }
+  };
+
+  // Flat field list for browsing
+  const responseFields = [
+    { path: `${varPrefix}.status`, type: 'Number', desc: 'HTTP 状态码', example: '200' },
+    { path: `${varPrefix}.data`, type: 'Object', desc: '响应数据体（完整对象）', example: '{...}' },
+    { path: `${varPrefix}.data.id`, type: 'Number', desc: '示例字段（实际字段取决于接口响应）', example: '12345' },
+    { path: `${varPrefix}.data.name`, type: 'String', desc: '示例字段', example: '"示例数据"' },
+    { path: `${varPrefix}.headers`, type: 'Object', desc: '响应头对象', example: '{...}' },
+    { path: `${varPrefix}.headers.content-type`, type: 'String', desc: '响应内容类型', example: '"application/json"' },
+  ];
+
+  return `
+    <div class="config-section output-vars-section">
+      <div class="config-section-title" style="color:#16a34a;display:flex;align-items:center;gap:6px">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M9 14l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        输出变量
+        <span style="font-size:10px;font-weight:400;color:var(--md-outline);margin-left:auto">下游节点可引用</span>
+      </div>
+
+      <div class="output-vars-editable">
+        <div class="output-var-edit-row">
+          <div class="output-var-edit-main">
+            <span class="var-icon type-Object" title="Object">O</span>
+            <input
+              class="output-var-input"
+              value="${varPrefix}"
+              placeholder="response"
+              style="flex:1;font-family:var(--font-family-mono)"
+              onchange="updateNodeConfig(${node.id}, 'responseVar', this.value); renderDesigner()"
+            />
+            <code class="var-ref-tag">{{${nodeCode}.${varPrefix}}}</code>
+          </div>
+          <div class="output-var-desc">HTTP 响应对象（包含 status / data / headers）</div>
+        </div>
+      </div>
+
+      <div class="output-vars-fixed">
+        <div class="output-var-item" onclick="copyOutputVarPath('${nodeCode}', '${varPrefix}.status')" title="点击复制引用路径">
+          <span class="var-icon type-Number" title="Number">N</span>
+          <div class="output-var-info">
+            <div class="output-var-name">${varPrefix}.status</div>
+            <div class="output-var-desc-inline">HTTP 状态码</div>
+          </div>
+          <code class="var-ref-tag">{{${nodeCode}.${varPrefix}.status}}</code>
+        </div>
+        <div class="output-var-item" onclick="copyOutputVarPath('${nodeCode}', '${varPrefix}.data')" title="点击复制引用路径">
+          <span class="var-icon type-Object" title="Object">O</span>
+          <div class="output-var-info">
+            <div class="output-var-name">${varPrefix}.data</div>
+            <div class="output-var-desc-inline">响应数据体</div>
+          </div>
+          <code class="var-ref-tag">{{${nodeCode}.${varPrefix}.data}}</code>
+        </div>
+        <div class="output-var-item" onclick="copyOutputVarPath('${nodeCode}', '${varPrefix}.headers')" title="点击复制引用路径">
+          <span class="var-icon type-Object" title="Object">O</span>
+          <div class="output-var-info">
+            <div class="output-var-name">${varPrefix}.headers</div>
+            <div class="output-var-desc-inline">响应头</div>
+          </div>
+          <code class="var-ref-tag">{{${nodeCode}.${varPrefix}.headers}}</code>
+        </div>
+      </div>
+
+      <!-- Response structure browser -->
+      <div style="margin-top:var(--space-2)">
+        <button
+          class="btn btn-ghost btn-sm"
+          style="width:100%;justify-content:space-between;height:28px;font-size:11px;color:var(--md-outline)"
+          onclick="updateNodeConfig(${node.id},'_responsePreviewExpanded',${!expanded});renderDesigner()"
+        >
+          <span style="display:flex;align-items:center;gap:4px">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+            浏览响应字段结构
+          </span>
+          <span style="font-size:10px">${expanded ? '▲ 收起' : '▼ 展开'}</span>
+        </button>
+        ${expanded ? `
+        <div style="margin-top:4px;border:1px solid var(--md-outline-variant);border-radius:6px;overflow:hidden">
+          <div style="padding:6px 10px;background:var(--md-surface-container);font-size:10px;color:var(--md-outline);border-bottom:1px solid var(--md-outline-variant)">
+            ℹ️ 示例字段结构（实际字段取决于接口响应）· 点击行复制引用路径
+          </div>
+          ${responseFields.map(f => `
+          <div
+            style="display:flex;align-items:center;gap:6px;padding:5px 10px;cursor:pointer;border-bottom:1px solid var(--md-outline-variant,rgba(0,0,0,0.08));font-size:11px"
+            onclick="navigator.clipboard.writeText('{{${nodeCode}.${f.path}}}').then(()=>showToast('success','已复制','{{${nodeCode}.${f.path}}} 已复制'))"
+            onmouseover="this.style.background='var(--md-surface-container)'"
+            onmouseout="this.style.background=''"
+          >
+            <span class="var-icon type-${f.type}" style="flex-shrink:0;width:16px;height:16px;font-size:9px" title="${f.type}">${f.type.charAt(0)}</span>
+            <code style="font-family:var(--font-family-mono);flex:1;color:var(--md-on-surface)">${f.path}</code>
+            <span style="color:var(--md-outline);font-size:10px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${f.desc}</span>
+            <code style="font-family:var(--font-family-mono);font-size:10px;color:#64748b;background:var(--md-surface-container);padding:0 3px;border-radius:2px;flex-shrink:0">${f.example}</code>
+          </div>`).join('')}
+        </div>
+        ` : ''}
+      </div>
+
+      <div class="output-vars-hint">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <path d="M12 16v-4M12 8h.01"/>
+        </svg>
+        点击变量行或引用路径可复制，下游节点通过此路径引用响应值
       </div>
     </div>
   `;
