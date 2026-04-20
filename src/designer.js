@@ -725,9 +725,10 @@ function renderConnections() {
 
     // Interaction group
     let html = '';
+    html += `<g class="conn-group" data-conn="${conn.id}" onmouseenter="onConnectionHover(event, ${conn.id})" onmouseleave="onConnectionLeave(event, ${conn.id})">`;
 
     // Invisible wider path for easier hover detection
-    html += `<path d="${path}" fill="none" stroke="transparent" stroke-width="14" style="cursor:${isAltDelete ? 'pointer' : 'pointer'}" onmouseenter="onConnectionHover(event, ${conn.id})" onmouseleave="onConnectionLeave(event, ${conn.id})" onclick="onConnectionClick(event, ${conn.id})" oncontextmenu="onConnectionContextMenu(event, ${conn.id})" />`;
+    html += `<path d="${path}" fill="none" stroke="transparent" stroke-width="14" style="cursor:pointer" onclick="onConnectionClick(event, ${conn.id})" oncontextmenu="onConnectionContextMenu(event, ${conn.id})" />`;
 
     // Glow path for selected/hovered state
     if (isSelected || isHovered) {
@@ -766,6 +767,7 @@ function renderConnections() {
       }
     }
 
+    html += '</g>';
     return html;
   }).join('');
 }
@@ -2900,15 +2902,7 @@ function onConnectionClick(e, connId) {
 function onConnectionHover(e, connId) {
   if (designerHoveredConnId === connId) return;
   designerHoveredConnId = connId;
-  // Only re-render the connections layer, not the full canvas
-  const svg = document.getElementById('canvasSvg');
-  const g = svg?.querySelector('g');
-  if (g) {
-    // Re-render connections in-place to show hover state
-    const existingConns = g.querySelectorAll('.conn-delete-btn, .conn-endpoint-handle');
-    // We need full re-render for hover effects on connections
-    renderDesigner();
-  }
+  renderDesigner();
 }
 
 function onConnectionLeave(e, connId) {
@@ -2955,8 +2949,7 @@ function deleteSelectedConnection() {
 
 // --- Endpoint Drag Reconnect (React Flow / Node-RED style) ---
 function onEndpointDragStart(e, connId, end) {
-  e.stopPropagation();
-  e.preventDefault();
+  if (e) { e.stopPropagation(); e.preventDefault(); }
   if (designerReadonly || designerDebugMode) return;
 
   const conn = designerConnections.find(c => c.id === connId);
@@ -4981,83 +4974,6 @@ function selectVariable(editorId, ref) {
  * 条件行左值（变量对象）的变量选择器
  * 选中后直接写入路径并触发 update 回调（无论当前是 select 还是 input 模式）
  */
-function showCondLeftVarPicker(leftInputId, nodeId, updateFnPfx) {
-  const picker = document.getElementById(leftInputId + '_picker');
-  const btn = document.getElementById(leftInputId + '_btn');
-  const anchorEl = btn || document.getElementById(leftInputId);
-  if (!picker || !anchorEl) return;
-
-  if (picker.style.display === 'flex') {
-    picker.style.display = 'none';
-    return;
-  }
-
-  const rect = anchorEl.getBoundingClientRect();
-  const pickerH = 240;
-  const spaceBelow = window.innerHeight - rect.bottom;
-  const spaceAbove = rect.top;
-
-  picker.style.left = rect.left + 'px';
-  picker.style.width = '280px';
-
-  if (spaceBelow >= pickerH || spaceBelow >= spaceAbove) {
-    picker.style.top = (rect.bottom + 4) + 'px';
-    picker.style.bottom = '';
-  } else {
-    picker.style.top = '';
-    picker.style.bottom = (window.innerHeight - rect.top + 4) + 'px';
-  }
-
-  const groups = getAvailableVariables(nodeId);
-  picker.innerHTML = `
-    <div style="padding:8px;border-bottom:1px solid var(--md-outline-variant)">
-      <input type="text" placeholder="搜索变量..." style="width:100%;padding:4px 8px;border:1px solid var(--md-outline-variant);border-radius:4px;font-size:12px;background:var(--md-surface)" oninput="filterCondVarPicker('${leftInputId}', this.value)">
-    </div>
-    <div id="${leftInputId}_picker_body" style="overflow-y:auto;max-height:200px">
-      ${groups.length === 0
-        ? '<div style="padding:16px;text-align:center;font-size:12px;color:var(--md-outline)">暂无可用变量</div>'
-        : groups.map(group => `
-          <div class="cond-var-group" data-group="${group.id}">
-            <div style="padding:6px 10px 2px;font-size:10px;font-weight:600;color:var(--md-outline);text-transform:uppercase;letter-spacing:0.05em">${group.name}</div>
-            ${group.variables.map(v => `
-              <div class="cond-var-item" data-ref="${v.ref}" data-path="${v.path}" data-name="${v.name}"
-                   style="padding:5px 10px;cursor:pointer;display:flex;align-items:center;gap:8px;font-size:12px"
-                   onmouseenter="this.style.background='var(--md-surface-container)'"
-                   onmouseleave="this.style.background=''"
-                   onclick="selectCondLeftVar('${leftInputId}', '${escHtml(v.path)}', '${updateFnPfx}')">
-                <span style="font-size:10px;font-weight:600;padding:1px 4px;border-radius:3px;background:var(--md-primary-container);color:var(--md-on-primary-container);flex-shrink:0">${(v.type||'?').charAt(0)}</span>
-                <div style="flex:1;min-width:0">
-                  <div style="font-weight:500;color:var(--md-on-surface)">${v.name}</div>
-                  <div style="font-size:10px;color:var(--md-outline);font-family:var(--font-family-mono)">${v.path}</div>
-                </div>
-              </div>
-            `).join('')}
-          </div>
-        `).join('')}
-    </div>
-  `;
-  picker.style.display = 'flex';
-  picker.style.flexDirection = 'column';
-
-  const closeOnOutside = (e) => {
-    if (!picker.contains(e.target)) {
-      picker.style.display = 'none';
-      document.removeEventListener('mousedown', closeOnOutside, true);
-    }
-  };
-  setTimeout(() => document.addEventListener('mousedown', closeOnOutside, true), 0);
-}
-
-/**
- * 左值选择：路径写入后触发 update 回调（path 是不带 {{}} 的路径）
- */
-function selectCondLeftVar(leftInputId, path, updateFnPfx) {
-  const fn = new Function(`${updateFnPfx}'left',${JSON.stringify(path)})`);
-  try { fn(); } catch(e) { console.warn('selectCondLeftVar callback failed', e); }
-  const picker = document.getElementById(leftInputId + '_picker');
-  if (picker) picker.style.display = 'none';
-}
-
 /**
  * 内部共用：在 fixed picker 容器里渲染统一变量选择器
  * @param {HTMLElement} picker      - .var-picker-dropdown 容器
@@ -5110,10 +5026,16 @@ function _showCondPickerAt(picker, anchorEl, groups, pickerId, onSelectFn, onSel
   // 生成每条 item 的 onclick（直接调用外部传入的选择函数）
   const groupsForRender = groups.map(group => ({
     ...group,
-    variables: group.variables.map(v => ({
-      ...v,
-      _selectOnclick: `${onSelectFn}('${pickerId}', '${v.ref.replace(/'/g, "\\'")}' ${onSelectArg ? ', ' + onSelectArg : ''})`
-    }))
+    variables: group.variables.map(v => {
+      // 左值 picker（selectCondLeftVar）传 path，右值 picker（selectCondVar）传 ref
+      const valueArg = (onSelectFn === 'selectCondLeftVar')
+        ? v.path.replace(/'/g, "\\'")
+        : v.ref.replace(/'/g, "\\'");
+      return {
+        ...v,
+        _selectOnclick: `${onSelectFn}('${pickerId}', '${valueArg}' ${onSelectArg ? ', ' + onSelectArg : ''})`
+      };
+    })
   }));
 
   picker.innerHTML = `

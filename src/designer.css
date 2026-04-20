@@ -433,10 +433,15 @@
   cursor: pointer;
 }
 
-.canvas-svg path:hover {
-  stroke: #1890FF !important;
-  stroke-width: 4;
-  filter: drop-shadow(0 0 4px rgba(24, 144, 255, 0.5));
+/* Connection hover/selection is handled via JS rendering, not CSS :hover on individual paths.
+   The transparent hit-area path has pointer-events, visible paths have pointer-events:none. */
+.canvas-svg .conn-group {
+  pointer-events: auto;
+}
+
+.canvas-svg .conn-delete-btn,
+.canvas-svg .conn-endpoint-handle {
+  pointer-events: auto;
 }
 
 .canvas-nodes {
