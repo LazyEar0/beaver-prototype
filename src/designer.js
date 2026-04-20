@@ -578,12 +578,20 @@ function filterNodes(query) {
 
 // --- Canvas Nodes ---
 function renderCanvasNodes() {
+  // Pre-compute all loop body sets so we don't call getLoopBodyDescendants per-node repeatedly
+  const loopBodyMap = new Map(); // nodeId → ownerLoopNode
+  designerNodes.filter(n => n.type === 'loop').forEach(loopNode => {
+    getLoopBodyDescendants(loopNode.id).forEach(nid => loopBodyMap.set(nid, loopNode));
+  });
+
   return designerNodes.map(node => {
     const nt = nodeTypes.find(t => t.type === node.type) || {};
     const isSelected = designerSelectedNodeId === node.id || designerSelectedNodeIds.includes(node.id);
     const debugClass = designerDebugMode ? getNodeDebugClass(node) : '';
     const hasWarning = getNodeWarnings(node).length;
     const isPlaceholder = node.type === 'placeholder';
+    const ownerLoop = loopBodyMap.get(node.id) || null;
+    const isLoopBodyNode = !!ownerLoop;
     const inputConns = designerConnections.filter(c => c.to === node.id);
     // Don't show merge strategy badge when all inputs come from loop ports of the same loop node
     // (loop body and done never fire simultaneously, so merging makes no sense)
@@ -617,12 +625,13 @@ function renderCanvasNodes() {
       portsHtml += `<div class="canvas-node-port port-out" data-port="out" data-node="${node.id}"></div>`;
     }
 
-    return `<div class="canvas-node ${isSelected ? 'selected' : ''} ${debugClass} ${isPlaceholder ? 'node-placeholder' : ''} ${node.type === 'loop' ? 'loop-node-style' : ''}" id="node-${node.id}"
+    return `<div class="canvas-node ${isSelected ? 'selected' : ''} ${debugClass} ${isPlaceholder ? 'node-placeholder' : ''} ${node.type === 'loop' ? 'loop-node-style' : ''} ${isLoopBodyNode ? 'loop-body-node' : ''}" id="node-${node.id}"
       style="left:${node.x}px;top:${node.y}px"
       onmousedown="onNodeMouseDown(event, ${node.id})"
       onclick="onNodeClick(event, ${node.id})"
       oncontextmenu="onNodeContextMenu(event, ${node.id})">
       ${hasWarning > 0 ? `<div class="canvas-node-warning" title="${hasWarning} 个问题">${hasWarning}</div>` : ''}
+      ${isLoopBodyNode ? `<div class="loop-body-badge" title="此节点位于循环节点「${ownerLoop.name}」的循环体内">↺</div>` : ''}
       ${node._breakpoint ? '<div class="canvas-node-breakpoint"></div>' : ''}
       ${debugClass ? renderNodeDebugStatus(node) : ''}
       ${mergeIndicator}
@@ -2125,6 +2134,42 @@ function renderVariablesPanel(vars) {
   `).join('');
 }
 
+// --- Loop Body Scope Utility ---
+// Returns the set of node IDs that belong to the "loop body" of a given loop node.
+// The loop body is defined as all nodes reachable through the 'loop' port (and their
+// successors via normal 'out'/'true'/'false'/etc. ports), stopping before any node that
+// is also reachable from the loop node's 'done' port (i.e. the main-flow continuation).
+function getLoopBodyDescendants(loopNodeId) {
+  const bodySet = new Set();
+  const visited = new Set();
+  // BFS/DFS from the node directly connected via the 'loop' port
+  const loopConn = designerConnections.find(c => c.from === loopNodeId && c.fromPort === 'loop');
+  if (!loopConn) return bodySet;
+
+  const stack = [loopConn.to];
+  while (stack.length > 0) {
+    const nid = stack.pop();
+    if (visited.has(nid)) continue;
+    visited.add(nid);
+    bodySet.add(nid);
+    // Follow all outgoing connections EXCEPT connections that go back to the loop node itself
+    designerConnections
+      .filter(c => c.from === nid && c.to !== loopNodeId)
+      .forEach(c => { if (!visited.has(c.to)) stack.push(c.to); });
+  }
+  return bodySet;
+}
+
+// Returns the loop node that "owns" a given node (i.e. the node is inside its loop body).
+// Returns null if the node is not inside any loop body.
+function getOwnerLoopNode(nodeId) {
+  return designerNodes.find(loopNode => {
+    if (loopNode.type !== 'loop') return false;
+    const body = getLoopBodyDescendants(loopNode.id);
+    return body.has(nodeId);
+  }) || null;
+}
+
 // --- Problems Detection ---
 function getProblems() {
   const problems = [];
@@ -2169,7 +2214,36 @@ function getProblems() {
       } else {
         const hasOut = designerConnections.some(c => c.from === node.id);
         if (!hasIn) problems.push({ level: 'error', message: `节点「${node.name}」没有输入连线`, location: node.code, nodeId: node.id });
-        if (!hasOut) problems.push({ level: 'warning', message: `节点「${node.name}」没有输出连线`, location: node.code, nodeId: node.id });
+        // Suppress "no output" warning for nodes that are the tail of a loop body —
+        // loop body tail nodes intentionally have no outgoing connection; the engine
+        // automatically advances to the next iteration.
+        const isLoopBodyTail = !hasOut && (() => {
+          const owner = getOwnerLoopNode(node.id);
+          return owner != null;
+        })();
+        if (!hasOut && !isLoopBodyTail) {
+          problems.push({ level: 'warning', message: `节点「${node.name}」没有输出连线`, location: node.code, nodeId: node.id });
+        }
+        // Detect loop body boundary escape: a node inside a loop body connects to a node outside
+        if (hasOut) {
+          const owner = getOwnerLoopNode(node.id);
+          if (owner) {
+            const bodySet = getLoopBodyDescendants(owner.id);
+            designerConnections
+              .filter(c => c.from === node.id)
+              .forEach(c => {
+                if (!bodySet.has(c.to) && c.to !== owner.id) {
+                  const targetNode = designerNodes.find(n => n.id === c.to);
+                  problems.push({
+                    level: 'warning',
+                    message: `节点「${node.name}」从循环体内连线到循环体外的「${targetNode?.name || c.to}」，会导致每次迭代提前结束流程。如需循环结束后继续，应使用循环节点的"完成"端口`,
+                    location: node.code,
+                    nodeId: node.id,
+                  });
+                }
+              });
+          }
+        }
       }
     }
 
@@ -2629,6 +2703,30 @@ function completeConnection(fromNodeId, fromPort, targetId) {
     showToast('error', '检测到环', '该连线会形成循环依赖，不允许创建'); return;
   }
 
+  // Loop body boundary check:
+  // If the source node is inside a loop body AND the target node is outside that loop body,
+  // warn the user — this typically means the loop body is "escaping" to the main flow,
+  // which would cause the workflow to terminate prematurely on each iteration.
+  const ownerLoop = getOwnerLoopNode(fromNodeId);
+  if (ownerLoop) {
+    const bodySet = getLoopBodyDescendants(ownerLoop.id);
+    const targetInBody = bodySet.has(targetId);
+    const targetIsLoopNode = targetId === ownerLoop.id;
+    if (!targetInBody && !targetIsLoopNode) {
+      const targetNode = designerNodes.find(n => n.id === targetId);
+      const targetName = targetNode ? `「${targetNode.name}」` : '';
+      const confirmed = confirm(
+        `⚠️ 跨越循环边界的连线\n\n` +
+        `节点「${fromNode.name}」位于循环节点「${ownerLoop.name}」的循环体内，` +
+        `而目标节点${targetName}位于循环体外（主流程中）。\n\n` +
+        `这会导致每次迭代执行到此节点时直接跳出循环，流程提前结束，通常是错误连线。\n\n` +
+        `如需在循环结束后继续流程，请使用循环节点的"完成"端口连接后续节点。\n\n` +
+        `确认仍要创建此连线吗？`
+      );
+      if (!confirmed) return;
+    }
+  }
+
   pushUndoState();
 
   // Determine label for Switch / Loop branches
@@ -2913,6 +3011,11 @@ function switchBottomTab(tab) {
 
 function closeBottomPanel() {
   designerBottomPanel = null;
+  renderDesigner();
+}
+
+function openBottomPanel() {
+  designerBottomPanel = designerBottomTab;
   renderDesigner();
 }
 
