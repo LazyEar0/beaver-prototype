@@ -761,16 +761,23 @@ function renderOverviewPanel() {
           <div class="config-field"><div class="config-field-label">版本</div><div style="font-size:var(--font-size-sm);color:var(--md-on-surface)">${wf.version > 0 ? 'v' + wf.version : '未发布'}</div></div>
           <div class="config-field"><div class="config-field-label">调试状态</div><div style="font-size:var(--font-size-sm);color:${wf.debugPassed ? 'var(--md-success)' : 'var(--md-error)'}">${wf.debugPassed ? '已通过' : '未通过'}</div></div>
         </div>
+        ${designerVariables.length > 0 ? `
         <div class="config-section">
-          <div class="config-section-title">全局变量</div>
-          ${designerVariables.length > 0 ? designerVariables.map(v => `
+          <div class="config-section-title" style="display:flex;align-items:center;justify-content:space-between">
+            <span>全局变量</span>
+            <a href="javascript:void(0)" onclick="switchBottomTab('variables');openBottomPanel()" style="font-size:var(--font-size-xs);color:var(--md-primary);text-decoration:none;font-weight:normal">管理</a>
+          </div>
+          ${designerVariables.map(v => `
             <div class="var-item" style="padding:4px 0">
               <span class="var-type-badge">${v.type}</span>
               <span class="var-name">${v.name}</span>
               ${v.desc ? `<span style="font-size:var(--font-size-xs);color:var(--md-outline);margin-left:6px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${v.desc}</span>` : ''}
             </div>
-          `).join('') : `<div style="font-size:var(--font-size-xs);color:var(--md-outline)">暂无全局变量，<a href="javascript:void(0)" onclick="switchBottomTab('variables');openBottomPanel()" style="color:var(--md-primary);text-decoration:none">点击管理</a></div>`}
-        </div>
+          `).join('')}
+        </div>` : `
+        <div style="padding:var(--space-3) 0 var(--space-1);border-top:1px solid var(--md-outline-variant)">
+          <span style="font-size:var(--font-size-xs);color:var(--md-outline)">暂无全局变量 · </span><a href="javascript:void(0)" onclick="switchBottomTab('variables');openBottomPanel()" style="font-size:var(--font-size-xs);color:var(--md-primary);text-decoration:none">点击管理</a>
+        </div>`}
       </div>
     </div>`;
 }
