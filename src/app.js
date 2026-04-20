@@ -1312,7 +1312,7 @@ function renderWsWorkflowsTab(ws) {
           <td><span style="font-size:var(--font-size-xs);color:var(--md-outline)">—</span></td>
           <td style="font-size:var(--font-size-sm);color:var(--md-outline)">${f.editedAt}</td>
           <td onclick="event.stopPropagation()"><div class="table-actions">
-            ${isMemberOrAbove ? `<button class="table-action-btn" title="编辑" onclick="showEditFolderModal(${f.id})">${icons.edit}</button><div class="more-menu-wrapper"><button class="table-action-btn" title="更多" onclick="event.stopPropagation();toggleMoreMenu(this)">${icons.chevronDown}</button><div class="more-menu-panel hidden"><div class="more-menu-item" onclick="showMoveFolderModal(${f.id})">${icons.move}<span>移动</span></div></div></div>` : ''}
+            ${isMemberOrAbove ? `<button class="table-action-btn" title="编辑" onclick="showEditFolderModal(${f.id})">${icons.edit}</button><div class="more-menu-wrapper"><button class="table-action-btn" title="更多" onclick="event.stopPropagation();toggleMoreMenu(this)">${icons.chevronDown}</button><div class="more-menu-panel hidden"><div class="more-menu-item" onclick="showMoveFolderModal(${f.id})">${icons.move}<span>移动</span></div><div class="more-menu-item" style="color:var(--md-error)" onclick="showDeleteFolderModal(${f.id})">${icons.trash}<span>删除</span></div></div></div>` : ''}
           </div></td></tr>`;
       }).join('') : ''}
       ${sortedWf.map(wf => {
