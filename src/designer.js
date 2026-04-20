@@ -3187,6 +3187,9 @@ function renderBottomPanel() {
   const problems = getProblems();
   const vars = designerVariables;
   const logs = designerDebugLog;
+  const debugLogCount = logs.length;
+  const errorCount = logs.filter(l => l.level === 'error').length;
+  const warnCount = logs.filter(l => l.level === 'warn').length;
 
   return `<div class="bottom-panel open" style="height:${designerBottomPanelHeight}px">
     <div class="bottom-panel-resize-handle" onmousedown="onBottomResizeStart(event)" title="拖拽调整高度"></div>
@@ -3196,13 +3199,14 @@ function renderBottomPanel() {
           ${icons.alertTriangle} 问题 ${problems.length > 0 ? `<span class="bottom-panel-tab-badge">${problems.length}</span>` : ''}
         </div>
         <div class="bottom-panel-tab ${designerBottomTab === 'debug' ? 'active' : ''}" onclick="switchBottomTab('debug')">
-          ${icons.play} 调试日志
+          ${icons.play} 调试日志 ${debugLogCount > 0 ? `<span class="bottom-panel-tab-badge">${debugLogCount}</span>` : ''}${errorCount > 0 ? `<span class="bottom-panel-tab-badge" style="background:var(--md-error-container);color:var(--md-error)">${errorCount}</span>` : ''}
         </div>
         <div class="bottom-panel-tab ${designerBottomTab === 'variables' ? 'active' : ''}" onclick="switchBottomTab('variables')">
           ${icons.hash} 全局变量 <span class="bottom-panel-tab-badge" style="background:var(--md-primary-container);color:var(--md-primary)">${vars.length}</span>
         </div>
       </div>
       <div class="bottom-panel-actions">
+        ${designerBottomTab === 'debug' && logs.length > 0 ? `<div class="debug-log-filters"><span class="debug-log-chip ${designerDebugLogFilter === 'all' ? 'active' : ''}" onclick="setDebugLogFilter('all')">全部</span><span class="debug-log-chip ${designerDebugLogFilter === 'info' ? 'active' : ''}" onclick="setDebugLogFilter('info')">信息</span><span class="debug-log-chip ${designerDebugLogFilter === 'warn' ? 'active' : ''}" onclick="setDebugLogFilter('warn')">警告${warnCount > 0 ? `(${warnCount})` : ''}</span><span class="debug-log-chip ${designerDebugLogFilter === 'error' ? 'active' : ''}" onclick="setDebugLogFilter('error')">错误${errorCount > 0 ? `(${errorCount})` : ''}</span><span class="debug-log-chip ${designerDebugLogFilter === 'debug' ? 'active' : ''}" onclick="setDebugLogFilter('debug')">调试</span></div>` : ''}
         ${designerBottomTab === 'variables' ? `<button class="toolbar-btn" style="height:24px;font-size:11px" onclick="showAddVariableDialog()">${icons.plus} 新增全局变量</button>` : ''}
         <button class="canvas-control-btn" style="width:24px;height:24px" onclick="closeBottomPanel()">${icons.close}</button>
       </div>
@@ -3226,15 +3230,54 @@ function renderProblemsPanel(problems) {
   `).join('');
 }
 
+let designerDebugLogFilter = 'all';
+function setDebugLogFilter(f) { designerDebugLogFilter = f; renderDesigner(); }
+
 function renderDebugPanel(logs) {
   if (logs.length === 0) return '<div style="text-align:center;color:var(--md-outline);padding:var(--space-6);font-size:var(--font-size-sm)">暂无调试日志，点击"调试"按钮开始</div>';
-  return logs.map(log => `
-    <div class="debug-log-item">
-      <span class="debug-log-time">${log.time}</span>
-      <span class="debug-log-level ${log.level}">${log.level.toUpperCase()}</span>
-      <span class="debug-log-msg">${log.message}</span>
-    </div>
-  `).join('');
+  const filtered = designerDebugLogFilter === 'all' ? logs : logs.filter(l => l.level === designerDebugLogFilter);
+  const levelIcon = { info: icons.info || 'ℹ', warn: icons.alertTriangle || '⚠', error: icons.xCircle || '✕', debug: icons.code || '⚙' };
+  const levelLabel = { info: 'INFO', warn: 'WARN', error: 'ERROR', debug: 'DEBUG' };
+  const eventGroupIcon = {
+    'workflow.started': '▶', 'workflow.finished': '⏹',
+    'node.started': '→', 'node.completed': '✓', 'node.retry': '↻',
+    'trigger.input': '📥',
+    'http.request': '⬆', 'http.response': '⬇', 'http.error': '✕',
+    'condition.eval': '🔀', 'condition.result': '🔀',
+    'switch.eval': '🔃', 'switch.result': '🔃',
+    'loop.start': '🔄', 'loop.iteration': '↻', 'loop.done': '✓', 'loop.break': '⛔',
+    'assign.set': '📝', 'assign.empty': '⚠',
+    'code.execute': '💻', 'code.output': '📤',
+    'delay.wait': '⏱',
+    'output.write': '📤'
+  };
+  if (filtered.length === 0) return `<div style="text-align:center;color:var(--md-outline);padding:var(--space-6);font-size:var(--font-size-sm)">无 ${designerDebugLogFilter.toUpperCase()} 级别的日志</div>`;
+  return filtered.map((log, i) => {
+    const hasDetail = log.detail && (typeof log.detail === 'object' && Object.keys(log.detail).length > 0);
+    const detailId = `debug-detail-${Date.now()}-${i}`;
+    const evIcon = eventGroupIcon[log.event] || '●';
+    return `<div class="debug-log-item debug-log-${log.level}" onclick="${hasDetail ? `this.querySelector('.debug-log-detail')?.classList.toggle('open')` : ''}">
+      <span class="debug-log-time">${log.time.split('.')[0].split(' ')[1] || log.time}</span>
+      <span class="debug-log-level ${log.level}">${levelLabel[log.level] || log.level.toUpperCase()}</span>
+      ${log.node ? `<span class="debug-log-node" onclick="event.stopPropagation();flashDebugNode('${escHtml(log.node)}')">${escHtml(log.node)}</span>` : ''}
+      <span class="debug-log-ev">${evIcon}</span>
+      <span class="debug-log-msg">${escHtml(log.message)}</span>
+      ${hasDetail ? `<span class="debug-log-expand-hint">▸</span>` : ''}
+      ${hasDetail ? `<div class="debug-log-detail"><pre class="debug-log-detail-pre">${escHtml(JSON.stringify(log.detail, null, 2))}</pre></div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function flashDebugNode(nodeName) {
+  const node = designerNodes.find(n => n.name === nodeName);
+  if (!node) return;
+  selectNode(node.id);
+  // Flash highlight
+  const el = document.querySelector(`.canvas-node[data-id="${node.id}"]`);
+  if (el) {
+    el.classList.add('debug-flash');
+    setTimeout(() => el.classList.remove('debug-flash'), 1200);
+  }
 }
 
 function renderVariablesPanel(vars) {
@@ -4539,60 +4582,261 @@ function startDebugExecution() {
   designerDebugMode = true;
   designerDebugLog = [];
 
-  // Simulate debug execution
   const now = new Date();
   const ts = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+  const ms = () => String(now.getMilliseconds()).padStart(3, '0');
+  let seq = 0;
+  const nextTs = () => { seq++; return `${ts}.${String(seq * 37 % 1000).padStart(3, '0')}`; };
 
-  designerDebugLog.push(
-    { time: ts, level: 'info', message: '调试会话已启动' },
-    { time: ts, level: 'info', message: '正在执行触发器节点...' },
-  );
-
-  // Simulate node execution states
+  // Reset all node debug states
   designerNodes.forEach(n => { n._debugStatus = null; });
+  designerConnections.forEach(c => { c._debugActive = false; });
+
+  // --- Generate per-node diagnostic logs ---
+  function generateNodeLogs(nodes, conns, phase) {
+    const logs = [];
+    const typeLabel = { trigger: '触发器', http: 'HTTP 请求', code: '代码', assign: '赋值', if: 'IF 条件', switch: 'Switch', loop: '循环', delay: '延迟', output: '输出', end: '结束' };
+
+    // Build execution order based on connections
+    const triggerNode = nodes.find(n => n.type === 'trigger');
+    const endNode = nodes.find(n => n.type === 'end');
+    const orderedNodes = [];
+    if (triggerNode) orderedNodes.push(triggerNode);
+
+    // Simple topological sort via BFS along connections
+    const visited = new Set(triggerNode ? [triggerNode.id] : []);
+    const queue = triggerNode ? [triggerNode.id] : [];
+    while (queue.length > 0) {
+      const currentId = queue.shift();
+      const outConns = conns.filter(c => c.from === currentId);
+      for (const conn of outConns) {
+        const targetNode = nodes.find(n => n.id === conn.to);
+        if (targetNode && !visited.has(targetNode.id)) {
+          visited.add(targetNode.id);
+          orderedNodes.push(targetNode);
+          queue.push(targetNode.id);
+        }
+      }
+    }
+    // Add any remaining nodes not reached
+    nodes.forEach(n => { if (!visited.has(n.id)) orderedNodes.push(n); });
+
+    // --- Trigger node ---
+    const trigger = orderedNodes.find(n => n.type === 'trigger');
+    if (trigger) {
+      const trigType = trigger.config?.triggerType || 'manual';
+      const trigLabel = { manual: '手动', scheduled: '定时', event: '事件', webhook: 'Webhook' };
+      const inputParams = trigger.config?.inputParams || [];
+      logs.push({ time: nextTs(), level: 'info', node: trigger.name, event: 'workflow.started', message: `工作流开始执行，触发方式: ${trigLabel[trigType] || trigType}` });
+      if (inputParams.length > 0) {
+        const paramPreview = inputParams.map(p => `${p.name}=${p.fieldType === 'toggle' ? 'true' : p.fieldType === 'number' ? '42' : '"模拟值"'}`).join(', ');
+        logs.push({ time: nextTs(), level: 'debug', node: trigger.name, event: 'trigger.input', message: `输入参数: ${paramPreview}`, detail: inputParams.map(p => ({ name: p.name, label: p.label || p.name, type: p.fieldType || 'shortText', value: p.fieldType === 'toggle' ? true : p.fieldType === 'number' ? 42 : '模拟值' })) });
+      }
+      logs.push({ time: nextTs(), level: 'info', node: trigger.name, event: 'node.completed', message: '触发器执行完成，耗时 2ms' });
+    }
+
+    // --- Middle nodes (skip trigger & end) ---
+    const middleNodes = orderedNodes.filter(n => n.type !== 'trigger' && n.type !== 'end');
+    for (const node of middleNodes) {
+      const nt = typeLabel[node.type] || node.type;
+      const dur = node.type === 'http' ? Math.floor(Math.random() * 300 + 50) : node.type === 'code' ? Math.floor(Math.random() * 100 + 10) : Math.floor(Math.random() * 20 + 1);
+
+      logs.push({ time: nextTs(), level: 'info', node: node.name, event: 'node.started', message: `[${nt}] 开始执行 (${node.code})` });
+
+      switch (node.type) {
+        case 'http': {
+          const method = (node.config?.method || 'GET').toUpperCase();
+          const url = node.config?.url || 'https://api.example.com/endpoint';
+          const headers = node.config?.headers || [];
+          logs.push({ time: nextTs(), level: 'debug', node: node.name, event: 'http.request', message: `${method} ${url}`, detail: { method, url, headers: headers.length > 0 ? headers : '无自定义请求头', body: node.config?.body || null } });
+          // Simulate response
+          const statusCode = Math.random() > 0.15 ? 200 : 500;
+          if (statusCode === 200) {
+            const respBody = method === 'GET' ? { data: { items: [{ id: 1, name: '示例数据', status: 'active' }], total: 1 }, status: 'ok' } : { success: true, message: '操作成功' };
+            logs.push({ time: nextTs(), level: 'debug', node: node.name, event: 'http.response', message: `HTTP ${statusCode} OK，耗时 ${dur}ms`, detail: { statusCode, responseSize: JSON.stringify(respBody).length + ' 字符', body: respBody } });
+            logs.push({ time: nextTs(), level: 'info', node: node.name, event: 'node.completed', message: `HTTP 请求完成，状态码 ${statusCode}，耗时 ${dur}ms` });
+          } else {
+            const errMsg = 'Internal Server Error';
+            logs.push({ time: nextTs(), level: 'error', node: node.name, event: 'http.error', message: `HTTP ${statusCode} ${errMsg}，耗时 ${dur}ms`, detail: { statusCode, error: errMsg, url } });
+            logs.push({ time: nextTs(), level: 'warn', node: node.name, event: 'node.retry', message: '正在重试 (1/3)...' });
+            logs.push({ time: nextTs(), level: 'info', node: node.name, event: 'node.completed', message: `重试成功，HTTP 200，耗时 ${dur + 120}ms` });
+          }
+          break;
+        }
+        case 'if': {
+          const cond = node.config?.condition || 'true';
+          const result = Math.random() > 0.3;
+          logs.push({ time: nextTs(), level: 'debug', node: node.name, event: 'condition.eval', message: `条件表达式: ${cond}`, detail: { expression: cond, result: result ? 'TRUE' : 'FALSE', variables: '上游输出变量已注入上下文' } });
+          logs.push({ time: nextTs(), level: 'info', node: node.name, event: 'condition.result', message: `条件判断结果: ${result ? 'TRUE → 进入真分支' : 'FALSE → 进入假分支'}` });
+          logs.push({ time: nextTs(), level: 'info', node: node.name, event: 'node.completed', message: `IF 条件评估完成，耗时 ${dur}ms` });
+          break;
+        }
+        case 'switch': {
+          const cases = node.config?.cases || [{ label: '条件1', value: 'A' }, { label: '条件2', value: 'B' }];
+          const matchedIdx = 0;
+          logs.push({ time: nextTs(), level: 'debug', node: node.name, event: 'switch.eval', message: `匹配模式: ${node.config?.matchMode === 'all' ? '全部匹配' : '首次匹配'}`, detail: { cases: cases.map(c => c.label || c.value), matched: cases[matchedIdx]?.label || 'Default' } });
+          logs.push({ time: nextTs(), level: 'info', node: node.name, event: 'switch.result', message: `匹配分支: ${cases[matchedIdx]?.label || 'Default'}` });
+          logs.push({ time: nextTs(), level: 'info', node: node.name, event: 'node.completed', message: `Switch 路由完成，耗时 ${dur}ms` });
+          break;
+        }
+        case 'loop': {
+          const loopMode = node.config?.loopMode || 'forEach';
+          const listVar = node.config?.listVar || 'items';
+          const iterCount = Math.floor(Math.random() * 5 + 2);
+          const breakCond = node.config?.breakCondition;
+          logs.push({ time: nextTs(), level: 'debug', node: node.name, event: 'loop.start', message: `循环模式: ${loopMode === 'forEach' ? 'ForEach 遍历' : 'While 条件循环'}`, detail: { loopMode, listVar, itemVar: node.config?.itemVar || 'item', indexVar: node.config?.indexVar || 'index', maxIterations: node.config?.maxIterations || 1000, breakCondition: breakCond || '无' } });
+          // Simulate iteration logs
+          const actualIters = breakCond && Math.random() > 0.5 ? Math.min(iterCount, 2) : iterCount;
+          for (let i = 0; i < actualIters; i++) {
+            logs.push({ time: nextTs(), level: 'debug', node: node.name, event: 'loop.iteration', message: `第 ${i + 1} 轮迭代: ${node.config?.itemVar || 'item'} = { index: ${i}, ... }` });
+          }
+          if (breakCond && actualIters < iterCount) {
+            logs.push({ time: nextTs(), level: 'warn', node: node.name, event: 'loop.break', message: `Break 条件满足: ${breakCond}，在第 ${actualIters} 轮中断循环` });
+          }
+          logs.push({ time: nextTs(), level: 'info', node: node.name, event: 'loop.done', message: `循环完成，共 ${actualIters} 轮迭代，耗时 ${dur + actualIters * 30}ms` });
+          logs.push({ time: nextTs(), level: 'info', node: node.name, event: 'node.completed', message: `循环节点执行完成` });
+          break;
+        }
+        case 'assign': {
+          const assignments = node.config?.assignments || [];
+          if (assignments.length > 0) {
+            const assignStr = assignments.map(a => `${a.target} = ${a.source || '""'} (${a.type || 'String'})`).join(', ');
+            logs.push({ time: nextTs(), level: 'debug', node: node.name, event: 'assign.set', message: `赋值: ${assignStr}`, detail: assignments.map(a => ({ target: a.target, source: a.source || '""', type: a.type || 'String', resolvedValue: a.type === 'Integer' ? 42 : a.type === 'Boolean' ? true : '模拟赋值结果' })) });
+          } else {
+            logs.push({ time: nextTs(), level: 'warn', node: node.name, event: 'assign.empty', message: '未配置赋值规则，节点无实际操作' });
+          }
+          logs.push({ time: nextTs(), level: 'info', node: node.name, event: 'node.completed', message: `赋值完成，耗时 ${dur}ms` });
+          break;
+        }
+        case 'code': {
+          const lang = node.config?.language || 'JavaScript';
+          const outputVars = node.config?.outputVars || [];
+          logs.push({ time: nextTs(), level: 'debug', node: node.name, event: 'code.execute', message: `执行 ${lang} 脚本`, detail: { language: lang, script: node.config?.script ? node.config.script.substring(0, 100) + '...' : '// 空脚本', outputVars: outputVars.length > 0 ? outputVars : '无输出变量定义' } });
+          if (outputVars.length > 0) {
+            const varStr = outputVars.map(v => `${v.name}=${v.type === 'Integer' ? 42 : v.type === 'Boolean' ? true : '"计算结果"'}`).join(', ');
+            logs.push({ time: nextTs(), level: 'debug', node: node.name, event: 'code.output', message: `输出变量: ${varStr}` });
+          }
+          logs.push({ time: nextTs(), level: 'info', node: node.name, event: 'node.completed', message: `代码执行完成，耗时 ${dur}ms` });
+          break;
+        }
+        case 'delay': {
+          const delayMs = node.config?.duration || 1000;
+          logs.push({ time: nextTs(), level: 'info', node: node.name, event: 'delay.wait', message: `等待 ${delayMs}ms (模拟跳过)` });
+          logs.push({ time: nextTs(), level: 'info', node: node.name, event: 'node.completed', message: `延迟完成，耗时 ${dur}ms` });
+          break;
+        }
+        case 'output': {
+          const level = node.config?.level || 'INFO';
+          const outputMode = node.config?.outputMode || 'variables';
+          logs.push({ time: nextTs(), level: level === 'ERROR' ? 'error' : level === 'WARN' ? 'warn' : 'info', node: node.name, event: 'output.write', message: `输出级别: ${level}，模式: ${outputMode}` });
+          logs.push({ time: nextTs(), level: 'info', node: node.name, event: 'node.completed', message: `输出完成，耗时 ${dur}ms` });
+          break;
+        }
+        default:
+          logs.push({ time: nextTs(), level: 'info', node: node.name, event: 'node.completed', message: `节点执行完成，耗时 ${dur}ms` });
+      }
+    }
+
+    // --- End node ---
+    if (endNode) {
+      logs.push({ time: nextTs(), level: 'info', node: endNode.name, event: 'workflow.finished', message: `工作流执行完成，共 ${middleNodes.length + 1} 个节点，总耗时 ${Math.floor(Math.random() * 800 + 200)}ms` });
+    }
+
+    return logs;
+  }
+
+  // Generate all logs upfront
+  const allLogs = generateNodeLogs(designerNodes, designerConnections, 'start');
+
+  // Phase 1: Trigger node starts immediately
+  designerDebugLog.push(allLogs[0]); // workflow.started
   const triggerNode = designerNodes.find(n => n.type === 'trigger');
-  if (triggerNode) triggerNode._debugStatus = 'success';
-
-  // Animate through nodes (guard against exited debug mode)
-  _debugTimer1 = setTimeout(() => {
-    if (!designerDebugMode) return;
-    designerNodes.forEach(n => {
-      if (n.type !== 'trigger' && n.type !== 'end') n._debugStatus = 'success';
-    });
-    designerDebugLog.push({ time: ts, level: 'info', message: '所有节点执行完成' });
-    renderDesigner();
-
-    _debugTimer2 = setTimeout(() => {
-      if (!designerDebugMode) return;
-      const endNode = designerNodes.find(n => n.type === 'end');
-      if (endNode) endNode._debugStatus = 'success';
-      designerDebugLog.push({ time: ts, level: 'info', message: '调试执行完成 - 通过' });
-      designerConnections.forEach(c => c._debugActive = true);
-
-      if (designerWf) designerWf.debugPassed = true;
-
-      designerBottomPanel = 'debug';
-      designerBottomTab = 'debug';
-      renderDesigner();
-      showToast('success', '调试通过', '所有节点执行成功');
-    }, 800);
-  }, 600);
+  if (triggerNode) triggerNode._debugStatus = 'running';
 
   designerBottomPanel = 'debug';
   designerBottomTab = 'debug';
   renderDesigner();
+
+  // Phase 2: Animate through nodes progressively
+  let logIdx = 1;
+  let nodePhaseIdx = 0;
+  const middleNodes = designerNodes.filter(n => n.type !== 'trigger' && n.type !== 'end');
+  const endNode = designerNodes.find(n => n.type === 'end');
+
+  function animateNextNode() {
+    if (!designerDebugMode) return;
+
+    // Mark trigger as success on first tick
+    if (nodePhaseIdx === 0) {
+      if (triggerNode) triggerNode._debugStatus = 'success';
+      // Push trigger remaining logs
+      while (logIdx < allLogs.length && allLogs[logIdx].node === triggerNode?.name) {
+        designerDebugLog.push(allLogs[logIdx++]);
+      }
+      nodePhaseIdx++;
+      renderDesigner();
+      _debugTimer1 = setTimeout(animateNextNode, 400);
+      return;
+    }
+
+    // Animate middle nodes one by one
+    const midIdx = nodePhaseIdx - 1;
+    if (midIdx < middleNodes.length) {
+      const node = middleNodes[midIdx];
+      node._debugStatus = 'running';
+      // Highlight incoming connection
+      const inConn = designerConnections.find(c => c.to === node.id);
+      if (inConn) inConn._debugActive = true;
+      renderDesigner();
+
+      _debugTimer1 = setTimeout(() => {
+        if (!designerDebugMode) return;
+        node._debugStatus = 'success';
+        // Push logs for this node
+        while (logIdx < allLogs.length && allLogs[logIdx].node === node.name) {
+          designerDebugLog.push(allLogs[logIdx++]);
+        }
+        // Highlight outgoing connection
+        const outConn = designerConnections.find(c => c.from === node.id);
+        if (outConn) outConn._debugActive = true;
+        nodePhaseIdx++;
+        renderDesigner();
+        _debugTimer1 = setTimeout(animateNextNode, 300);
+      }, 500);
+      return;
+    }
+
+    // End node
+    if (endNode) {
+      endNode._debugStatus = 'running';
+      renderDesigner();
+      _debugTimer1 = setTimeout(() => {
+        if (!designerDebugMode) return;
+        endNode._debugStatus = 'success';
+        while (logIdx < allLogs.length) {
+          designerDebugLog.push(allLogs[logIdx++]);
+        }
+        if (designerWf) designerWf.debugPassed = true;
+        designerBottomPanel = 'debug';
+        designerBottomTab = 'debug';
+        renderDesigner();
+        showToast('success', '调试通过', '所有节点执行成功');
+      }, 400);
+    }
+  }
+
+  _debugTimer1 = setTimeout(animateNextNode, 400);
 }
 
-// Debug timer IDs for cleanup
+// Debug timer ID for cleanup
 let _debugTimer1 = null;
-let _debugTimer2 = null;
 
 function exitDebugMode() {
   // Clear pending debug animation timers
   if (_debugTimer1) { clearTimeout(_debugTimer1); _debugTimer1 = null; }
-  if (_debugTimer2) { clearTimeout(_debugTimer2); _debugTimer2 = null; }
 
   designerDebugMode = false;
+  designerDebugLogFilter = 'all';
   designerNodes.forEach(n => { n._debugStatus = null; });
   designerConnections.forEach(c => { c._debugActive = false; });
   designerBottomPanel = null;
