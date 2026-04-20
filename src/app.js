@@ -1332,8 +1332,7 @@ function renderWsWorkflowsTab(ws) {
             <div class="more-menu-wrapper"><button class="table-action-btn" title="更多" onclick="event.stopPropagation();toggleMoreMenu(this)">${icons.chevronDown}</button><div class="more-menu-panel hidden">
               ${isMemberOrAbove ? `<div class="more-menu-item" onclick="showCopyWfModal(${wf.id})">${icons.copy}<span>复制</span></div>` : ''}
               ${isMemberOrAbove ? `<div class="more-menu-item" onclick="showMoveWfModal(${wf.id})">${icons.move}<span>移动</span></div>` : ''}
-              ${wf.versions && wf.versions.length > 0 ? `<div class="more-menu-item" onclick="showVersionHistory(${wf.id})">${icons.history}<span>版本历史</span></div>` : ''}
-              ${isAdmin ? `<div style="border-top:1px solid var(--md-outline-variant);margin:4px 0"></div><div class="more-menu-item danger" onclick="showDeleteWfModal(${wf.id})">${icons.trash}<span>删除</span></div>` : ''}
+
             </div></div>
           </div></td></tr>`;
       }).join('')}
