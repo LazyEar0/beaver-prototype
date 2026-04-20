@@ -679,6 +679,8 @@ function renderCanvasNodes() {
       <div class="canvas-node-body">
         <span class="canvas-node-code">${node.code}</span>
         ${isPlaceholder ? '<div class="placeholder-tag">待完善</div>' : ''}
+        ${isPlaceholder && node.config?.requirementDesc ? `<div class="placeholder-desc-preview" title="${escHtml(node.config.requirementDesc)}">${truncate(node.config.requirementDesc, 24)}</div>` : ''}
+        ${isPlaceholder && node.config?.assignee ? `<div class="placeholder-assignee-badge">${escHtml(node.config.assignee)}</div>` : ''}
         ${node.type === 'trigger' ? (() => {
           const et = node.config?.enabledTypes || { manual: true, scheduled: false, event: false, webhook: false };
           const typeLabels = { manual: '手动', scheduled: '定时', event: '事件', webhook: 'Webhook' };
@@ -1067,6 +1069,9 @@ function renderNodeConfigFields(node, nt) {
       break;
     case 'break':
       html += renderBreakNodeConfig(node);
+      break;
+    case 'placeholder':
+      html += renderPlaceholderConfig(node);
       break;
   }
 
@@ -2800,6 +2805,70 @@ function renderBreakNodeConfig(node) {
   </div>`;
 }
 
+function renderPlaceholderConfig(node) {
+  return `
+  <div class="config-section placeholder-requirement-section" style="background:linear-gradient(135deg,#f8fafc 0%,#fafafa 100%);border:1px solid #e2e8f0;border-radius:var(--radius-md);padding:var(--space-3)">
+    <div style="font-size:var(--font-size-xs);color:var(--md-primary);font-weight:600;margin-bottom:8px">📋 需求描述</div>
+    <div style="font-size:var(--font-size-xs);color:var(--md-on-surface-variant);line-height:1.7;margin-bottom:8px">
+      描述此占位节点的业务意图，帮助协作者理解需要实现什么功能，以及转换为哪种节点类型。
+    </div>
+    <div class="config-field" style="margin-bottom:12px">
+      <div class="config-field-label">需求说明 <span class="required">*</span></div>
+      <textarea class="config-textarea" rows="3" placeholder="描述此位置需要实现的业务功能，例如：调用审批系统提交审批单，传入 orderId 和金额，返回审批单号和状态" onchange="updateNodeConfig(${node.id}, 'requirementDesc', this.value)">${escHtml(node.config?.requirementDesc || '')}</textarea>
+      <div class="config-field-help">清晰描述需求，方便其他协作者了解应转换为哪种节点并正确配置</div>
+    </div>
+    <div class="config-field" style="margin-bottom:12px">
+      <div class="config-field-label">预期输入</div>
+      <input class="config-input" value="${escHtml(node.config?.expectedInput || '')}" placeholder="例：orderId, amount" onchange="updateNodeConfig(${node.id}, 'expectedInput', this.value)" />
+      <div class="config-field-help">期望从前序节点获取哪些数据</div>
+    </div>
+    <div class="config-field" style="margin-bottom:12px">
+      <div class="config-field-label">预期输出</div>
+      <input class="config-input" value="${escHtml(node.config?.expectedOutput || '')}" placeholder="例：approvalId, status" onchange="updateNodeConfig(${node.id}, 'expectedOutput', this.value)" />
+      <div class="config-field-help">期望为后续节点提供哪些数据</div>
+    </div>
+    <div class="config-field">
+      <div class="config-field-label">指定处理人</div>
+      <input class="config-input" value="${escHtml(node.config?.assignee || '')}" placeholder="例：@张三" onchange="updateNodeConfig(${node.id}, 'assignee', this.value)" />
+      <div class="config-field-help">可选，标记由谁来实现此节点的具体逻辑</div>
+    </div>
+  </div>
+  <div class="config-section">
+    <div class="config-section-title">转换建议</div>
+    <div class="placeholder-convert-suggestions">
+      ${renderPlaceholderConvertSuggestions(node)}
+    </div>
+  </div>`;
+}
+
+function renderPlaceholderConvertSuggestions(node) {
+  const desc = (node.config?.requirementDesc || '').toLowerCase();
+  const suggestions = [];
+  if (/调用|接口|api|请求|http|rest/.test(desc)) suggestions.push({ type: 'http', name: 'HTTP 请求', icon: '🌐', reason: '需求涉及外部接口调用' });
+  if (/消息|队列|mq|通知|事件发布/.test(desc)) suggestions.push({ type: 'mq', name: 'MQ 发送', icon: '📨', reason: '需求涉及消息发送' });
+  if (/条件|判断|分支|如果|是否/.test(desc)) suggestions.push({ type: 'if', name: 'IF 条件', icon: '🔀', reason: '需求涉及条件判断' });
+  if (/代码|脚本|计算|转换|处理|python|javascript|js/.test(desc)) suggestions.push({ type: 'code', name: '代码', icon: '💻', reason: '需求涉及自定义逻辑' });
+  if (/赋值|变量|设置|映射/.test(desc)) suggestions.push({ type: 'assign', name: '赋值', icon: '📝', reason: '需求涉及变量操作' });
+  if (/工作流|子流程|复用/.test(desc)) suggestions.push({ type: 'workflow', name: '工作流', icon: '🔗', reason: '需求涉及调用其他工作流' });
+  if (/遍历|循环|批量|逐条|轮询/.test(desc)) suggestions.push({ type: 'loop', name: '循环', icon: '🔄', reason: '需求涉及重复处理' });
+  if (/等待|延迟|定时/.test(desc)) suggestions.push({ type: 'delay', name: '延迟', icon: '⏱️', reason: '需求涉及等待' });
+
+  if (suggestions.length === 0) {
+    return '<div style="font-size:var(--font-size-xs);color:var(--md-outline);padding:var(--space-2) 0">填写需求说明后，将根据描述内容推荐合适的节点类型</div>';
+  }
+
+  return suggestions.map(s => `
+    <div class="placeholder-suggest-item" onclick="convertNodeTo(${node.id}, '${s.type}')" title="点击转换为${s.name}">
+      <span style="font-size:16px">${s.icon}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;font-weight:600;color:var(--md-on-surface)">${s.name}</div>
+        <div style="font-size:10px;color:var(--md-on-surface-variant)">${s.reason}</div>
+      </div>
+      <span style="font-size:10px;color:var(--md-primary);white-space:nowrap">转换 →</span>
+    </div>
+  `).join('');
+}
+
 // --- Settings Panel ---
 function renderDesignerSettingsPanel() {
   const wf = designerWf;
@@ -3198,7 +3267,9 @@ function getProblems() {
     }
     // Placeholder node warning
     if (node.type === 'placeholder') {
-      problems.push({ level: 'warning', message: `占位节点「${node.name}」待完善`, location: node.code, nodeId: node.id });
+      const desc = node.config?.requirementDesc ? `：${node.config.requirementDesc}` : '';
+      const assignee = node.config?.assignee ? `（处理人：${node.config.assignee}）` : '';
+      problems.push({ level: 'warning', message: `占位节点「${node.name}」待完善${desc}${assignee}`, location: node.code, nodeId: node.id });
     }
   });
 
@@ -6426,32 +6497,91 @@ function openCodeEditorModal(editorId, nodeId, language) {
     });
   }
 
-  // --- Build available functions list ---
+  // --- Build available functions list (with full signature tooltips) ---
   const builtinFunctions = isJS ? [
-    { name: 'getVariable(name)', desc: '获取变量', code: 'getVariable("")' },
-    { name: 'setVariable(name, val)', desc: '设置变量', code: 'setVariable("", )' },
-    { name: 'getInput(name)', desc: '获取输入', code: 'getInput("")' },
-    { name: 'getOutputFrom(id, name)', desc: '获取上游输出', code: 'getOutputFrom("", "")' },
-    { name: 'toJson(obj)', desc: '转 JSON 字符串', code: 'toJson()' },
-    { name: 'newGuid()', desc: '生成 GUID', code: 'newGuid()' },
-    { name: 'setOutcome(name)', desc: '设置分支走向', code: 'setOutcome("")' },
+    {
+      name: 'getVariable(name)',
+      desc: '读取工作流全局变量',
+      code: 'getVariable("")',
+      sig: 'getVariable(name: string): any',
+      example: 'getVariable("userId")  // 返回全局变量 userId 的值'
+    },
+    {
+      name: 'setVariable(name, value)',
+      desc: '写入工作流全局变量',
+      code: 'setVariable("", )',
+      sig: 'setVariable(name: string, value: any): void',
+      example: 'setVariable("totalCount", 100)  // 设置全局变量'
+    },
+    {
+      name: 'getInput(name)',
+      desc: '获取当前节点输入参数',
+      code: 'getInput("")',
+      sig: 'getInput(name: string): any',
+      example: 'getInput("userId")  // 等同于 inputs.userId'
+    },
+    {
+      name: 'getOutputFrom(nodeCode, outputName)',
+      desc: '获取指定上游节点的输出值',
+      code: 'getOutputFrom("", "")',
+      sig: 'getOutputFrom(nodeCode: string, outputName?: string): any',
+      example: 'getOutputFrom("http_1", "response")  // 取 http_1 节点的 response 输出'
+    },
+    {
+      name: 'toJson(obj)',
+      desc: '将对象序列化为 JSON 字符串',
+      code: 'toJson()',
+      sig: 'toJson(obj: any): string',
+      example: 'toJson({ key: "val" })  // → \'{\'key\':\'val\'}\"'
+    },
+    {
+      name: 'newGuid()',
+      desc: '生成一个新的 GUID',
+      code: 'newGuid()',
+      sig: 'newGuid(): Guid',
+      example: 'const id = newGuid().toString()  // 生成唯一 ID'
+    },
+    {
+      name: 'newGuidString()',
+      desc: '生成 GUID 字符串',
+      code: 'newGuidString()',
+      sig: 'newGuidString(): string',
+      example: 'const id = newGuidString()  // "550e8400-e29b-41d4-a716-..."'
+    },
+    {
+      name: 'setOutcome(name)',
+      desc: '控制节点走哪个出口分支',
+      code: 'setOutcome("")',
+      sig: 'setOutcome(name: string): void',
+      example: 'setOutcome("success")  // 让流程走 success 分支'
+    },
+    {
+      name: 'isNullOrEmpty(value)',
+      desc: '判断字符串是否为空',
+      code: 'isNullOrEmpty()',
+      sig: 'isNullOrEmpty(value: string): boolean',
+      example: 'if (isNullOrEmpty(inputs.name)) { ... }'
+    },
   ] : [
-    { name: 'get_variable(name)', desc: '获取变量', code: 'get_variable("")' },
-    { name: 'set_variable(name, val)', desc: '设置变量', code: 'set_variable("", )' },
-    { name: 'get_input(name)', desc: '获取输入', code: 'get_input("")' },
-    { name: 'to_json(obj)', desc: '转 JSON 字符串', code: 'to_json()' },
-    { name: 'new_guid()', desc: '生成 GUID', code: 'new_guid()' },
+    { name: 'get_variable(name)', desc: '获取全局变量', code: 'get_variable("")', sig: 'get_variable(name: str) -> Any', example: 'val = get_variable("userId")' },
+    { name: 'set_variable(name, value)', desc: '设置全局变量', code: 'set_variable("", )', sig: 'set_variable(name: str, value: Any) -> None', example: 'set_variable("count", 100)' },
+    { name: 'get_input(name)', desc: '获取节点输入', code: 'get_input("")', sig: 'get_input(name: str) -> Any', example: 'val = get_input("userId")' },
+    { name: 'to_json(obj)', desc: '序列化为 JSON', code: 'to_json()', sig: 'to_json(obj: Any) -> str', example: 'json_str = to_json({"key": "val"})' },
+    { name: 'new_guid()', desc: '生成 GUID', code: 'new_guid()', sig: 'new_guid() -> str', example: 'id = new_guid()' },
   ];
 
-  let funcListHtml = builtinFunctions.map(fn => `
-    <div class="expr-expand-var-item" 
+  let funcListHtml = builtinFunctions.map(fn => {
+    const tooltipHtml = `<div class="code-fn-tooltip"><div class="code-fn-sig">${escHtml(fn.sig || fn.name)}</div><div class="code-fn-example">${escHtml(fn.example || '')}</div></div>`;
+    return `
+    <div class="expr-expand-var-item code-fn-item"
       onclick="insertCodeVarIntoEditor(${JSON.stringify(fn.code).replace(/"/g, '&quot;')})"
-      title="${escHtml(fn.desc)}">
-      <span class="expr-expand-var-name" style="color:var(--md-tertiary)">${escHtml(fn.name)}</span>
+      title="">
+      <span class="expr-expand-var-name" style="color:var(--md-tertiary);font-family:var(--font-family-mono);font-size:11px">${escHtml(fn.name)}</span>
       <span class="expr-expand-var-type">${escHtml(fn.desc)}</span>
       <span class="expr-expand-var-insert">插入</span>
-    </div>
-  `).join('');
+      ${tooltipHtml}
+    </div>`;
+  }).join('');
 
   const langTag = isJS 
     ? '<span class="code-lang-tag js" style="margin-right:8px">JS</span>' 
@@ -6481,13 +6611,19 @@ function openCodeEditorModal(editorId, nodeId, language) {
       </div>
       <div class="expr-expand-body">
         <div class="expr-expand-vars">
-          <div class="expr-expand-vars-header">可用变量</div>
-          <div class="expr-expand-vars-list" id="exprExpandVarList">
+          <div class="code-editor-left-tabs">
+            <button class="code-left-tab active" onclick="switchCodeEditorTab(this,'vars')">可用变量</button>
+            <button class="code-left-tab" onclick="switchCodeEditorTab(this,'funcs')">内置函数</button>
+            <button class="code-left-tab" onclick="switchCodeEditorTab(this,'snippets')">片段</button>
+          </div>
+          <div id="codeEditorTabVars" class="expr-expand-vars-list code-editor-tab-panel" style="overflow-y:auto;flex:1">
             ${varListHtml}
           </div>
-          <div class="expr-expand-vars-header" style="margin-top:8px">内置函数</div>
-          <div class="expr-expand-vars-list">
+          <div id="codeEditorTabFuncs" class="expr-expand-vars-list code-editor-tab-panel" style="display:none;overflow-y:auto;flex:1">
             ${funcListHtml}
+          </div>
+          <div id="codeEditorTabSnippets" class="expr-expand-vars-list code-editor-tab-panel" style="display:none;overflow-y:auto;flex:1">
+            ${isJS ? buildJsSnippetsHtml() : buildPySnippetsHtml()}
           </div>
         </div>
         <div class="expr-expand-editor-area">
@@ -6524,9 +6660,11 @@ function openCodeEditorModal(editorId, nodeId, language) {
   if (ta) {
     ta.focus();
     ta.setSelectionRange(ta.value.length, ta.value.length);
+    // inputs. autocomplete
+    ta.addEventListener('input', _onCodeEditorInput);
   }
 
-  _codeExpandState = { editorId };
+  _codeExpandState = { editorId, nodeId, language };
   document.addEventListener('keydown', _onCodeExpandEsc);
 }
 
@@ -6552,12 +6690,29 @@ function closeCodeEditorModal(editorId, confirm) {
     const ta = document.getElementById('codeExpandTextarea');
     const origEl = document.getElementById(editorId);
     if (ta && origEl) {
+      // Syntax check before confirming
+      const lang = _codeExpandState?.language || 'JavaScript';
+      const err = _validateCodeSyntax(ta.value, lang);
+      if (err) {
+        // Show error banner but don't block saving
+        let errBanner = document.getElementById('codeExpandSyntaxErr');
+        if (!errBanner) {
+          errBanner = document.createElement('div');
+          errBanner.id = 'codeExpandSyntaxErr';
+          errBanner.className = 'code-syntax-error-banner';
+          const footer = document.querySelector('#codeExpandContainer .expr-expand-footer');
+          if (footer) footer.insertAdjacentElement('beforebegin', errBanner);
+        }
+        errBanner.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> 语法错误：${escHtml(err)}`;
+        return; // block save
+      }
       origEl.value = ta.value;
       origEl.dispatchEvent(new Event('change', { bubbles: true }));
     }
   }
 
   document.removeEventListener('keydown', _onCodeExpandEsc);
+  _hideCodeAutocomplete();
   container.remove();
   _codeExpandState = null;
 }
@@ -6568,6 +6723,8 @@ function closeCodeEditorModal(editorId, confirm) {
 function insertCodeVarIntoEditor(codeRef) {
   const ta = document.getElementById('codeExpandTextarea');
   if (!ta) return;
+  // Close autocomplete if open
+  _hideCodeAutocomplete();
   const start = ta.selectionStart;
   const end = ta.selectionEnd;
   const before = ta.value.substring(0, start);
@@ -6576,6 +6733,280 @@ function insertCodeVarIntoEditor(codeRef) {
   const pos = start + codeRef.length;
   ta.focus();
   ta.setSelectionRange(pos, pos);
+}
+
+// ============================================================
+// 代码片段 (Snippets)
+// ============================================================
+function buildJsSnippetsHtml() {
+  const snippets = [
+    {
+      label: '获取输入并处理',
+      desc: '模板：读 inputs 并返回结果',
+      code: `const { data } = inputs;
+// 在此处理数据
+return { result: data };`
+    },
+    {
+      label: '条件分支路由',
+      desc: '根据条件走不同分支',
+      code: `const status = inputs.status;
+if (status === 'success') {
+  setOutcome('success');
+} else {
+  setOutcome('fail');
+}`
+    },
+    {
+      label: '遍历数组并转换',
+      desc: '对数组每个元素做处理',
+      code: `const list = inputs.list || [];
+const result = list.map(item => ({
+  id: item.id,
+  name: item.name,
+  // 添加处理逻辑
+}));
+return { result };`
+    },
+    {
+      label: '调用上游节点结果',
+      desc: '获取指定节点的输出',
+      code: `const httpResult = getOutputFrom('http_1', 'response');
+const data = httpResult?.data;
+return { data };`
+    },
+    {
+      label: '读写全局变量',
+      desc: '读取和写入全局变量',
+      code: `// 读取
+ const count = getVariable('retryCount') || 0;
+// 写入
+setVariable('retryCount', count + 1);
+return { count };`
+    },
+    {
+      label: '错误处理',
+      desc: '带异常捕获的模板',
+      code: `try {
+  const result = inputs.data;
+  if (!result) throw new Error('数据为空');
+  return { success: true, result };
+} catch (e) {
+  setOutcome('error');
+  return { success: false, message: e.message };
+}`
+    },
+  ];
+  return snippets.map(s => `
+    <div class="code-snippet-item" onclick="insertSnippet(${JSON.stringify(s.code).replace(/"/g, '&quot;')})">
+      <div class="code-snippet-label">${escHtml(s.label)}</div>
+      <div class="code-snippet-desc">${escHtml(s.desc)}</div>
+    </div>`).join('');
+}
+
+function buildPySnippetsHtml() {
+  const snippets = [
+    {
+      label: '获取输入并处理',
+      desc: '模板：读 inputs 并返回结果',
+      code: `data = inputs.get('data')
+# 在此处理数据
+return {'result': data}`
+    },
+    {
+      label: '条件分支路由',
+      desc: '根据条件走不同分支',
+      code: `status = inputs.get('status')
+if status == 'success':
+    set_outcome('success')
+else:
+    set_outcome('fail')`
+    },
+    {
+      label: '遍历列表并转换',
+      desc: '对列表每个元素做处理',
+      code: `items = inputs.get('list', [])
+result = [{'id': item['id'], 'name': item['name']} for item in items]
+return {'result': result}`
+    },
+  ];
+  return snippets.map(s => `
+    <div class="code-snippet-item" onclick="insertSnippet(${JSON.stringify(s.code).replace(/"/g, '&quot;')})">
+      <div class="code-snippet-label">${escHtml(s.label)}</div>
+      <div class="code-snippet-desc">${escHtml(s.desc)}</div>
+    </div>`).join('');
+}
+
+function insertSnippet(code) {
+  const ta = document.getElementById('codeExpandTextarea');
+  if (!ta) return;
+  const start = ta.selectionStart;
+  const before = ta.value.substring(0, start);
+  const after = ta.value.substring(ta.selectionEnd);
+  // Add newline separator if needed
+  const sep = (before && !before.endsWith('\n')) ? '\n' : '';
+  ta.value = before + sep + code + (after ? '\n' + after : '');
+  const pos = before.length + sep.length + code.length;
+  ta.focus();
+  ta.setSelectionRange(pos, pos);
+}
+
+// ============================================================
+// 左侧面板 Tab 切换
+// ============================================================
+function switchCodeEditorTab(btn, tab) {
+  // Update tab button styles
+  const tabs = btn.closest('.code-editor-left-tabs');
+  if (tabs) tabs.querySelectorAll('.code-left-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  // Show/hide panels
+  const panels = { vars: 'codeEditorTabVars', funcs: 'codeEditorTabFuncs', snippets: 'codeEditorTabSnippets' };
+  Object.entries(panels).forEach(([key, id]) => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = key === tab ? 'block' : 'none';
+  });
+}
+
+// ============================================================
+// inputs. 自动补全
+// ============================================================
+let _codeAutoCompleteItems = [];
+
+function _onCodeEditorInput(event) {
+  const ta = event.target;
+  const pos = ta.selectionStart;
+  const before = ta.value.substring(0, pos);
+  // Detect 'inputs.' trigger
+  const match = before.match(/(inputs\.)([\w.]*)$/);
+  if (match) {
+    const prefix = match[2]; // text after 'inputs.'
+    _showCodeAutocomplete(ta, prefix);
+  } else {
+    _hideCodeAutocomplete();
+  }
+}
+
+function _buildInputsCompletionItems() {
+  if (!_codeExpandState) return [];
+  const { nodeId, language } = _codeExpandState;
+  const isJS = language === 'JavaScript';
+  const varGroups = getAvailableVariables(nodeId);
+  const items = [];
+  varGroups.forEach(group => {
+    group.variables.forEach(v => {
+      const fieldName = v.path.replace(/^.*\./, '');
+      items.push({
+        label: fieldName,
+        type: v.type || 'Any',
+        desc: `${group.name} · ${v.desc || v.type || ''}`,
+        insert: isJS ? `inputs.${fieldName}` : `inputs["${fieldName}"]`,
+        replace: true, // replace 'inputs.PREFIX' entirely
+      });
+    });
+  });
+  return items;
+}
+
+function _showCodeAutocomplete(ta, prefix) {
+  const allItems = _buildInputsCompletionItems();
+  const filtered = prefix
+    ? allItems.filter(it => it.label.toLowerCase().startsWith(prefix.toLowerCase()))
+    : allItems;
+  if (filtered.length === 0) { _hideCodeAutocomplete(); return; }
+
+  _codeAutoCompleteItems = filtered;
+
+  let dropdown = document.getElementById('codeAutoCompleteDropdown');
+  if (!dropdown) {
+    dropdown = document.createElement('div');
+    dropdown.id = 'codeAutoCompleteDropdown';
+    dropdown.className = 'code-autocomplete-dropdown';
+    document.body.appendChild(dropdown);
+  }
+
+  // Position below cursor (approximate using textarea dimensions)
+  const rect = ta.getBoundingClientRect();
+  const lines = ta.value.substring(0, ta.selectionStart).split('\n');
+  const lineIndex = lines.length - 1;
+  const lineHeight = parseInt(getComputedStyle(ta).lineHeight) || 20;
+  const paddingTop = parseInt(getComputedStyle(ta).paddingTop) || 10;
+  const top = rect.top + paddingTop + lineIndex * lineHeight + lineHeight - ta.scrollTop;
+  const left = rect.left + 12;
+
+  dropdown.style.cssText = `top:${Math.min(top, window.innerHeight - 220)}px;left:${left}px;min-width:280px;display:block`;
+  dropdown.innerHTML = filtered.slice(0, 10).map((item, i) => `
+    <div class="code-ac-item${i === 0 ? ' active' : ''}" data-index="${i}" onmousedown="event.preventDefault();_applyCodeAutocomplete(${i})">
+      <span class="code-ac-label">${escHtml(item.label)}</span>
+      <span class="code-ac-type">${escHtml(item.type)}</span>
+      <span class="code-ac-desc">${escHtml(item.desc)}</span>
+    </div>`).join('');
+
+  // Keyboard nav
+  ta.onkeydown = function(e) {
+    if (!document.getElementById('codeAutoCompleteDropdown')) {
+      handleCodeExpandKeydown(e);
+      return;
+    }
+    const items = dropdown.querySelectorAll('.code-ac-item');
+    const active = dropdown.querySelector('.code-ac-item.active');
+    const idx = active ? parseInt(active.dataset.index) : 0;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      const next = Math.min(idx + 1, items.length - 1);
+      items.forEach((el, i) => el.classList.toggle('active', i === next));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      const prev = Math.max(idx - 1, 0);
+      items.forEach((el, i) => el.classList.toggle('active', i === prev));
+    } else if (e.key === 'Enter' || e.key === 'Tab') {
+      e.preventDefault();
+      _applyCodeAutocomplete(idx);
+    } else if (e.key === 'Escape') {
+      _hideCodeAutocomplete();
+    } else {
+      handleCodeExpandKeydown(e);
+    }
+  };
+}
+
+function _applyCodeAutocomplete(index) {
+  const item = _codeAutoCompleteItems[index];
+  if (!item) return;
+  const ta = document.getElementById('codeExpandTextarea');
+  if (!ta) return;
+  const pos = ta.selectionStart;
+  const before = ta.value.substring(0, pos);
+  // Replace 'inputs.PREFIX' with full insert text
+  const replaced = before.replace(/(inputs\.[\w.]*)$/, item.insert);
+  ta.value = replaced + ta.value.substring(pos);
+  const newPos = replaced.length;
+  ta.focus();
+  ta.setSelectionRange(newPos, newPos);
+  _hideCodeAutocomplete();
+  // Restore default keydown
+  ta.onkeydown = handleCodeExpandKeydown;
+}
+
+function _hideCodeAutocomplete() {
+  const el = document.getElementById('codeAutoCompleteDropdown');
+  if (el) el.remove();
+  _codeAutoCompleteItems = [];
+  const ta = document.getElementById('codeExpandTextarea');
+  if (ta) ta.onkeydown = handleCodeExpandKeydown;
+}
+
+// ============================================================
+// 语法检查
+// ============================================================
+function _validateCodeSyntax(code, language) {
+  if (language !== 'JavaScript') return null; // Python syntax check not feasible in browser
+  try {
+    // Wrap in function to allow top-level return
+    new Function(code);
+    return null; // no error
+  } catch (e) {
+    return e.message;
+  }
 }
 
 /**
