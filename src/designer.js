@@ -66,7 +66,7 @@ const nodeTypes = [
   { type: 'loop', name: '循环', icon: '🔄', color: 'node-color-logic', category: '流程控制', desc: '循环执行，支持 ForEach 遍历、While 条件循环、Break 中断', code: 'loop' },
   { type: 'delay', name: '延迟', icon: '⏱️', color: 'node-color-logic', category: '流程控制', desc: '延迟执行后续节点，支持固定时长或到达指定时间', code: 'delay' },
   { type: 'assign', name: '赋值', icon: '📝', color: 'node-color-data', category: '数据处理', desc: '变量赋值操作，支持表达式计算和 ${变量名} 引用', code: 'assign' },
-  { type: 'output', name: '输出', icon: '📤', color: 'node-color-data', category: '数据处理', desc: '输出日志到调试面板，支持 INFO / WARNING / ERROR 级别', code: 'output' },
+  { type: 'output', name: '输出', icon: '📤', color: 'node-color-data', category: '数据处理', desc: '输出数据到下游节点，支持变量模式（结构化输出）和文本模式（模板输出）', code: 'output' },
   { type: 'code', name: '代码', icon: '💻', color: 'node-color-data', category: '数据处理', desc: '编写自定义脚本（JS / Python），实现复杂数据处理逻辑', code: 'code' },
   { type: 'http', name: 'HTTP 请求', icon: '🌐', color: 'node-color-integration', category: '集成', desc: 'HTTP 请求调用，支持 GET/POST/PUT/DELETE，可配置请求头和请求体', code: 'http' },
   { type: 'mq', name: 'MQ 消息', icon: '📨', color: 'node-color-integration', category: '集成', desc: '消息队列操作，支持发送和消费消息，需配置 Topic', code: 'mq' },
@@ -220,7 +220,7 @@ function generateRealisticNodes(wf) {
     { id: 2, type: 'http', name: '查询数据', code: 'http_1', x: 320, y: 160, config: { method: 'GET', url: 'https://api.example.com/data' }, warnings: 0 },
     { id: 3, type: 'if', name: '数据校验', code: 'if_1', x: 540, y: 240, config: { condition: 'response.status == 200' }, warnings: 0 },
     { id: 4, type: 'assign', name: '数据处理', code: 'assign_1', x: 760, y: 140, config: {}, warnings: 0 },
-    { id: 5, type: 'output', name: '记录日志', code: 'output_1', x: 760, y: 340, config: { level: 'ERROR' }, warnings: 0 },
+    { id: 5, type: 'output', name: '记录日志', code: 'output_1', x: 760, y: 340, config: { level: 'ERROR', outputMode: 'variables', outputVars: [{ name: 'result', type: 'String', source: '' }] }, warnings: 0 },
     { id: 6, type: 'http', name: '推送结果', code: 'http_2', x: 980, y: 140, config: { method: 'POST' }, warnings: 0 },
     { id: 7, type: 'end', name: '结束', code: 'end_1', x: 1200, y: 240, config: {}, warnings: 0 },
   ];
@@ -1759,10 +1759,10 @@ function renderAssignConfig(node) {
       return `
     <div class="assign-rule-row">
       <div class="assign-rule-main">
-        <select class="assign-type-select" title="变量类型" onchange="updateAssignment(${node.id}, ${i}, 'type', this.value)">
+        <input class="config-input assign-target-input" placeholder="如 orderStatus" value="${escHtml(a.target)}" style="font-family:var(--font-family-mono)" oninput="updateAssignment(${node.id}, ${i}, 'target', this.value); refreshAssignOutputVars(${node.id})" />
+        <select class="assign-type-select" title="变量类型" onchange="updateAssignment(${node.id}, ${i}, 'type', this.value); refreshAssignOutputVars(${node.id})">
           ${typeOptions.map(t => `<option value="${t}"${curType === t ? ' selected' : ''}>${t}</option>`).join('')}
         </select>
-        <input class="config-input assign-target-input" placeholder="变量名" value="${escHtml(a.target)}" style="font-family:var(--font-family-mono)" onchange="updateAssignment(${node.id}, ${i}, 'target', this.value); renderDesigner()" />
         <span class="condition-op">=</span>
         ${renderExprEditor({
           id: `assign_src_${node.id}_${i}`,
@@ -1794,9 +1794,24 @@ function updateAssignment(nodeId, index, field, value) {
     node.config.assignments[index][field] = value;
   }
   designerDirty = true;
-  // 改 type 或 target 时需要刷新输出变量区域
-  if (field === 'type' || field === 'target') {
-    renderDesigner();
+}
+
+/**
+ * 仅刷新赋值节点的输出变量区域，不整体 renderDesigner，避免焦点丢失
+ */
+function refreshAssignOutputVars(nodeId) {
+  const node = designerNodes.find(n => n.id === nodeId);
+  if (!node) return;
+  const panel = document.querySelector('.config-panel-body');
+  if (!panel) return;
+  const section = panel.querySelector('.output-vars-section');
+  if (!section) return;
+  const newHtml = renderOutputVariablesSection(node);
+  const tmp = document.createElement('div');
+  tmp.innerHTML = newHtml;
+  const newSection = tmp.querySelector('.output-vars-section');
+  if (newSection) {
+    section.replaceWith(newSection);
   }
 }
 
@@ -1821,10 +1836,122 @@ function removeAssignment(nodeId, index) {
   renderDesigner();
 }
 
+function toggleOutputMode(nodeId, mode) {
+  const node = designerNodes.find(n => n.id === nodeId);
+  if (!node) return;
+  if (!node.config) node.config = {};
+  node.config.outputMode = mode;
+  // Initialize data for target mode if missing
+  if (mode === 'variables' && !node.config.outputVars) {
+    node.config.outputVars = [{ name: 'result', type: 'String', source: '' }];
+  }
+  if (mode === 'text' && !node.config.textTemplate) {
+    node.config.textTemplate = '';
+  }
+  designerDirty = true;
+  renderDesigner();
+}
+
+function updateOutputVar(nodeId, index, field, value) {
+  const node = designerNodes.find(n => n.id === nodeId);
+  if (!node) return;
+  if (!node.config) node.config = {};
+  if (!node.config.outputVars) node.config.outputVars = [{ name: 'result', type: 'String', source: '' }];
+  if (node.config.outputVars[index]) {
+    node.config.outputVars[index][field] = value;
+  }
+  designerDirty = true;
+  // Changing name or type requires refresh for output vars section
+  if (field === 'name' || field === 'type') {
+    renderDesigner();
+  }
+}
+
+function addOutputVar(nodeId) {
+  const node = designerNodes.find(n => n.id === nodeId);
+  if (!node) return;
+  if (!node.config) node.config = {};
+  if (!node.config.outputVars) node.config.outputVars = [];
+  node.config.outputVars.push({ name: 'newVar', type: 'String', source: '' });
+  designerDirty = true;
+  renderDesigner();
+}
+
+function removeOutputVar(nodeId, index) {
+  const node = designerNodes.find(n => n.id === nodeId);
+  if (!node || !node.config?.outputVars) return;
+  node.config.outputVars.splice(index, 1);
+  if (node.config.outputVars.length === 0) {
+    node.config.outputVars = [{ name: 'result', type: 'String', source: '' }];
+  }
+  designerDirty = true;
+  renderDesigner();
+}
+
 function renderOutputConfig(node) {
   const upstreamPreview = renderUpstreamOutputPreview(node.id);
+  const outputVarsSection = renderOutputVariablesSection(node);
+  const mode = node.config?.outputMode || 'variables';
+  const typeOptions = ['String', 'Number', 'Boolean', 'Object', 'Array[String]', 'Array[Object]'];
+
+  // Variable mode content
+  const outputVars = node.config?.outputVars || [{ name: 'result', type: 'String', source: '' }];
+  const varModeHtml = `
+    <div class="config-field">
+      <div class="config-field-label">输出变量</div>
+      ${outputVars.map((v, i) => {
+        const curType = v.type || 'String';
+        return `
+    <div class="assign-rule-row">
+      <div class="assign-rule-main">
+        <select class="assign-type-select" title="变量类型" onchange="updateOutputVar(${node.id}, ${i}, 'type', this.value)">
+          ${typeOptions.map(t => `<option value="${t}"${curType === t ? ' selected' : ''}>${t}</option>`).join('')}
+        </select>
+        <input class="config-input assign-target-input" placeholder="变量名" value="${escHtml(v.name)}" style="font-family:var(--font-family-mono)" onchange="updateOutputVar(${node.id}, ${i}, 'name', this.value); renderDesigner()" />
+        <span class="condition-op">=</span>
+        ${renderExprEditor({
+          id: `output_src_${node.id}_${i}`,
+          value: v.source,
+          placeholder: '{{节点.输出变量}}',
+          nodeId: node.id,
+          singleLine: true,
+          onChange: `updateOutputVar(${node.id}, ${i}, 'source', this.value)`
+        })}
+        ${outputVars.length > 1 ? `<button class="assign-remove-btn" title="删除此变量" onclick="removeOutputVar(${node.id}, ${i})">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>` : ''}
+      </div>
+      <div class="assign-rule-hint">变量名将作为下游节点引用路径，仅允许字母、数字和下划线</div>
+    </div>`;
+      }).join('')}
+      <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;margin-top:var(--space-2)" onclick="addOutputVar(${node.id})">${icons.plus} 添加输出变量</button>
+    </div>`;
+
+  // Text mode content
+  const textModeHtml = `
+    <div class="config-field">
+      <div class="config-field-label">输出文本</div>
+      ${renderExprEditor({
+        id: `output_text_${node.id}`,
+        value: node.config?.textTemplate || '',
+        placeholder: '输出文本，支持 {{节点.变量路径}} 插入变量',
+        nodeId: node.id,
+        minHeight: 80,
+        label: '文本模板',
+        hint: '使用 {{节点.变量路径}} 插入上游变量，输出固定为 text 变量',
+        onChange: `updateNodeConfig(${node.id}, 'textTemplate', this.value)`
+      })}
+    </div>
+    <div class="config-field-help" style="margin-top:2px">文本模式下，所有内容合并输出为一个 <code style="background:var(--md-surface-container);padding:0 3px;border-radius:2px">text</code> 变量</div>`;
+
   return `<div class="config-section">
-    <div class="config-section-title">输出配置</div>
+    <div class="config-section-title" style="display:flex;align-items:center;justify-content:space-between">
+      <span>输出配置</span>
+      <div class="cond-mode-tabs">
+        <button class="cond-mode-tab ${mode === 'variables' ? 'active' : ''}" onclick="toggleOutputMode(${node.id},'variables')">变量模式</button>
+        <button class="cond-mode-tab ${mode === 'text' ? 'active' : ''}" onclick="toggleOutputMode(${node.id},'text')">文本模式</button>
+      </div>
+    </div>
     <div class="config-field">
       <div class="config-field-label">输出级别</div>
       <select class="config-select" onchange="updateNodeConfig(${node.id}, 'level', this.value)">
@@ -1833,19 +1960,10 @@ function renderOutputConfig(node) {
         <option ${node.config?.level === 'ERROR' ? 'selected' : ''}>ERROR</option>
       </select>
     </div>
-    <div class="config-field">
-      <div class="config-field-label">输出内容</div>
-      ${renderExprEditor({
-        id: `output_content_${node.id}`,
-        value: node.config?.content || '',
-        placeholder: '输出内容或 {{变量名}}',
-        nodeId: node.id,
-        minHeight: 60,
-        onChange: `updateNodeConfig(${node.id}, 'content', this.value)`
-      })}
-    </div>
+    ${mode === 'variables' ? varModeHtml : textModeHtml}
     ${upstreamPreview}
-  </div>`;
+  </div>
+  ${outputVarsSection}`;
 }
 
 function renderLoopConfig(node) {
@@ -4510,7 +4628,28 @@ function getNodeOutputs(node, forPicker = false) {
       });
       break;
     }
-      
+          
+    case 'output': {
+      const outMode = node.config?.outputMode || 'variables';
+      if (outMode === 'text') {
+        outputs.push({ name: 'text', type: 'String', desc: '输出文本', editable: false });
+      } else {
+        const outVars = node.config?.outputVars || [{ name: 'result', type: 'String', source: '' }];
+        outVars.forEach(v => {
+          if (v.name) {
+            outputs.push({
+              name: v.name,
+              type: v.type || 'String',
+              desc: '输出变量',
+              editable: true,
+              configField: 'outputVars'
+            });
+          }
+        });
+      }
+      break;
+    }
+          
     default:
       outputs.push({ name: 'output', type: 'Object', desc: '节点输出', editable: false });
   }
