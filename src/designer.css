@@ -4108,6 +4108,30 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  flex-wrap: nowrap;
+}
+
+/* 变量名包装盒：固定宽度，不抢占表达式区域空间 */
+.assign-target-wrap {
+  flex: 0 0 120px;
+  min-width: 0;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+/* 目标变量名输入框 */
+.assign-target-input {
+  flex: 1;
+  min-width: 0;
+  height: 30px !important;
+}
+
+/* 赋值规则行内表达式编辑器占剩余空间 */
+.assign-rule-main .expr-editor-wrapper {
+  flex: 1;
+  min-width: 0;
+  width: auto;
 }
 
 .assign-rule-hint {

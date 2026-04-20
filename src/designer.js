@@ -1761,7 +1761,7 @@ function renderAssignConfig(node) {
       return `
     <div class="assign-rule-row">
       <div class="assign-rule-main">
-        <div class="assign-target-wrap" style="position:relative;display:flex;align-items:center;flex:1;min-width:0">
+        <div class="assign-target-wrap">
           <input id="${targetId}" class="config-input assign-target-input" placeholder="如 orderStatus" value="${escHtml(a.target)}" style="font-family:var(--font-family-mono);padding-right:26px;width:100%" oninput="updateAssignment(${node.id}, ${i}, 'target', this.value); refreshAssignOutputVars(${node.id}); checkAssignOverwrite('${targetId}')" />
           <button class="cond-ref-btn assign-target-picker-btn" title="从全局变量中选择" onclick="showAssignTargetPicker('${targetId}', ${node.id}, ${i})" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);pointer-events:auto">⊙</button>
           <div id="${targetId}_picker" class="var-picker-dropdown" style="display:none;position:fixed;z-index:9999;max-height:240px;overflow-y:auto;background:var(--md-surface-container-high);border:1px solid var(--md-outline-variant);border-radius:8px;box-shadow:var(--shadow-lg);flex-direction:column;width:260px"></div>
