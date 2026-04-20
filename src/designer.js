@@ -4615,10 +4615,39 @@ function showVarPicker(editorId, nodeId) {
   designerVarPickerHighlighted = -1;
   
   const groups = getAvailableVariables(nodeId);
+
+  // 统计各来源变量数
+  const tabCounts = { all: 0, trigger: 0, node: 0, global: 0, datasource: 0 };
+  groups.forEach(g => {
+    const cnt = g.variables.length;
+    tabCounts.all += cnt;
+    if (tabCounts[g.source] !== undefined) tabCounts[g.source] += cnt;
+  });
+
+  // 只显示有变量的来源 Tab
+  const tabDefs = [
+    { key: 'all',        label: '全部' },
+    { key: 'trigger',    label: '触发器' },
+    { key: 'node',       label: '上游节点' },
+    { key: 'global',     label: '全局变量' },
+    { key: 'datasource', label: '数据源' },
+  ].filter(t => t.key === 'all' || tabCounts[t.key] > 0);
+
+  const tabsHtml = tabDefs.map(t => `
+    <span class="var-picker-tab${t.key === 'all' ? ' active' : ''}" 
+          data-tab="${t.key}"
+          onclick="filterVarPickerByTab('${editorId}', '${t.key}', this)">
+      <span class="tab-dot"></span>
+      ${t.label}
+      <span class="tab-count">${tabCounts[t.key]}</span>
+    </span>
+  `).join('');
   
   picker.innerHTML = `
+    <div class="var-picker-tabs">${tabsHtml}</div>
     <div class="var-picker-search">
-      <input type="text" placeholder="搜索变量..." oninput="filterVarPicker('${editorId}', this.value)">
+      <input type="text" placeholder="搜索变量名或路径..." 
+             oninput="filterVarPicker('${editorId}', this.value)">
     </div>
     <div class="var-picker-body" id="${editorId}_picker_body">
       ${renderVarPickerGroups(groups, editorId)}
@@ -4627,7 +4656,6 @@ function showVarPicker(editorId, nodeId) {
   
   picker.style.display = 'flex';
   
-  // 聚焦搜索框
   setTimeout(() => {
     const searchInput = picker.querySelector('.var-picker-search input');
     if (searchInput) searchInput.focus();
@@ -4635,14 +4663,13 @@ function showVarPicker(editorId, nodeId) {
 }
 
 /**
- * 渲染变量分组
+ * 渲染变量分组（支持折叠 + 类型Tag文字）
  */
-function renderVarPickerGroups(groups, editorId) {
+function renderVarPickerGroups(groups, editorId, keyword = '') {
   if (groups.length === 0) {
     return '<div class="var-picker-empty">暂无可用变量</div>';
   }
 
-  // 来源标签配置
   const sourceBadgeMap = {
     trigger:    { label: '触发器', cls: 'source-trigger' },
     node:       { label: '上游节点', cls: 'source-node' },
@@ -4650,63 +4677,122 @@ function renderVarPickerGroups(groups, editorId) {
     datasource: { label: '数据源', cls: 'source-datasource' },
   };
 
+  // 类型全称 map
+  const typeLabel = {
+    String: 'Str', Number: 'Num', Integer: 'Int', Double: 'Dbl',
+    Boolean: 'Bool', Object: 'Obj', Array: 'Arr', File: 'File', DateTime: 'Date'
+  };
+
+  function highlight(text) {
+    if (!keyword) return escHtml(text);
+    const re = new RegExp('(' + keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+    return escHtml(text).replace(re, '<mark class="var-highlight">$1</mark>');
+  }
+
   return groups.map(group => {
     const badge = sourceBadgeMap[group.source];
     const badgeHtml = badge
       ? `<span class="var-picker-source-badge ${badge.cls}">${badge.label}</span>`
       : '';
-    return `
-    <div class="var-picker-group" data-group="${group.id}" data-source="${group.source || ''}">
-      <div class="var-picker-group-header">
-        <span>${group.name}</span>
-        ${badgeHtml}
-      </div>
-      ${group.variables.map(v => `
+    const chevron = `<svg class="var-picker-group-chevron" viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 6 8 10 12 6"/></svg>`;
+    const itemsHtml = group.variables.map(v => {
+      const tLabel = typeLabel[v.type] || v.type || '?';
+      return `
         <div class="var-picker-item" 
              data-ref="${v.ref}" 
              data-path="${v.path}"
-             onclick="selectVariable('${editorId}', '${v.ref}')">
-          <div class="var-icon type-${v.type}" title="${v.type}">${v.type.charAt(0)}</div>
+             onclick="selectVariable('${editorId}', '${v.ref.replace(/'/g, "\\'")}')">
+          <span class="var-type-tag type-${v.type}" title="${v.type}">${tLabel}</span>
           <div class="var-info">
-            <div class="var-name">${v.name}</div>
-            <div class="var-path">${v.path}</div>
-            ${v.desc ? `<div class="var-desc">${v.desc}</div>` : ''}
+            <div class="var-name">${highlight(v.name)}</div>
+            <div class="var-path">${highlight(v.path)}</div>
+            ${v.desc ? `<div class="var-desc">${escHtml(v.desc)}</div>` : ''}
           </div>
         </div>
-      `).join('')}
+      `;
+    }).join('');
+
+    return `
+    <div class="var-picker-group" data-group="${group.id}" data-source="${group.source || ''}">
+      <div class="var-picker-group-header" onclick="toggleVarPickerGroup(this)">
+        <span>${group.name}</span>
+        ${badgeHtml}
+        ${chevron}
+      </div>
+      <div class="var-picker-items">${itemsHtml}</div>
     </div>
   `}).join('');
 }
 
 /**
- * 过滤变量选择器
+ * 折叠/展开变量分组
+ */
+function toggleVarPickerGroup(headerEl) {
+  const group = headerEl.closest('.var-picker-group');
+  if (group) group.classList.toggle('collapsed');
+}
+
+/**
+ * 按来源 Tab 过滤
+ */
+function filterVarPickerByTab(editorId, tab, tabEl) {
+  // 切换 active
+  const tabs = tabEl.closest('.var-picker-tabs').querySelectorAll('.var-picker-tab');
+  tabs.forEach(t => t.classList.toggle('active', t === tabEl));
+
+  const body = document.getElementById(editorId + '_picker_body');
+  if (!body) return;
+
+  body.querySelectorAll('.var-picker-group').forEach(group => {
+    const source = group.dataset.source;
+    group.style.display = (tab === 'all' || source === tab) ? '' : 'none';
+  });
+
+  // 清空搜索并重新聚焦
+  const searchInput = document.querySelector(`#${editorId}_picker .var-picker-search input`);
+  if (searchInput) { searchInput.value = ''; searchInput.focus(); }
+}
+
+/**
+ * 过滤变量选择器（搜索 + 高亮）
  */
 function filterVarPicker(editorId, keyword) {
   const body = document.getElementById(editorId + '_picker_body');
   if (!body) return;
-  
-  const groups = body.querySelectorAll('.var-picker-group');
+
   const lowerKeyword = keyword.toLowerCase();
-  
+  const groups = body.querySelectorAll('.var-picker-group');
+
+  // 获取当前激活 Tab
+  const activeTab = document.querySelector(`#${editorId}_picker .var-picker-tab.active`);
+  const currentTab = activeTab ? activeTab.dataset.tab : 'all';
+
   groups.forEach(group => {
+    const source = group.dataset.source;
+    if (currentTab !== 'all' && source !== currentTab) {
+      group.style.display = 'none';
+      return;
+    }
     const items = group.querySelectorAll('.var-picker-item');
     let hasVisible = false;
-    
+
     items.forEach(item => {
       const name = item.querySelector('.var-name')?.textContent || '';
       const path = item.dataset.path || '';
       const desc = item.querySelector('.var-desc')?.textContent || '';
-      
-      const visible = !keyword || 
+
+      const visible = !keyword ||
         name.toLowerCase().includes(lowerKeyword) ||
         path.toLowerCase().includes(lowerKeyword) ||
         desc.toLowerCase().includes(lowerKeyword);
-      
+
       item.style.display = visible ? '' : 'none';
       if (visible) hasVisible = true;
     });
-    
+
     group.style.display = hasVisible ? '' : 'none';
+    // 搜索时自动展开已折叠的分组
+    if (keyword && hasVisible) group.classList.remove('collapsed');
   });
 }
 
