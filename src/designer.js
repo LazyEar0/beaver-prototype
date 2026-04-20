@@ -69,7 +69,7 @@ const nodeTypes = [
   { type: 'output', name: '输出', icon: '📤', color: 'node-color-data', category: '数据处理', desc: '输出数据到下游节点，支持变量模式（结构化输出）和文本模式（模板输出）', code: 'output' },
   { type: 'code', name: '代码', icon: '💻', color: 'node-color-data', category: '数据处理', desc: '编写自定义脚本（JS / Python），实现复杂数据处理逻辑', code: 'code' },
   { type: 'http', name: 'HTTP 请求', icon: '🌐', color: 'node-color-integration', category: '集成', desc: 'HTTP 请求调用，支持 GET/POST/PUT/DELETE，可配置请求头和请求体', code: 'http' },
-  { type: 'mq', name: 'MQ 消息', icon: '📨', color: 'node-color-integration', category: '集成', desc: '消息队列操作，支持发送和消费消息，需配置 Topic', code: 'mq' },
+  { type: 'mq', name: 'MQ 发送', icon: '📨', color: 'node-color-integration', category: '集成', desc: '向消息队列发送消息，需配置 Topic，支持消息 Key 和属性', code: 'mq' },
   { type: 'workflow', name: '工作流', icon: '🔗', color: 'node-color-flow', category: '集成', desc: '调用被授权且支持引用的工作流，支持输入参数映射', code: 'wf' },
   { type: 'placeholder', name: '占位节点', icon: '⬜', color: 'node-color-placeholder', category: '其他', desc: '标记待完善的流程分支，可后续转换为具体节点类型', code: 'placeholder' },
 ];
@@ -875,7 +875,7 @@ function renderNodeConfigPanel() {
   const node = designerNodes.find(n => n.id === designerSelectedNodeId);
   if (!node) { designerRightPanel = 'overview'; return renderOverviewPanel(); }
   const nt = nodeTypes.find(t => t.type === node.type) || {};
-  const hasAdvancedValues = node.config?._mergeStrategy || node.config?._retryCount || node.config?._timeout;
+  const hasAdvancedValues = checkHasAdvancedValues(node);
 
   return `
     <div class="right-panel-header">
@@ -4205,6 +4205,37 @@ function designerSave() {
   }, 600);
 }
 
+// --- Node Advanced Config: Check if non-default values exist (for blue dot indicator) ---
+function checkHasAdvancedValues(node) {
+  const c = node.config || {};
+  // Common fields
+  if (c._mergeStrategy || c._timeout || c._retryCount || c._retryInterval || c._retryDegradation ||
+      c._errorBehavior || c._note || c._suspendTimeout) return true;
+  // Type-specific fields
+  switch (node.type) {
+    case 'trigger':
+      if (c.preventConcurrent === false) return true; // default is true
+      break;
+    case 'http':
+      if (c.suspendCallback || c.callbackTimeout) return true;
+      break;
+    case 'mq':
+      if (c.consumeTimeout) return true;
+      break;
+    case 'loop':
+      if (c.iterationTimeout || c.iterationErrorBehavior) return true;
+      break;
+    case 'delay':
+      if (c.suspendTimeout) return true;
+      break;
+    case 'workflow':
+      // _timeout already checked above, default 300
+      if (c._timeout && c._timeout !== 300) return true;
+      break;
+  }
+  return false;
+}
+
 // --- Node Config Tab Switch ---
 function switchNodeConfigTab(tab) {
   const basicTab = document.getElementById('rpTabBasic');
@@ -4228,46 +4259,289 @@ function switchNodeConfigTab(tab) {
 }
 
 function renderAdvancedConfig(node) {
-  const ms = node.config?._mergeStrategy || 'all';
-  const retry = node.config?._retryCount || 0;
-  const timeout = node.config?._timeout || 30;
-  return `
-    <div class="config-section">
-      <div class="config-section-title">执行策略</div>
-      <div class="config-field">
-        <div class="config-field-label">超时时间 (秒)</div>
-        <input class="config-input" type="number" value="${timeout}" min="1" max="3600" onchange="updateNodeConfig(${node.id}, '_timeout', parseInt(this.value))" />
-      </div>
-      <div class="config-field">
-        <div class="config-field-label">失败重试次数</div>
-        <input class="config-input" type="number" value="${retry}" min="0" max="10" onchange="updateNodeConfig(${node.id}, '_retryCount', parseInt(this.value))" />
-      </div>
-      <div class="config-field">
-        <div class="config-field-label">汇合策略</div>
-        <select class="config-select" onchange="updateNodeConfig(${node.id}, '_mergeStrategy', this.value)">
-          <option value="all" ${ms === 'all' ? 'selected' : ''}>等待全部 (Wait All)</option>
-          <option value="any" ${ms === 'any' ? 'selected' : ''}>任一完成 (Any)</option>
-        </select>
-        <div style="font-size:var(--font-size-xs);color:var(--md-on-surface-variant);margin-top:4px">当有多条输入连线时，决定何时执行此节点</div>
-      </div>
-    </div>
-    <div class="config-section">
-      <div class="config-section-title">错误处理</div>
-      <div class="config-field">
-        <div class="config-field-label">错误时行为</div>
-        <select class="config-select" onchange="updateNodeConfig(${node.id}, '_errorBehavior', this.value)">
-          <option value="stop" ${(node.config?._errorBehavior || 'stop') === 'stop' ? 'selected' : ''}>停止流程</option>
-          <option value="continue" ${node.config?._errorBehavior === 'continue' ? 'selected' : ''}>继续执行</option>
-          <option value="retry" ${node.config?._errorBehavior === 'retry' ? 'selected' : ''}>自动重试</option>
-        </select>
-      </div>
-    </div>
+  let html = '';
+
+  // Node-type-specific advanced sections
+  switch (node.type) {
+    case 'trigger':
+      html += renderTriggerAdvancedConfig(node);
+      break;
+    case 'end':
+      html += renderEndAdvancedConfig(node);
+      break;
+    case 'http':
+      html += renderHttpAdvancedConfig(node);
+      break;
+    case 'mq':
+      html += renderMqAdvancedConfig(node);
+      break;
+    case 'loop':
+      html += renderLoopAdvancedConfig(node);
+      break;
+    case 'workflow':
+      html += renderSubWfAdvancedConfig(node);
+      break;
+    case 'delay':
+      html += renderDelayAdvancedConfig(node);
+      break;
+    default:
+      // if, switch, assign, output, code, placeholder
+      html += renderCommonAdvancedConfig(node);
+      break;
+  }
+
+  // All nodes have a 备注 section
+  html += `
     <div class="config-section">
       <div class="config-section-title">备注</div>
       <div class="config-field">
         <textarea class="config-textarea" rows="3" placeholder="输入节点备注，用于描述节点的业务含义" onchange="updateNodeConfig(${node.id}, '_note', this.value)">${node.config?._note || ''}</textarea>
       </div>
     </div>`;
+
+  return html;
+}
+
+// --- Shared: Error Handling Section ---
+function renderErrorHandlingSection(node, opts) {
+  const options = opts || {};
+  const isSubWorkflow = options.isSubWorkflow || false;
+  const errorBehavior = node.config?._errorBehavior || 'stop';
+  const retryCount = node.config?._retryCount || 3;
+  const retryInterval = node.config?._retryInterval || 5;
+  const retryDegradation = node.config?._retryDegradation || 'stop';
+
+  let html = `
+    <div class="config-section">
+      <div class="config-section-title">错误处理</div>
+      <div class="config-field">
+        <div class="config-field-label">错误时行为</div>
+        <select class="config-select" onchange="updateNodeConfig(${node.id}, '_errorBehavior', this.value); renderDesigner()">
+          <option value="stop" ${errorBehavior === 'stop' ? 'selected' : ''}>终止流程</option>
+          <option value="continue" ${errorBehavior === 'continue' ? 'selected' : ''}>忽略并继续</option>
+          <option value="retry" ${errorBehavior === 'retry' ? 'selected' : ''}>自动重试</option>
+          <option value="manual" ${errorBehavior === 'manual' ? 'selected' : ''}>转人工处理</option>
+          <option value="callback" ${errorBehavior === 'callback' ? 'selected' : ''}>挂起等待回调</option>
+        </select>
+        <div class="config-field-help">${isSubWorkflow ? '子流程节点执行异常时的处理策略' : '节点执行异常时的处理策略'}</div>
+      </div>
+      ${errorBehavior === 'retry' ? `
+      <div class="config-field">
+        <div class="config-field-label">重试次数</div>
+        <input class="config-input" type="number" value="${retryCount}" min="1" max="10" onchange="updateNodeConfig(${node.id}, '_retryCount', parseInt(this.value))" />
+        <div class="config-field-help">默认 3 次</div>
+      </div>
+      <div class="config-field">
+        <div class="config-field-label">重试间隔 (秒)</div>
+        <input class="config-input" type="number" value="${retryInterval}" min="1" max="300" onchange="updateNodeConfig(${node.id}, '_retryInterval', parseInt(this.value))" />
+        <div class="config-field-help">默认 5 秒</div>
+      </div>
+      <div class="config-field">
+        <div class="config-field-label">重试用尽后降级策略</div>
+        <select class="config-select" onchange="updateNodeConfig(${node.id}, '_retryDegradation', this.value)">
+          <option value="stop" ${retryDegradation === 'stop' ? 'selected' : ''}>终止流程</option>
+          <option value="continue" ${retryDegradation === 'continue' ? 'selected' : ''}>忽略并继续</option>
+          <option value="manual" ${retryDegradation === 'manual' ? 'selected' : ''}>转人工处理</option>
+        </select>
+      </div>
+      ` : ''}
+      ${errorBehavior === 'callback' || errorBehavior === 'manual' ? `
+      <div class="config-field">
+        <div class="config-field-label">挂起等待超时 (小时)</div>
+        <input class="config-input" type="number" value="${node.config?._suspendTimeout || 24}" min="1" max="720" onchange="updateNodeConfig(${node.id}, '_suspendTimeout', parseInt(this.value))" />
+        <div class="config-field-help">等待外部回调或人工处理的最大时长，超时后触发异常策略（默认 24 小时）</div>
+      </div>
+      ` : ''}
+    </div>`;
+
+  return html;
+}
+
+// --- Shared: Merge Strategy Field ---
+function renderMergeStrategyField(node) {
+  const ms = node.config?._mergeStrategy || 'all';
+  return `
+    <div class="config-field">
+      <div class="config-field-label">汇合策略</div>
+      <select class="config-select" onchange="updateNodeConfig(${node.id}, '_mergeStrategy', this.value)">
+        <option value="all" ${ms === 'all' ? 'selected' : ''}>等待全部 (Wait All)</option>
+        <option value="any" ${ms === 'any' ? 'selected' : ''}>任一完成 (Any)</option>
+      </select>
+      <div style="font-size:var(--font-size-xs);color:var(--md-on-surface-variant);margin-top:4px">当有多条输入连线时，决定何时执行此节点</div>
+    </div>`;
+}
+
+// --- Common Advanced Config (if, switch, assign, output, code, placeholder) ---
+function renderCommonAdvancedConfig(node) {
+  const timeout = node.config?._timeout || 30;
+
+  let html = `
+    <div class="config-section">
+      <div class="config-section-title">执行策略</div>
+      <div class="config-field">
+        <div class="config-field-label">超时时间 (秒)</div>
+        <input class="config-input" type="number" value="${timeout}" min="1" max="3600" onchange="updateNodeConfig(${node.id}, '_timeout', parseInt(this.value))" />
+        <div class="config-field-help">节点执行的最大等待时间，超时后触发异常处理（默认 30 秒）</div>
+      </div>
+      ${renderMergeStrategyField(node)}
+    </div>`;
+
+  html += renderErrorHandlingSection(node);
+  return html;
+}
+
+// --- Trigger Advanced Config ---
+function renderTriggerAdvancedConfig(node) {
+  // Trigger is the entry point — no execution timeout, no merge strategy, no error handling
+  // Only provide trigger-specific advanced options
+  return `
+    <div class="config-section">
+      <div class="config-section-title">触发器高级设置</div>
+      <div class="config-field">
+        <div style="display:flex;align-items:center;gap:10px">
+          <label class="toggle-sm"><input type="checkbox" ${node.config?.preventConcurrent !== false ? 'checked' : ''} onchange="updateNodeConfig(${node.id}, 'preventConcurrent', this.checked)" /><span class="toggle-sm-slider"></span></label>
+          <span style="font-size:var(--font-size-xs);color:var(--md-on-surface-variant)">防止并发触发（同一时刻只允许一个实例运行）</span>
+        </div>
+      </div>
+    </div>`;
+}
+
+// --- End Advanced Config ---
+function renderEndAdvancedConfig(node) {
+  // End node is the termination point — minimal advanced config
+  return '';
+}
+
+// --- HTTP Advanced Config ---
+function renderHttpAdvancedConfig(node) {
+  const timeout = node.config?._timeout || 30;
+  const suspendCallback = node.config?.suspendCallback || false;
+  const callbackTimeout = node.config?.callbackTimeout || 24;
+
+  let html = `
+    <div class="config-section">
+      <div class="config-section-title">执行策略</div>
+      <div class="config-field">
+        <div class="config-field-label">超时时间 (秒)</div>
+        <input class="config-input" type="number" value="${timeout}" min="1" max="3600" onchange="updateNodeConfig(${node.id}, '_timeout', parseInt(this.value))" />
+        <div class="config-field-help">HTTP 请求的最大等待时间（默认 30 秒）</div>
+      </div>
+      ${renderMergeStrategyField(node)}
+    </div>
+    <div class="config-section">
+      <div class="config-section-title">挂起等待回调</div>
+      <div class="config-field">
+        <div style="display:flex;align-items:center;gap:10px">
+          <label class="toggle-sm"><input type="checkbox" ${suspendCallback ? 'checked' : ''} onchange="updateNodeConfig(${node.id}, 'suspendCallback', this.checked); renderDesigner()" /><span class="toggle-sm-slider"></span></label>
+          <span style="font-size:var(--font-size-xs);color:var(--md-on-surface-variant)">开启后请求发送后节点挂起，等待外部系统通过回调 URL 返回结果</span>
+        </div>
+      </div>
+      ${suspendCallback ? `
+      <div class="config-field">
+        <div class="config-field-label">回调超时 (小时)</div>
+        <input class="config-input" type="number" value="${callbackTimeout}" min="1" max="720" onchange="updateNodeConfig(${node.id}, 'callbackTimeout', parseInt(this.value))" />
+        <div class="config-field-help">等待回调的最长时间，超时未收到回调触发异常策略（默认 24 小时）</div>
+      </div>
+      ` : ''}
+    </div>`;
+
+  html += renderErrorHandlingSection(node);
+  return html;
+}
+
+// --- MQ Advanced Config ---
+function renderMqAdvancedConfig(node) {
+  const timeout = node.config?._timeout || 30;
+  const consumeTimeout = node.config?.consumeTimeout || 30;
+
+  let html = `
+    <div class="config-section">
+      <div class="config-section-title">执行策略</div>
+      <div class="config-field">
+        <div class="config-field-label">节点超时 (秒)</div>
+        <input class="config-input" type="number" value="${timeout}" min="1" max="3600" onchange="updateNodeConfig(${node.id}, '_timeout', parseInt(this.value))" />
+      </div>
+      <div class="config-field">
+        <div class="config-field-label">消费超时 (秒)</div>
+        <input class="config-input" type="number" value="${consumeTimeout}" min="1" max="3600" onchange="updateNodeConfig(${node.id}, 'consumeTimeout', parseInt(this.value))" />
+        <div class="config-field-help">消费模式下等待消息的最长时间，与节点超时取较小值生效（默认 30 秒）</div>
+      </div>
+      ${renderMergeStrategyField(node)}
+    </div>`;
+
+  html += renderErrorHandlingSection(node);
+  return html;
+}
+
+// --- Loop Advanced Config ---
+function renderLoopAdvancedConfig(node) {
+  const timeout = node.config?._timeout || 30;
+  const iterationTimeout = node.config?.iterationTimeout || 300;
+
+  let html = `
+    <div class="config-section">
+      <div class="config-section-title">执行策略</div>
+      <div class="config-field">
+        <div class="config-field-label">节点超时 (秒)</div>
+        <input class="config-input" type="number" value="${timeout}" min="1" max="3600" onchange="updateNodeConfig(${node.id}, '_timeout', parseInt(this.value))" />
+      </div>
+      <div class="config-field">
+        <div class="config-field-label">单次迭代超时 (秒)</div>
+        <input class="config-input" type="number" value="${iterationTimeout}" min="1" max="3600" onchange="updateNodeConfig(${node.id}, 'iterationTimeout', parseInt(this.value))" />
+        <div class="config-field-help">单次循环体执行的最大时间，超时视为该次迭代失败（默认 300 秒）</div>
+      </div>
+      <div class="config-field">
+        <div class="config-field-label">迭代错误时行为</div>
+        <select class="config-select" onchange="updateNodeConfig(${node.id}, 'iterationErrorBehavior', this.value)">
+          <option value="stop" ${(node.config?.iterationErrorBehavior || 'stop') === 'stop' ? 'selected' : ''}>停止循环</option>
+          <option value="continue" ${node.config?.iterationErrorBehavior === 'continue' ? 'selected' : ''}>跳过继续</option>
+          <option value="retry" ${node.config?.iterationErrorBehavior === 'retry' ? 'selected' : ''}>重试当前迭代</option>
+        </select>
+        <div class="config-field-help">单次迭代执行失败时的处理方式</div>
+      </div>
+      ${renderMergeStrategyField(node)}
+    </div>`;
+
+  html += renderErrorHandlingSection(node);
+  return html;
+}
+
+// --- Sub-Workflow Advanced Config ---
+function renderSubWfAdvancedConfig(node) {
+  const timeout = node.config?._timeout || 300;
+
+  let html = `
+    <div class="config-section">
+      <div class="config-section-title">执行策略</div>
+      <div class="config-field">
+        <div class="config-field-label">子流程执行超时 (秒)</div>
+        <input class="config-input" type="number" value="${timeout}" min="1" max="86400" onchange="updateNodeConfig(${node.id}, '_timeout', parseInt(this.value))" />
+        <div class="config-field-help">子流程整体执行的最大等待时间（默认 300 秒）</div>
+      </div>
+      ${renderMergeStrategyField(node)}
+    </div>`;
+
+  html += renderErrorHandlingSection(node, { isSubWorkflow: true });
+  return html;
+}
+
+// --- Delay Advanced Config ---
+function renderDelayAdvancedConfig(node) {
+  const suspendTimeout = node.config?.suspendTimeout || 24;
+
+  let html = `
+    <div class="config-section">
+      <div class="config-section-title">执行策略</div>
+      <div class="config-field">
+        <div class="config-field-label">挂起等待超时 (小时)</div>
+        <input class="config-input" type="number" value="${suspendTimeout}" min="1" max="720" onchange="updateNodeConfig(${node.id}, 'suspendTimeout', parseInt(this.value))" />
+        <div class="config-field-help">延迟等待的最大时长，超时后触发异常策略（默认 24 小时）</div>
+      </div>
+      ${renderMergeStrategyField(node)}
+    </div>`;
+
+  html += renderErrorHandlingSection(node);
+  return html;
 }
 
 // --- Merge Strategy Config ---

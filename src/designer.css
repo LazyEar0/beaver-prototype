@@ -425,16 +425,16 @@
   width: 100%;
   height: 100%;
   pointer-events: none;
-  z-index: 1;
+  z-index: 3;
 }
 
 .canvas-svg path {
-  pointer-events: stroke;
-  cursor: pointer;
+  pointer-events: none;
 }
 
-/* Connection hover/selection is handled via JS rendering, not CSS :hover on individual paths.
-   The transparent hit-area path has pointer-events, visible paths have pointer-events:none. */
+/* Connection hover/selection is handled via JS rendering.
+   The transparent hit-area path inside .conn-group has pointer-events set inline.
+   The .canvas-svg itself is pointer-events:none so it doesn't block canvas panning. */
 .canvas-svg .conn-group {
   pointer-events: auto;
 }
@@ -566,7 +566,7 @@
   border: 2px solid var(--md-outline-variant);
   cursor: crosshair;
   transition: var(--transition-fast);
-  z-index: 2;
+  z-index: 5;
 }
 
 .canvas-node-port:hover {
