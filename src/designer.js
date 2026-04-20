@@ -45,6 +45,8 @@ let designerBoxSelectRect = null;
 let designerContextMenu = null; // Right-click context menu
 let designerSelectedConnId = null; // Selected connection
 let designerHoveredConnId = null; // Hovered connection
+let designerAltDown = false; // Alt key held for quick-delete mode
+let designerReconnecting = null; // { connId, end: 'from'|'to' } dragging endpoint to reconnect
 let designerBottomResizing = false; // Bottom panel resize
 let designerFullscreen = false; // Fullscreen toggle
 let designerSpaceDown = false; // Space key held for pan mode
@@ -97,6 +99,8 @@ function openDesigner(wsId, wfId) {
   designerContextMenu = null;
   designerSelectedConnId = null;
   designerHoveredConnId = null;
+  designerAltDown = false;
+  designerReconnecting = null;
   designerGridSnap = true;
   designerMinimapVisible = true;
 
@@ -486,8 +490,11 @@ function renderDesigner() {
               <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
                 <polygon points="0 0, 10 3.5, 0 7" fill="#222" />
               </marker>
-              <marker id="arrowhead-active" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+                            <marker id="arrowhead-active" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
                 <polygon points="0 0, 10 3.5, 0 7" fill="#1890FF" />
+              </marker>
+              <marker id="arrowhead-danger" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+                <polygon points="0 0, 10 3.5, 0 7" fill="#dc2626" />
               </marker>
             </defs>
             <g transform="translate(${designerPanX}, ${designerPanY}) scale(${designerZoom})">
@@ -689,21 +696,77 @@ function renderConnections() {
     const cp = Math.max(dx * 0.4, 50);
 
     const path = `M${fromPos.x},${fromPos.y} C${fromPos.x + cp},${fromPos.y} ${toPos.x - cp},${toPos.y} ${toPos.x},${toPos.y}`;
+    const midX = (fromPos.x + toPos.x) / 2;
+    const midY = (fromPos.y + toPos.y) / 2;
 
     const isActive = designerDebugMode && conn._debugActive;
     const isSelected = designerSelectedConnId === conn.id;
-    const connClass = [
-      isActive ? 'connection-flow' : '',
-      isSelected ? 'connection-selected' : ''
-    ].filter(Boolean).join(' ');
+    const isHovered = designerHoveredConnId === conn.id;
+    const isAltDelete = isHovered && designerAltDown;
 
-    const strokeColor = isActive ? '#1890FF' : (isSelected ? '#1890FF' : '#222');
-    const strokeWidth = isActive ? 3.5 : (isSelected ? 3.5 : 2.5);
-    const markerEnd = (isActive || isSelected) ? 'url(#arrowhead-active)' : 'url(#arrowhead)';
+    // Determine visual style
+    let strokeColor, strokeWidth, connClass, markerEnd;
+    if (isAltDelete) {
+      strokeColor = '#dc2626';
+      strokeWidth = 3.5;
+      connClass = 'connection-alt-delete';
+      markerEnd = 'url(#arrowhead-danger)';
+    } else if (isActive || isSelected || isHovered) {
+      strokeColor = '#1890FF';
+      strokeWidth = 3.5;
+      connClass = isActive ? 'connection-flow' : (isSelected ? 'connection-selected' : 'connection-hovered');
+      markerEnd = 'url(#arrowhead-active)';
+    } else {
+      strokeColor = '#222';
+      strokeWidth = 2.5;
+      connClass = '';
+      markerEnd = 'url(#arrowhead)';
+    }
 
-    return `<path d="${path}" fill="none" stroke="${strokeColor}" stroke-width="${strokeWidth}" marker-end="${markerEnd}" class="${connClass}" onclick="onConnectionClick(event, ${conn.id})" oncontextmenu="onConnectionContextMenu(event, ${conn.id})" style="cursor:pointer" />
-    ${isSelected ? `<path d="${path}" fill="none" stroke="rgba(24,144,255,0.15)" stroke-width="12" style="pointer-events:none" />` : ''}
-    ${conn.label ? `<text x="${(fromPos.x + toPos.x) / 2}" y="${(fromPos.y + toPos.y) / 2 - 10}" text-anchor="middle" font-size="11" fill="${conn.label === 'TRUE' ? '#16a34a' : conn.label === 'FALSE' ? '#dc2626' : conn.label === 'Default' ? '#94a3b8' : conn.label === '循环体' ? '#7c3aed' : conn.label === '完成' ? '#16a34a' : '#1890FF'}" font-weight="700" font-family="Roboto, sans-serif" paint-order="stroke" stroke="#fff" stroke-width="3">${conn.label}</text>` : ''}`;
+    // Interaction group
+    let html = '';
+
+    // Invisible wider path for easier hover detection
+    html += `<path d="${path}" fill="none" stroke="transparent" stroke-width="14" style="cursor:${isAltDelete ? 'pointer' : 'pointer'}" onmouseenter="onConnectionHover(event, ${conn.id})" onmouseleave="onConnectionLeave(event, ${conn.id})" onclick="onConnectionClick(event, ${conn.id})" oncontextmenu="onConnectionContextMenu(event, ${conn.id})" />`;
+
+    // Glow path for selected/hovered state
+    if (isSelected || isHovered) {
+      html += `<path d="${path}" fill="none" stroke="${isAltDelete ? 'rgba(220,38,38,0.12)' : 'rgba(24,144,255,0.12)'}" stroke-width="14" style="pointer-events:none" />`;
+    }
+
+    // Visible path
+    html += `<path d="${path}" fill="none" stroke="${strokeColor}" stroke-width="${strokeWidth}" marker-end="${markerEnd}" class="${connClass}" style="pointer-events:none" />`;
+
+    // Label
+    if (conn.label) {
+      const labelColor = conn.label === 'TRUE' ? '#16a34a' : conn.label === 'FALSE' ? '#dc2626' : conn.label === 'Default' ? '#94a3b8' : conn.label === '循环体' ? '#7c3aed' : conn.label === '完成' ? '#16a34a' : '#1890FF';
+      html += `<text x="${midX}" y="${midY - 10}" text-anchor="middle" font-size="11" fill="${labelColor}" font-weight="700" font-family="Roboto, sans-serif" paint-order="stroke" stroke="#fff" stroke-width="3" style="pointer-events:none">${conn.label}</text>`;
+    }
+
+    // Hovered or selected: show delete button at midpoint (n8n style)
+    if (isHovered || isSelected) {
+      if (!isAltDelete) {
+        html += `<g class="conn-delete-btn" onclick="deleteConnectionById(event, ${conn.id})" style="cursor:pointer">
+          <circle cx="${midX}" cy="${midY}" r="10" fill="#fff" stroke="${isSelected ? '#1890FF' : '#bbb'}" stroke-width="1.5" />
+          <line x1="${midX - 4}" y1="${midY - 4}" x2="${midX + 4}" y2="${midY + 4}" stroke="#dc2626" stroke-width="2" stroke-linecap="round" />
+          <line x1="${midX + 4}" y1="${midY - 4}" x2="${midX - 4}" y2="${midY + 4}" stroke="#dc2626" stroke-width="2" stroke-linecap="round" />
+        </g>`;
+      }
+
+      // Endpoint handles (draggable circles) when selected
+      if (isSelected) {
+        html += `<g class="conn-endpoint-handle" onmousedown="onEndpointDragStart(event, ${conn.id}, 'from')" style="cursor:grab">
+          <circle cx="${fromPos.x}" cy="${fromPos.y}" r="6" fill="#fff" stroke="#1890FF" stroke-width="2" />
+          <circle cx="${fromPos.x}" cy="${fromPos.y}" r="2.5" fill="#1890FF" />
+        </g>`;
+        html += `<g class="conn-endpoint-handle" onmousedown="onEndpointDragStart(event, ${conn.id}, 'to')" style="cursor:grab">
+          <circle cx="${toPos.x}" cy="${toPos.y}" r="6" fill="#fff" stroke="#1890FF" stroke-width="2" />
+          <circle cx="${toPos.x}" cy="${toPos.y}" r="2.5" fill="#1890FF" />
+        </g>`;
+      }
+    }
+
+    return html;
   }).join('');
 }
 
@@ -1393,7 +1456,7 @@ function renderConditionRows(conditions, addFnStr, removeFnPfx, updateFnPfx, nod
         <div class="cond-right-wrap" style="flex:1">
           <input id="${leftInputId}" class="cond-left-input" value="${escHtml(leftVal)}" placeholder="输入或引用变量，如 vars.status" onchange="${updateFnPfx}${idx},'left',this.value)" style="padding-right:28px;width:100%" />
           <button class="cond-ref-btn" title="引用变量" onclick="showCondVarPicker('${leftInputId}', ${nodeId}, '${updateFnPfx}${idx}', 'left')">⊙</button>
-          <div id="${leftInputId}_picker" class="var-picker-dropdown" style="display:none;position:fixed;z-index:9999;max-height:240px;overflow-y:auto;background:var(--md-surface-container-high);border:1px solid var(--md-outline-variant);border-radius:8px;box-shadow:var(--shadow-lg);flex-direction:column;width:280px"></div>
+          <div id="${leftInputId}_picker" class="var-picker-dropdown" style="display:none"></div>
         </div>
         ${conditions.length > 1
           ? `<button class="cond-delete-btn" onclick="${removeFnPfx}${idx})" title="删除此条件">${icons.close}</button>`
@@ -1622,29 +1685,15 @@ function renderDelayConfig(node) {
       <div class="config-field-help">范围：1 秒 ~ 30 天，需输入正整数</div>
     </div>`;
 
-  const targetTimeMode = node.config?.targetTimeMode || 'fixed';
-  const isTargetFixed = targetTimeMode === 'fixed';
-
+  const targetInputId = `delay_target_${node.id}_${Date.now()}`;
   const targetTimeField = `<div class="config-field">
       <div class="config-field-label">目标时间</div>
-      <div style="display:flex;gap:6px;margin-bottom:6px">
-        <button class="cron-preset-chip${isTargetFixed ? ' active' : ''}" onclick="updateNodeConfig(${node.id}, 'targetTimeMode', 'fixed'); renderDesigner()">固定值</button>
-        <button class="cron-preset-chip${!isTargetFixed ? ' active' : ''}" onclick="updateNodeConfig(${node.id}, 'targetTimeMode', 'variable'); renderDesigner()">变量</button>
+      <div class="cond-right-wrap" style="position:relative">
+        <input id="${targetInputId}" class="config-input" type="text" value="${escHtml(node.config?.delayTarget || '')}" placeholder="输入时间或点击 ⊙ 引用变量" onchange="updateNodeConfig(${node.id}, 'delayTarget', this.value)" style="padding-right:28px;width:100%;font-family:var(--font-family-mono)" />
+        <button class="cond-ref-btn" title="引用变量" onclick="showCondVarPicker('${targetInputId}', ${node.id}, 'updateNodeConfig(${node.id},&quot;delayTarget&quot;,')">⊙</button>
+        <div id="${targetInputId}_picker" class="var-picker-dropdown" style="display:none;position:fixed;z-index:9999;max-height:240px;overflow-y:auto;background:var(--md-surface-container-high);border:1px solid var(--md-outline-variant);border-radius:8px;box-shadow:var(--shadow-lg);flex-direction:column;width:280px"></div>
       </div>
-      ${isTargetFixed
-        ? `<input class="config-input" type="datetime-local" value="${node.config?.delayTarget || ''}" onchange="updateNodeConfig(${node.id}, 'delayTarget', this.value)" />`
-        : renderExprEditor({
-            id: `delay_target_${node.id}`,
-            value: node.config?.delayTarget || '',
-            placeholder: '点击 T 按钮选择变量',
-            nodeId: node.id,
-            singleLine: true,
-            label: '目标时间',
-            hint: '目标时间必须大于当前时间，最大未来 30 天内',
-            onChange: `updateNodeConfig(${node.id}, 'delayTarget', this.value)`
-          })
-      }
-      <div class="config-field-help">目标时间必须大于当前时间，最大未来 30 天内</div>
+      <div class="config-field-help">输入日期时间（如 2025-04-20 18:00）或点击 ⊙ 引用变量，目标时间须大于当前且在 30 天内</div>
     </div>`;
 
   return `<div class="config-section">
@@ -1660,14 +1709,20 @@ function renderDelayConfig(node) {
 function renderAssignConfig(node) {
   const upstreamPreview = renderUpstreamOutputPreview(node.id);
   const outputVarsSection = renderOutputVariablesSection(node);
-  const assignments = node.config?.assignments || [{ target: 'processedData', source: '' }];
+  const assignments = node.config?.assignments || [{ target: 'processedData', source: '', type: 'String' }];
+  const typeOptions = ['String', 'Number', 'Boolean', 'Object', 'Array'];
   
   return `<div class="config-section">
     <div class="config-section-title">赋值规则</div>
-    ${assignments.map((a, i) => `
-    <div class="condition-row" style="flex-direction:column;gap:6px;align-items:stretch;margin-bottom:var(--space-2)">
-      <div style="display:flex;gap:6px;align-items:center">
-        <input class="config-input" placeholder="目标变量" value="${a.target}" style="flex:1;font-family:var(--font-family-mono)" onchange="updateAssignment(${node.id}, ${i}, 'target', this.value); renderDesigner()" />
+    ${assignments.map((a, i) => {
+      const curType = a.type || 'String';
+      return `
+    <div class="assign-rule-row">
+      <div class="assign-rule-main">
+        <select class="assign-type-select" title="变量类型" onchange="updateAssignment(${node.id}, ${i}, 'type', this.value)">
+          ${typeOptions.map(t => `<option value="${t}"${curType === t ? ' selected' : ''}>${t}</option>`).join('')}
+        </select>
+        <input class="config-input assign-target-input" placeholder="变量名" value="${escHtml(a.target)}" style="font-family:var(--font-family-mono)" onchange="updateAssignment(${node.id}, ${i}, 'target', this.value); renderDesigner()" />
         <span class="condition-op">=</span>
         ${renderExprEditor({
           id: `assign_src_${node.id}_${i}`,
@@ -1677,8 +1732,13 @@ function renderAssignConfig(node) {
           singleLine: true,
           onChange: `updateAssignment(${node.id}, ${i}, 'source', this.value)`
         })}
+        ${assignments.length > 1 ? `<button class="assign-remove-btn" title="删除此规则" onclick="removeAssignment(${node.id}, ${i})">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>` : ''}
       </div>
-    </div>`).join('')}
+      <div class="assign-rule-hint">变量名将作为下游节点引用路径，仅允许字母、数字和下划线</div>
+    </div>`;
+    }).join('')}
     <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;margin-top:var(--space-2)" onclick="addAssignment(${node.id})">${icons.plus} 添加赋值规则</button>
     ${upstreamPreview}
   </div>
@@ -2810,11 +2870,39 @@ function completeConnection(fromNodeId, fromPort, targetId) {
 function onConnectionClick(e, connId) {
   e.stopPropagation();
   if (designerDebugMode) return;
-  // Select the connection instead of immediately deleting
+  if (designerReadonly) return;
+
+  // Alt+click = quick delete (Unreal Blueprint style)
+  if (designerAltDown) {
+    deleteConnectionById(e, connId);
+    return;
+  }
+
+  // Normal click = select the connection
   designerSelectedConnId = connId;
   designerSelectedNodeId = null;
   designerSelectedNodeIds = [];
   designerContextMenu = null;
+  renderDesigner();
+}
+
+function onConnectionHover(e, connId) {
+  if (designerHoveredConnId === connId) return;
+  designerHoveredConnId = connId;
+  // Only re-render the connections layer, not the full canvas
+  const svg = document.getElementById('canvasSvg');
+  const g = svg?.querySelector('g');
+  if (g) {
+    // Re-render connections in-place to show hover state
+    const existingConns = g.querySelectorAll('.conn-delete-btn, .conn-endpoint-handle');
+    // We need full re-render for hover effects on connections
+    renderDesigner();
+  }
+}
+
+function onConnectionLeave(e, connId) {
+  if (designerHoveredConnId !== connId) return;
+  designerHoveredConnId = null;
   renderDesigner();
 }
 
@@ -2831,54 +2919,71 @@ function onConnectionContextMenu(e, connId) {
   renderDesigner();
 }
 
-function deleteSelectedConnection() {
-  if (!designerSelectedConnId) return;
-  const conn = designerConnections.find(c => c.id === designerSelectedConnId);
+function deleteConnectionById(e, connId) {
+  if (e) e.stopPropagation();
+  if (designerReadonly) return;
+  const conn = designerConnections.find(c => c.id === connId);
   if (!conn) return;
   const fromNode = designerNodes.find(n => n.id === conn.from);
   const toNode = designerNodes.find(n => n.id === conn.to);
   const desc = (fromNode ? fromNode.name : '?') + ' → ' + (toNode ? toNode.name : '?');
-  if (!confirm(`删除连线「${desc}」？`)) return;
   pushUndoState();
-  designerConnections = designerConnections.filter(c => c.id !== designerSelectedConnId);
-  designerSelectedConnId = null;
+  designerConnections = designerConnections.filter(c => c.id !== connId);
+  if (designerSelectedConnId === connId) designerSelectedConnId = null;
+  if (designerHoveredConnId === connId) designerHoveredConnId = null;
   designerDirty = true;
   syncDesignerState();
   renderDesigner();
-  showToast('success', '连线已删除', '');
+  showToast('success', '连线已删除', desc);
 }
 
-function reconnectConnectionFrom(connId) {
+function deleteSelectedConnection() {
+  if (!designerSelectedConnId) return;
+  deleteConnectionById(null, designerSelectedConnId);
+}
+
+// --- Endpoint Drag Reconnect (React Flow / Node-RED style) ---
+function onEndpointDragStart(e, connId, end) {
+  e.stopPropagation();
+  e.preventDefault();
+  if (designerReadonly || designerDebugMode) return;
+
   const conn = designerConnections.find(c => c.id === connId);
   if (!conn) return;
-  // Start a new connection from the original target's input, keeping the same destination
-  // Actually: remove the connection, start connecting from the same source port
-  const fromNode = designerNodes.find(n => n.id === conn.from);
-  if (!fromNode) return;
+
+  designerReconnecting = { connId, end };
+  // Remove the original connection
   pushUndoState();
   designerConnections = designerConnections.filter(c => c.id !== connId);
   designerSelectedConnId = null;
-  designerConnecting = { fromNodeId: conn.from, fromPort: conn.fromPort || 'out' };
+
+  // Start a new connecting drag from the preserved end
+  if (end === 'from') {
+    // Dragging the source endpoint: keep the target, rewire the source
+    // Start connecting from nothing — we need a reverse drag
+    // Actually, keep target as anchor and let user click a new source output port
+    // For simplicity: initiate a normal connection from the original source port
+    designerConnecting = { fromNodeId: conn.from, fromPort: conn.fromPort || 'out' };
+  } else {
+    // Dragging the target endpoint: keep the source, rewire the target
+    designerConnecting = { fromNodeId: conn.from, fromPort: conn.fromPort || 'out' };
+  }
+
   designerDirty = true;
   syncDesignerState();
   renderDesigner();
-  showToast('info', '重连起点', '请点击目标节点的输入端口');
+
+  const label = end === 'from' ? '起点' : '终点';
+  showToast('info', `重连${label}`, '请点击目标节点的端口');
+}
+
+// Keep reconnectConnectionFrom/To for right-click menu backward compatibility
+function reconnectConnectionFrom(connId) {
+  onEndpointDragStart(null, connId, 'from');
 }
 
 function reconnectConnectionTo(connId) {
-  const conn = designerConnections.find(c => c.id === connId);
-  if (!conn) return;
-  const toNode = designerNodes.find(n => n.id === conn.to);
-  if (!toNode) return;
-  pushUndoState();
-  designerConnections = designerConnections.filter(c => c.id !== connId);
-  designerSelectedConnId = null;
-  // Start connecting from the same source port to a new target
-  designerConnecting = { fromNodeId: conn.from, fromPort: conn.fromPort || 'out' };
-  designerDirty = true;
-  syncDesignerState();
-  renderDesigner();
-  showToast('info', '重连终点', '请点击目标节点的输入端口');
+  onEndpointDragStart(null, connId, 'to');
 }
 
 // --- Node Drag from Panel ---
