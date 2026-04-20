@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "target": "ESNext",
+    "strict": false,
+    "checkJs": false,
+    "allowJs": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "maxNodeModuleJsDepth": 0,
+    "noImplicitAny": false,
+    "strictNullChecks": false,
+    "strictFunctionTypes": false,
+    "jsx": "preserve",
+    "jsxFragmentFactory": null
+  },
+  "typeAcquisition": {
+    "enable": false
+  },
+  "include": ["src/**/*.js"],
+  "exclude": ["node_modules", "src/app.js"]
+}
