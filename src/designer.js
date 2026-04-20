@@ -43,6 +43,8 @@ let designerIsBoxSelecting = false; // Box selection
 let designerBoxSelectStart = null;
 let designerBoxSelectRect = null;
 let designerContextMenu = null; // Right-click context menu
+let designerSelectedConnId = null; // Selected connection
+let designerHoveredConnId = null; // Hovered connection
 let designerBottomResizing = false; // Bottom panel resize
 let designerFullscreen = false; // Fullscreen toggle
 let designerSpaceDown = false; // Space key held for pan mode
@@ -93,6 +95,8 @@ function openDesigner(wsId, wfId) {
   designerNodePanelExpanded = false;
   designerClipboard = [];
   designerContextMenu = null;
+  designerSelectedConnId = null;
+  designerHoveredConnId = null;
   designerGridSnap = true;
   designerMinimapVisible = true;
 
@@ -687,8 +691,18 @@ function renderConnections() {
     const path = `M${fromPos.x},${fromPos.y} C${fromPos.x + cp},${fromPos.y} ${toPos.x - cp},${toPos.y} ${toPos.x},${toPos.y}`;
 
     const isActive = designerDebugMode && conn._debugActive;
+    const isSelected = designerSelectedConnId === conn.id;
+    const connClass = [
+      isActive ? 'connection-flow' : '',
+      isSelected ? 'connection-selected' : ''
+    ].filter(Boolean).join(' ');
 
-    return `<path d="${path}" fill="none" stroke="${isActive ? '#1890FF' : '#222'}" stroke-width="${isActive ? 3.5 : 2.5}" marker-end="url(#${isActive ? 'arrowhead-active' : 'arrowhead'})" ${isActive ? 'class="connection-flow"' : ''} onclick="onConnectionClick(event, ${conn.id})" style="cursor:pointer" />
+    const strokeColor = isActive ? '#1890FF' : (isSelected ? '#1890FF' : '#222');
+    const strokeWidth = isActive ? 3.5 : (isSelected ? 3.5 : 2.5);
+    const markerEnd = (isActive || isSelected) ? 'url(#arrowhead-active)' : 'url(#arrowhead)';
+
+    return `<path d="${path}" fill="none" stroke="${strokeColor}" stroke-width="${strokeWidth}" marker-end="${markerEnd}" class="${connClass}" onclick="onConnectionClick(event, ${conn.id})" oncontextmenu="onConnectionContextMenu(event, ${conn.id})" style="cursor:pointer" />
+    ${isSelected ? `<path d="${path}" fill="none" stroke="rgba(24,144,255,0.15)" stroke-width="12" style="pointer-events:none" />` : ''}
     ${conn.label ? `<text x="${(fromPos.x + toPos.x) / 2}" y="${(fromPos.y + toPos.y) / 2 - 10}" text-anchor="middle" font-size="11" fill="${conn.label === 'TRUE' ? '#16a34a' : conn.label === 'FALSE' ? '#dc2626' : conn.label === 'Default' ? '#94a3b8' : conn.label === '循环体' ? '#7c3aed' : conn.label === '完成' ? '#16a34a' : '#1890FF'}" font-weight="700" font-family="Roboto, sans-serif" paint-order="stroke" stroke="#fff" stroke-width="3">${conn.label}</text>` : ''}`;
   }).join('');
 }
@@ -1599,16 +1613,37 @@ function renderCodeConfig(node) {
 }
 
 function renderDelayConfig(node) {
+  const delayMode = node.config?.delayMode || '固定时长';
+  const isFixed = delayMode === '固定时长';
+
+  const fixedDurationField = `<div class="config-field">
+      <div class="config-field-label">延迟时长</div>
+      <div style="display:flex;gap:6px"><input class="config-input" type="number" value="${node.config?.delayValue || 5}" style="flex:1" onchange="updateNodeConfig(${node.id}, 'delayValue', this.value)" /><select class="config-select" style="width:80px" onchange="updateNodeConfig(${node.id}, 'delayUnit', this.value)"><option${(!node.config?.delayUnit || node.config.delayUnit === '秒') ? ' selected' : ''}>秒</option><option${(node.config?.delayUnit === '分钟') ? ' selected' : ''}>分钟</option><option${(node.config?.delayUnit === '小时') ? ' selected' : ''}>小时</option><option${(node.config?.delayUnit === '天') ? ' selected' : ''}>天</option></select></div>
+      <div class="config-field-help">范围：1 秒 ~ 30 天，需输入正整数</div>
+    </div>`;
+
+  const targetTimeField = `<div class="config-field">
+      <div class="config-field-label">目标时间</div>
+      ${renderExprEditor({
+        id: `delay_target_${node.id}`,
+        value: node.config?.delayTarget || '',
+        placeholder: '输入日期时间表达式，如 {{trigger.scheduledTime}}',
+        nodeId: node.id,
+        singleLine: true,
+        label: '目标时间',
+        hint: '目标时间必须大于当前时间，最大未来 30 天内',
+        onChange: `updateNodeConfig(${node.id}, 'delayTarget', this.value)`
+      })}
+      <div class="config-field-help">目标时间必须大于当前时间，最大未来 30 天内</div>
+    </div>`;
+
   return `<div class="config-section">
     <div class="config-section-title">延迟配置</div>
     <div class="config-field">
       <div class="config-field-label">延迟方式</div>
-      <select class="config-select" onchange="updateNodeConfig(${node.id}, 'delayMode', this.value)"><option>固定时长</option><option>到指定时间</option></select>
+      <select class="config-select" onchange="updateNodeConfig(${node.id}, 'delayMode', this.value); renderDesigner()"><option${isFixed ? ' selected' : ''}>固定时长</option><option${!isFixed ? ' selected' : ''}>到指定时间</option></select>
     </div>
-    <div class="config-field">
-      <div class="config-field-label">延迟时长</div>
-      <div style="display:flex;gap:6px"><input class="config-input" type="number" value="${node.config?.delayValue || 5}" style="flex:1" onchange="updateNodeConfig(${node.id}, 'delayValue', this.value)" /><select class="config-select" style="width:80px"><option>秒</option><option>分钟</option><option>小时</option></select></div>
-    </div>
+    ${isFixed ? fixedDurationField : targetTimeField}
   </div>`;
 }
 
@@ -2303,6 +2338,7 @@ function onCanvasMouseDown(e) {
   // Deselect node if clicking on canvas
   deselectNode();
   designerSelectedNodeIds = [];
+  designerSelectedConnId = null;
 }
 
 function onCanvasMouseMove(e) {
@@ -2492,6 +2528,7 @@ function onNodeContextMenu(e, nodeId) {
 function onNodeClick(e, nodeId) {
   e.stopPropagation();
   designerContextMenu = null; // Close any open context menu
+  designerSelectedConnId = null; // Deselect connection when clicking a node
   if (e.ctrlKey || e.metaKey) {
     // Multi-select toggle
     const idx = designerSelectedNodeIds.indexOf(nodeId);
@@ -2763,14 +2800,75 @@ function completeConnection(fromNodeId, fromPort, targetId) {
 function onConnectionClick(e, connId) {
   e.stopPropagation();
   if (designerDebugMode) return;
-  if (confirm('删除此连线？')) {
-    pushUndoState();
-    designerConnections = designerConnections.filter(c => c.id !== connId);
-    designerDirty = true;
-    syncDesignerState();
-    renderDesigner();
-    showToast('success', '连线已删除', '');
-  }
+  // Select the connection instead of immediately deleting
+  designerSelectedConnId = connId;
+  designerSelectedNodeId = null;
+  designerSelectedNodeIds = [];
+  designerContextMenu = null;
+  renderDesigner();
+}
+
+function onConnectionContextMenu(e, connId) {
+  e.preventDefault();
+  e.stopPropagation();
+  if (designerDebugMode || designerReadonly) return;
+  designerSelectedConnId = connId;
+  designerSelectedNodeId = null;
+  designerSelectedNodeIds = [];
+  const shell = document.getElementById('designerShell');
+  const rect = shell.getBoundingClientRect();
+  designerContextMenu = { x: e.clientX - rect.left, y: e.clientY - rect.top, connId };
+  renderDesigner();
+}
+
+function deleteSelectedConnection() {
+  if (!designerSelectedConnId) return;
+  const conn = designerConnections.find(c => c.id === designerSelectedConnId);
+  if (!conn) return;
+  const fromNode = designerNodes.find(n => n.id === conn.from);
+  const toNode = designerNodes.find(n => n.id === conn.to);
+  const desc = (fromNode ? fromNode.name : '?') + ' → ' + (toNode ? toNode.name : '?');
+  if (!confirm(`删除连线「${desc}」？`)) return;
+  pushUndoState();
+  designerConnections = designerConnections.filter(c => c.id !== designerSelectedConnId);
+  designerSelectedConnId = null;
+  designerDirty = true;
+  syncDesignerState();
+  renderDesigner();
+  showToast('success', '连线已删除', '');
+}
+
+function reconnectConnectionFrom(connId) {
+  const conn = designerConnections.find(c => c.id === connId);
+  if (!conn) return;
+  // Start a new connection from the original target's input, keeping the same destination
+  // Actually: remove the connection, start connecting from the same source port
+  const fromNode = designerNodes.find(n => n.id === conn.from);
+  if (!fromNode) return;
+  pushUndoState();
+  designerConnections = designerConnections.filter(c => c.id !== connId);
+  designerSelectedConnId = null;
+  designerConnecting = { fromNodeId: conn.from, fromPort: conn.fromPort || 'out' };
+  designerDirty = true;
+  syncDesignerState();
+  renderDesigner();
+  showToast('info', '重连起点', '请点击目标节点的输入端口');
+}
+
+function reconnectConnectionTo(connId) {
+  const conn = designerConnections.find(c => c.id === connId);
+  if (!conn) return;
+  const toNode = designerNodes.find(n => n.id === conn.to);
+  if (!toNode) return;
+  pushUndoState();
+  designerConnections = designerConnections.filter(c => c.id !== connId);
+  designerSelectedConnId = null;
+  // Start connecting from the same source port to a new target
+  designerConnecting = { fromNodeId: conn.from, fromPort: conn.fromPort || 'out' };
+  designerDirty = true;
+  syncDesignerState();
+  renderDesigner();
+  showToast('info', '重连终点', '请点击目标节点的输入端口');
 }
 
 // --- Node Drag from Panel ---
@@ -3585,12 +3683,14 @@ function designerKeyHandler(e) {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
 
   if (e.key === 'Delete' || e.key === 'Backspace') {
-    deleteSelectedNode();
+    if (designerSelectedConnId) deleteSelectedConnection();
+    else deleteSelectedNode();
   }
   if (e.key === 'Escape') {
     if (designerConnecting) { cancelConnection(); }
     else if (designerMoreMenuOpen) { designerMoreMenuOpen = false; renderDesigner(); }
     else if (designerContextMenu) { designerContextMenu = null; renderDesigner(); }
+    else if (designerSelectedConnId) { designerSelectedConnId = null; renderDesigner(); }
     else if (designerDebugMode) exitDebugMode();
     else deselectNode();
   }
@@ -3627,6 +3727,24 @@ function renderContextMenu() {
       <div class="context-menu-divider"></div>
       <div class="context-menu-item" onclick="designerResetZoom();closeContextMenu()">🔍 重置缩放</div>
     </div>`;
+  }
+
+  // Connection context menu (right-click on a connection)
+  if (m.connId) {
+    const conn = designerConnections.find(c => c.id === m.connId);
+    if (!conn) return '';
+    const fromNode = designerNodes.find(n => n.id === conn.from);
+    const toNode = designerNodes.find(n => n.id === conn.to);
+    const fromName = fromNode ? fromNode.name : '未知';
+    const toName = toNode ? toNode.name : '未知';
+    return `<div class="designer-context-menu" style="left:${m.x}px;top:${m.y}px" onclick="event.stopPropagation()">
+    <div class="context-menu-item context-menu-info">${icons.workflow || '🔗'} ${fromName} → ${toName}</div>
+    <div class="context-menu-divider"></div>
+    <div class="context-menu-item" onclick="reconnectConnectionFrom(${m.connId});closeContextMenu()">🔄 重连起点</div>
+    <div class="context-menu-item" onclick="reconnectConnectionTo(${m.connId});closeContextMenu()">🔄 重连终点</div>
+    <div class="context-menu-divider"></div>
+    <div class="context-menu-item danger" onclick="deleteSelectedConnection();closeContextMenu()">${icons.trash} 删除连线 <span class="context-menu-shortcut">Delete</span></div>
+  </div>`;
   }
 
   // Node context menu
@@ -4513,11 +4631,25 @@ function renderVarPickerGroups(groups, editorId) {
   if (groups.length === 0) {
     return '<div class="var-picker-empty">暂无可用变量</div>';
   }
-  
-  return groups.map(group => `
-    <div class="var-picker-group" data-group="${group.id}">
+
+  // 来源标签配置
+  const sourceBadgeMap = {
+    trigger:    { label: '触发器', cls: 'source-trigger' },
+    node:       { label: '上游节点', cls: 'source-node' },
+    global:     { label: '全局变量', cls: 'source-global' },
+    datasource: { label: '数据源', cls: 'source-datasource' },
+  };
+
+  return groups.map(group => {
+    const badge = sourceBadgeMap[group.source];
+    const badgeHtml = badge
+      ? `<span class="var-picker-source-badge ${badge.cls}">${badge.label}</span>`
+      : '';
+    return `
+    <div class="var-picker-group" data-group="${group.id}" data-source="${group.source || ''}">
       <div class="var-picker-group-header">
         <span>${group.name}</span>
+        ${badgeHtml}
       </div>
       ${group.variables.map(v => `
         <div class="var-picker-item" 
@@ -4533,7 +4665,7 @@ function renderVarPickerGroups(groups, editorId) {
         </div>
       `).join('')}
     </div>
-  `).join('');
+  `}).join('');
 }
 
 /**
@@ -4912,8 +5044,18 @@ function openExprExpandModal(editorId, nodeId, label, hint) {
     varListHtml = '<div style="padding:12px;font-size:11px;color:var(--md-outline)">暂无可用变量</div>';
   } else {
     varGroups.forEach(group => {
-      varListHtml += `<div class="expr-expand-var-group">
-        <div class="expr-expand-var-group-label">${escHtml(group.name)}</div>`;
+      const sourceBadgeMap = {
+        trigger:    { label: '触发器', cls: 'source-trigger' },
+        node:       { label: '上游节点', cls: 'source-node' },
+        global:     { label: '全局变量', cls: 'source-global' },
+        datasource: { label: '数据源', cls: 'source-datasource' },
+      };
+      const badge = sourceBadgeMap[group.source];
+      const badgeHtml = badge
+        ? `<span class="var-picker-source-badge ${badge.cls}" style="margin-left:auto">${badge.label}</span>`
+        : '';
+      varListHtml += `<div class="expr-expand-var-group" data-source="${group.source || ''}">
+        <div class="expr-expand-var-group-label" style="display:flex;align-items:center">${escHtml(group.name)}${badgeHtml}</div>`;
       group.variables.forEach(v => {
         varListHtml += `<div class="expr-expand-var-item" 
           onclick="insertVarIntoExpandModal(${JSON.stringify(v.ref)})"
