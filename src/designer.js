@@ -3152,6 +3152,13 @@ function getProblems() {
     if (node.type === 'http' && !node.config?.url) {
       problems.push({ level: 'error', message: '请求 URL 未配置', location: node.code, nodeId: node.id });
     }
+    // Break node must be inside a loop body
+    if (node.type === 'break') {
+      const ownerLoop = getOwnerLoopNode(node.id);
+      if (!ownerLoop) {
+        problems.push({ level: 'error', message: `Break 节点「${node.name}」不在任何循环节点的循环体内，无法使用`, location: node.code, nodeId: node.id });
+      }
+    }
     // Placeholder node warning
     if (node.type === 'placeholder') {
       problems.push({ level: 'warning', message: `占位节点「${node.name}」待完善`, location: node.code, nodeId: node.id });
