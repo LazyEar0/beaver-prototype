@@ -299,7 +299,7 @@ function generateLoopExampleNodes(wf) {
       x: 860, y: 260,
       config: {
         assignments: [
-          { target: 'summary', value: '共通知 ${loop_1.iterationCount} 个房型' }
+          { target: 'summary', source: '共通知 ${loop_1.iterationCount} 个房型', type: 'String' }
         ]
       }, warnings: 0
     },
@@ -1444,6 +1444,14 @@ const COND_OPS = [
 function renderConditionRows(conditions, addFnStr, removeFnPfx, updateFnPfx, nodeId) {
   const noRightOps = ['isEmpty', 'isNotEmpty'];
   let html = '';
+
+  // 判断值是否是变量路径（以 {{ 开头，或以 vars./ds. 开头，或符合 nodeCode. 模式）
+  const isVarPath = (v) => {
+    if (!v) return false;
+    return v.startsWith('{{') || v.startsWith('vars.') || v.startsWith('ds.') ||
+      /^[a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_]/.test(v);
+  };
+
   conditions.forEach((cond, idx) => {
     if (idx > 0) {
       html += `<div class="condition-and-tag">AND</div>`;
@@ -1451,13 +1459,28 @@ function renderConditionRows(conditions, addFnStr, removeFnPfx, updateFnPfx, nod
     const leftVal = (cond.left === '__custom__' || !cond.left) ? '' : cond.left;
     const opIsNoRight = noRightOps.includes(cond.op);
     const leftInputId = `cond_left_${nodeId}_${idx}_${Date.now()}`;
+    const leftIsVar = isVarPath(leftVal);
+    // 左值路径去掉 {{}} 供 chip 显示
+    const leftPath = leftVal.replace(/^\{\{/, '').replace(/\}\}$/, '');
 
     html += `<div class="condition-visual-row">
       <!-- Row 1: variable input + ref picker -->
       <div class="cond-row-top">
         <div class="cond-right-wrap" style="flex:1">
+          ${leftIsVar ? `
+          <div class="var-chip-wrap">
+            <div class="var-chip" data-source="${_detectVarSource(leftPath)}" title="${escHtml(leftPath)}">
+              <span class="var-chip-icon">${({ trigger:'T',node:'N',global:'G',datasource:'D',unknown:'V' })[_detectVarSource(leftPath)]}</span>
+              <span class="var-chip-name">${escHtml(leftPath)}</span>
+              <button class="var-chip-clear" onclick="clearVarChip('${leftInputId}', null)" title="清除">✕</button>
+            </div>
+          </div>
+          <input id="${leftInputId}" class="cond-left-input" value="${escHtml(leftVal)}" placeholder="输入或引用变量，如 vars.status" onchange="${updateFnPfx}${idx},'left',this.value)" style="display:none;padding-right:28px;width:100%" />
+          <button class="cond-ref-btn" title="引用变量" onclick="showCondVarPicker('${leftInputId}', ${nodeId}, '${updateFnPfx}${idx}', 'left')" style="display:none">⊙</button>
+          ` : `
           <input id="${leftInputId}" class="cond-left-input" value="${escHtml(leftVal)}" placeholder="输入或引用变量，如 vars.status" onchange="${updateFnPfx}${idx},'left',this.value)" style="padding-right:28px;width:100%" />
           <button class="cond-ref-btn" title="引用变量" onclick="showCondVarPicker('${leftInputId}', ${nodeId}, '${updateFnPfx}${idx}', 'left')">⊙</button>
+          `}
           <div id="${leftInputId}_picker" class="var-picker-dropdown" style="display:none"></div>
         </div>
         ${conditions.length > 1
@@ -1474,9 +1497,24 @@ function renderConditionRows(conditions, addFnStr, removeFnPfx, updateFnPfx, nod
           ? `<span style="flex:1;font-size:11px;color:var(--md-outline);padding:0 10px;font-style:italic">（无需填写值）</span>`
           : (() => {
               const rightInputId = `cond_right_${nodeId}_${idx}_${Date.now()}`;
+              const rightVal = cond.right || '';
+              const rightIsVar = isVarPath(rightVal);
+              const rightPath = rightVal.replace(/^\{\{/, '').replace(/\}\}$/, '');
               return `<div class="cond-right-wrap" style="position:relative;flex:1">
-                <input id="${rightInputId}" class="cond-right-input" value="${escHtml(cond.right || '')}" placeholder="输入值或引用变量" onchange="${updateFnPfx}${idx},'right',this.value)" style="padding-right:28px;width:100%" />
+                ${rightIsVar ? `
+                <div class="var-chip-wrap">
+                  <div class="var-chip" data-source="${_detectVarSource(rightPath)}" title="${escHtml(rightPath)}">
+                    <span class="var-chip-icon">${{ trigger:'T',node:'N',global:'G',datasource:'D',unknown:'V' }[_detectVarSource(rightPath)]}</span>
+                    <span class="var-chip-name">${escHtml(rightPath)}</span>
+                    <button class="var-chip-clear" onclick="clearVarChip('${rightInputId}', null)" title="清除">✕</button>
+                  </div>
+                </div>
+                <input id="${rightInputId}" class="cond-right-input" value="${escHtml(rightVal)}" placeholder="输入值或引用变量" onchange="${updateFnPfx}${idx},'right',this.value)" style="display:none;padding-right:28px;width:100%" />
+                <button class="cond-ref-btn" title="从变量选择器中引用" onclick="showCondVarPicker('${rightInputId}', ${nodeId}, '${updateFnPfx}${idx}')" style="display:none">⊙</button>
+                ` : `
+                <input id="${rightInputId}" class="cond-right-input" value="${escHtml(rightVal)}" placeholder="输入值或引用变量" onchange="${updateFnPfx}${idx},'right',this.value)" style="padding-right:28px;width:100%" />
                 <button class="cond-ref-btn" title="从变量选择器中引用" onclick="showCondVarPicker('${rightInputId}', ${nodeId}, '${updateFnPfx}${idx}')">⊙</button>
+                `}
                 <div id="${rightInputId}_picker" class="var-picker-dropdown" style="display:none"></div>
               </div>`;
             })()
@@ -1751,11 +1789,15 @@ function updateAssignment(nodeId, index, field, value) {
   const node = designerNodes.find(n => n.id === nodeId);
   if (!node) return;
   if (!node.config) node.config = {};
-  if (!node.config.assignments) node.config.assignments = [{ target: 'processedData', source: '' }];
+  if (!node.config.assignments) node.config.assignments = [{ target: 'processedData', source: '', type: 'String' }];
   if (node.config.assignments[index]) {
     node.config.assignments[index][field] = value;
   }
   designerDirty = true;
+  // 改 type 或 target 时需要刷新输出变量区域
+  if (field === 'type' || field === 'target') {
+    renderDesigner();
+  }
 }
 
 function addAssignment(nodeId) {
@@ -4401,12 +4443,12 @@ function getNodeOutputs(node, forPicker = false) {
       break;
       
     case 'assign': {
-      const assignments = node.config?.assignments || [{ target: 'processedData', source: '' }];
+      const assignments = node.config?.assignments || [{ target: 'processedData', source: '', type: 'String' }];
       assignments.forEach(a => {
         if (a.target) {
           outputs.push({ 
             name: a.target, 
-            type: 'Object', 
+            type: a.type || 'String', 
             desc: '赋值结果',
             editable: true,
             configField: 'assignments'
@@ -5142,13 +5184,131 @@ function showCondLeftVarPicker(leftInputId, nodeId, updateFnPfx) {
   _showCondPickerAt(picker, anchorEl, groups, leftInputId, 'selectCondLeftVar', JSON.stringify(updateFnPfx));
 }
 
+/**
+ * 确定变量路径属于哪个来源（根据路径前缀）
+ */
+function _detectVarSource(path) {
+  if (!path) return 'unknown';
+  if (path.startsWith('ds.'))   return 'datasource';
+  if (path.startsWith('vars.')) return 'global';
+  // 触发器：路径第一段是 trigger 节点 code
+  const trigNode = designerNodes.find(n => n.type === 'trigger');
+  if (trigNode && path.startsWith(trigNode.code + '.')) return 'trigger';
+  return 'node';
+}
+
+/**
+ * 在 input 旁边显示变量 chip（单值引用场景专用）
+ * @param {string} inputId    - input 元素的 id
+ * @param {string} path       - 变量路径（不含 {{}}），用于显示名称和来源判断
+ * @param {string} clearFnCall - 点击 ✕ 时执行的 JS 字符串
+ */
+function showVarChip(inputId, path, clearFnCall) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+
+  const wrap = input.closest('.cond-right-wrap, .config-field');
+  if (!wrap) return;
+
+  // 隐藏 input 和 ⊙ 按钮
+  input.style.display = 'none';
+  const refBtn = wrap.querySelector('.cond-ref-btn');
+  if (refBtn) refBtn.style.display = 'none';
+
+  // 移除已有 chip
+  const existing = wrap.querySelector('.var-chip-wrap');
+  if (existing) existing.remove();
+
+  const source = _detectVarSource(path);
+  // 显示名：取路径末段
+  const displayName = path.split('.').pop() || path;
+  // 来源标注文字
+  const sourceLabel = { trigger: '触发器', node: '节点', global: '全局变量', datasource: '数据源', unknown: '变量' };
+  const typeChar = { trigger: 'T', node: 'N', global: 'G', datasource: 'D', unknown: 'V' };
+
+  const chipWrap = document.createElement('div');
+  chipWrap.className = 'var-chip-wrap';
+  chipWrap.innerHTML = `
+    <div class="var-chip" data-source="${source}" title="${path}">
+      <span class="var-chip-icon" title="${sourceLabel[source]}">${typeChar[source]}</span>
+      <span class="var-chip-name">${escHtml(path)}</span>
+      <button class="var-chip-clear" onclick="${clearFnCall}" title="清除，恢复手动输入">✕</button>
+    </div>
+  `;
+
+  // 插到 input 前
+  wrap.insertBefore(chipWrap, input);
+}
+
+/**
+ * 清除变量 chip，恢复 input 可编辑状态
+ * @param {string} inputId  - 对应 input 的 id
+ * @param {string} onChange - 清空时触发的持久化调用
+ */
+function clearVarChip(inputId, onChange) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+
+  const wrap = input.closest('.cond-right-wrap, .config-field');
+  if (!wrap) return;
+
+  // 移除 chip
+  const chip = wrap.querySelector('.var-chip-wrap');
+  if (chip) chip.remove();
+
+  // 恢复 input 和 ⊙ 按钮
+  input.style.display = '';
+  input.value = '';
+  const refBtn = wrap.querySelector('.cond-ref-btn');
+  if (refBtn) refBtn.style.display = '';
+
+  input.focus();
+
+  // 触发持久化
+  if (onChange) {
+    try { new Function(onChange)(); } catch(e) {}
+  }
+  input.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+/**
+ * 右值选中变量（替换 input 为 chip）
+ */
 function selectCondVar(inputId, ref, updateFnPfx) {
   const input = document.getElementById(inputId);
   if (!input) return;
+
+  // 写入真实值（用于持久化）
   input.value = ref;
   input.dispatchEvent(new Event('change', { bubbles: true }));
+
+  // 关闭 picker
   const picker = document.getElementById(inputId + '_picker');
   if (picker) picker.style.display = 'none';
+
+  // 提取 path（去掉 {{}}）
+  const path = ref.replace(/^\{\{/, '').replace(/\}\}$/, '');
+  const clearCall = `clearVarChip('${inputId}', '${updateFnPfx.replace(/'/g, "\\'")}'+'right', null)')`;
+  showVarChip(inputId, path, `clearVarChip('${inputId}', null)`);
+}
+
+/**
+ * 左值选中变量（替换 input 为 chip）
+ */
+function selectCondLeftVar(leftInputId, path, updateFnPfx) {
+  const input = document.getElementById(leftInputId);
+  if (!input) return;
+
+  // 写入真实值并触发持久化
+  input.value = path;
+  const fn = new Function(`${updateFnPfx}'left',${JSON.stringify(path)})`);
+  try { fn(); } catch(e) { console.warn('selectCondLeftVar callback failed', e); }
+
+  // 关闭 picker
+  const picker = document.getElementById(leftInputId + '_picker');
+  if (picker) picker.style.display = 'none';
+
+  showVarChip(leftInputId, path, `clearVarChip('${leftInputId}', null)`);
 }
 
 
