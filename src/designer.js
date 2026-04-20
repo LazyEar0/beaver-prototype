@@ -1756,10 +1756,15 @@ function renderAssignConfig(node) {
     <div class="config-section-title">赋值规则</div>
     ${assignments.map((a, i) => {
       const curType = a.type || 'String';
+      const curMode = a.mode || 'template'; // 'template' | 'expression'
+      const isExpr = curMode === 'expression';
       const targetId = `assign_target_${node.id}_${i}`;
+      const srcPlaceholder = isExpr
+        ? '{{price}} * {{qty}}，支持 + - * / % ( )'
+        : '文本或 {{节点.输出变量}}，多个变量拼接';
       const isOverwrite = a.target && designerVariables.some(v => v.name === a.target);
       return `
-    <div class="assign-rule-row">
+    <div class="assign-rule-row${isExpr ? ' assign-rule-expr-mode' : ''}">
       <div class="assign-rule-main">
         <div class="assign-target-wrap">
           <input id="${targetId}" class="config-input assign-target-input" placeholder="如 orderStatus" value="${escHtml(a.target)}" style="font-family:var(--font-family-mono);padding-right:26px;width:100%" oninput="updateAssignment(${node.id}, ${i}, 'target', this.value); refreshAssignOutputVars(${node.id}); checkAssignOverwrite('${targetId}')" />
@@ -1773,7 +1778,7 @@ function renderAssignConfig(node) {
         ${renderExprEditor({
           id: `assign_src_${node.id}_${i}`,
           value: a.source,
-          placeholder: '{{节点.输出变量}}',
+          placeholder: srcPlaceholder,
           nodeId: node.id,
           singleLine: true,
           onChange: `updateAssignment(${node.id}, ${i}, 'source', this.value)`
@@ -1782,8 +1787,20 @@ function renderAssignConfig(node) {
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
         </button>` : ''}
       </div>
+      <div class="assign-rule-footer">
+        <div class="assign-mode-switch">
+          <button class="assign-mode-btn${!isExpr ? ' active' : ''}" onclick="updateAssignment(${node.id}, ${i}, 'mode', 'template'); renderDesigner()" title="原样输出，支持变量插值">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 6h16M4 12h10M4 18h12"/></svg>
+            模板
+          </button>
+          <button class="assign-mode-btn${isExpr ? ' active' : ''}" onclick="updateAssignment(${node.id}, ${i}, 'mode', 'expression'); renderDesigner()" title="求值后输出，支持四则运算">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M8 3v18M16 3v18M3 8h18M3 16h18" stroke-linecap="round"/></svg>
+            表达式
+          </button>
+        </div>
+        ${isExpr ? '<span class="assign-expr-hint">支持 <code>+ - * / %</code> 运算、括号分组、三元 <code>? :</code></span>' : '<span class="assign-expr-hint">用 <code>{{节点.变量}}</code> 引用上游值，多个变量可直接拼接</span>'}
+      </div>
       ${isOverwrite ? `<div id="${targetId}_warn" class="assign-overwrite-warn">⚠ 将覆盖已有全局变量 <strong>${escHtml(a.target)}</strong></div>` : `<div id="${targetId}_warn" class="assign-overwrite-warn" style="display:none">⚠ 将覆盖已有全局变量</div>`}
-      <div class="assign-rule-hint">变量名将作为下游节点引用路径，仅允许字母、数字和下划线</div>
     </div>`;
     }).join('')}
     <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;margin-top:var(--space-2)" onclick="addAssignment(${node.id})">${icons.plus} 添加赋值规则</button>

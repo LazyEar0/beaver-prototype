@@ -4157,6 +4157,89 @@
   line-height: 1.4;
 }
 
+/* 赋值规则行底部：模式切换 + 提示 */
+.assign-rule-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.assign-mode-switch {
+  display: flex;
+  align-items: center;
+  background: var(--md-surface-container);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 6px;
+  padding: 2px;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.assign-mode-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: none;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  background: transparent;
+  color: var(--md-on-surface-variant);
+  transition: var(--transition-fast);
+  white-space: nowrap;
+}
+
+.assign-mode-btn:hover {
+  background: var(--md-surface-container-high);
+  color: var(--md-on-surface);
+}
+
+.assign-mode-btn.active {
+  background: var(--md-surface);
+  color: var(--md-primary);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+}
+
+.assign-mode-btn.active svg {
+  stroke: var(--md-primary);
+}
+
+/* 表达式模式激活时：整行蓝色左边框 + 淡蓝背景 */
+.assign-rule-row.assign-rule-expr-mode {
+  border-color: var(--md-primary);
+  background: linear-gradient(135deg, #eff6ff 0%, var(--md-surface) 100%);
+  border-left: 3px solid var(--md-primary);
+}
+
+/* 表达式模式下的输入框蓝色高亮 */
+.assign-rule-expr-mode .expr-editor-wrapper .expr-editor {
+  border-color: var(--md-primary) !important;
+  background: #f0f7ff;
+}
+
+/* 模式说明提示文字 */
+.assign-expr-hint {
+  font-size: 10px;
+  color: var(--md-on-surface-variant);
+  flex: 1;
+  min-width: 0;
+  line-height: 1.4;
+}
+
+.assign-expr-hint code {
+  background: var(--md-surface-container-high);
+  padding: 0 3px;
+  border-radius: 3px;
+  font-family: var(--font-family-mono);
+  font-size: 10px;
+  color: var(--md-primary);
+}
+
 /* 类型选择器 */
 .assign-type-select {
   height: 30px;
