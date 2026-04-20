@@ -26,6 +26,36 @@
   display: none;
 }
 
+.fullscreen-exit-btn {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+}
+
+.designer-shell.fullscreen:hover .fullscreen-exit-btn,
+.designer-shell.fullscreen .fullscreen-exit-btn:focus {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.fullscreen-exit-btn:hover {
+  background: rgba(0, 0, 0, 0.75);
+}
+
 /* --- Top Toolbar --- */
 .designer-toolbar {
   height: 52px;

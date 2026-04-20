@@ -417,6 +417,7 @@ function renderDesigner() {
 
   shell.innerHTML = `
     ${designerDebugMode ? `<div class="debug-mode-bar active">${icons.play} <span>调试模式 - 画布只读</span> <button class="btn btn-sm" style="height:24px;padding:0 12px;background:rgba(0,90,193,0.15);color:var(--md-info);border-radius:var(--radius-full);font-size:11px" onclick="exitDebugMode()">退出调试</button></div>` : ''}
+    ${designerFullscreen ? `<button class="fullscreen-exit-btn" onclick="toggleDesignerFullscreen()" title="退出全屏 (F11)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="4 14 4 20 10 20"/><polyline points="20 10 20 4 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg> 退出全屏</button>` : ''}
     <div class="designer-toolbar">
       <div class="designer-toolbar-left">
         <button class="designer-back-btn" onclick="closeDesigner()" title="返回">${icons.arrowLeft}</button>
