@@ -2035,18 +2035,44 @@ function renderDelayConfig(node) {
       <div class="config-field-help">范围：1 秒 ~ 30 天，需输入正整数</div>
     </div>`;
 
-  const targetInputId = `delay_target_${node.id}`;
+  // 判断当前目标时间值是否为变量引用模式
+  const delayTargetVal = node.config?.delayTarget || '';
+  const isVarMode = delayTargetVal.startsWith('${');
   const dtPickerId = `delay_dt_${node.id}`;
+  const varInputId = `delay_var_${node.id}`;
+
+  // datetime-local 控件需要 "YYYY-MM-DDTHH:mm" 格式，将存储的 "YYYY-MM-DD HH:mm" 转换
+  const dtLocalVal = (!isVarMode && delayTargetVal)
+    ? delayTargetVal.replace(' ', 'T')
+    : '';
+
   const targetTimeField = `<div class="config-field">
       <div class="config-field-label">目标时间</div>
-      <div class="cond-right-wrap" style="position:relative">
-        <input id="${targetInputId}" class="config-input" type="text" value="${escHtml(node.config?.delayTarget || '')}" placeholder="选择或输入日期时间" onchange="updateNodeConfig(${node.id}, 'delayTarget', this.value)" style="padding-right:54px;width:100%;font-family:var(--font-family-mono)" />
-        <button class="cond-ref-btn" style="right:26px" title="选择日期时间" onclick="(function(){var p=document.getElementById('${dtPickerId}');if(p.showPicker)p.showPicker();else p.click()})()">📅</button>
-        <button class="cond-ref-btn" title="引用变量" onclick="showCondVarPicker('${targetInputId}', ${node.id}, 'updateNodeConfig(${node.id},&quot;delayTarget&quot;,')">⊙</button>
-        <input id="${dtPickerId}" type="datetime-local" style="position:absolute;opacity:0;pointer-events:none;width:1px;height:1px;top:0;right:0" onchange="(function(v){var d=new Date(v);var pad=function(n){return String(n).padStart(2,'0')};var fmt=d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+' '+pad(d.getHours())+':'+pad(d.getMinutes());var inp=document.getElementById('${targetInputId}');inp.value=fmt;updateNodeConfig(${node.id},'delayTarget',fmt)})(this.value)" />
-        <div id="${targetInputId}_picker" class="var-picker-dropdown" style="display:none"></div>
+      <div style="position:relative">
+        <!-- 固定值模式：datetime-local 选择器 -->
+        <div id="delay_fixed_wrap_${node.id}" style="${isVarMode ? 'display:none' : 'display:flex'};align-items:center;gap:6px">
+          <input id="${dtPickerId}" class="config-input" type="datetime-local" value="${escHtml(dtLocalVal)}"
+            style="flex:1;font-family:var(--font-family-mono)"
+            onchange="(function(v){var d=new Date(v);var pad=function(n){return String(n).padStart(2,'0')};var fmt=d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+' '+pad(d.getHours())+':'+pad(d.getMinutes());updateNodeConfig(${node.id},'delayTarget',fmt)})(this.value)" />
+          <button class="cond-ref-btn" style="position:static;width:28px;height:28px;flex-shrink:0" title="改为引用变量"
+            onclick="(function(){document.getElementById('delay_fixed_wrap_${node.id}').style.display='none';document.getElementById('delay_var_wrap_${node.id}').style.display='flex';updateNodeConfig(${node.id},'delayTarget','')})()">⊙</button>
+        </div>
+        <!-- 变量引用模式：文本输入框 + 变量选择器 -->
+        <div id="delay_var_wrap_${node.id}" style="${isVarMode ? 'display:flex' : 'display:none'};align-items:center;gap:6px;position:relative">
+          <div style="flex:1;position:relative">
+            <input id="${varInputId}" class="config-input" type="text" value="${escHtml(isVarMode ? delayTargetVal : '')}"
+              placeholder="点击 ⊙ 选择变量"
+              style="width:100%;padding-right:28px;font-family:var(--font-family-mono)"
+              onchange="updateNodeConfig(${node.id},'delayTarget',this.value)" />
+            <button class="cond-ref-btn" title="选择变量"
+              onclick="showCondVarPicker('${varInputId}', ${node.id}, 'updateNodeConfig(${node.id},&quot;delayTarget&quot;,')">⊙</button>
+            <div id="${varInputId}_picker" class="var-picker-dropdown" style="display:none"></div>
+          </div>
+          <button class="cond-ref-btn" style="position:static;width:28px;height:28px;flex-shrink:0" title="改为选择固定时间"
+            onclick="(function(){document.getElementById('delay_var_wrap_${node.id}').style.display='none';document.getElementById('delay_fixed_wrap_${node.id}').style.display='flex';updateNodeConfig(${node.id},'delayTarget','')})()">📅</button>
+        </div>
       </div>
-      <div class="config-field-help">点击 📅 选择日期时间，或手动输入（如 2025-04-20 18:00）；点击 ⊙ 引用变量；目标时间须大于当前且在 30 天内</div>
+      <div class="config-field-help">${isVarMode ? '引用变量模式：点击 ⊙ 选择变量，点击 📅 切换回固定时间选择' : '固定时间模式：通过日期时间选择器选择，点击 ⊙ 切换为引用变量'}；目标时间须大于当前且在 30 天内</div>
     </div>`;
 
   return `<div class="config-section">
