@@ -1756,10 +1756,16 @@ function renderAssignConfig(node) {
     <div class="config-section-title">赋值规则</div>
     ${assignments.map((a, i) => {
       const curType = a.type || 'String';
+      const targetId = `assign_target_${node.id}_${i}`;
+      const isOverwrite = a.target && designerVariables.some(v => v.name === a.target);
       return `
     <div class="assign-rule-row">
       <div class="assign-rule-main">
-        <input class="config-input assign-target-input" placeholder="如 orderStatus" value="${escHtml(a.target)}" style="font-family:var(--font-family-mono)" oninput="updateAssignment(${node.id}, ${i}, 'target', this.value); refreshAssignOutputVars(${node.id})" />
+        <div class="assign-target-wrap" style="position:relative;display:flex;align-items:center;flex:1;min-width:0">
+          <input id="${targetId}" class="config-input assign-target-input" placeholder="如 orderStatus" value="${escHtml(a.target)}" style="font-family:var(--font-family-mono);padding-right:26px;width:100%" oninput="updateAssignment(${node.id}, ${i}, 'target', this.value); refreshAssignOutputVars(${node.id}); checkAssignOverwrite('${targetId}')" />
+          <button class="cond-ref-btn assign-target-picker-btn" title="从全局变量中选择" onclick="showAssignTargetPicker('${targetId}', ${node.id}, ${i})" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);pointer-events:auto">⊙</button>
+          <div id="${targetId}_picker" class="var-picker-dropdown" style="display:none;position:fixed;z-index:9999;max-height:240px;overflow-y:auto;background:var(--md-surface-container-high);border:1px solid var(--md-outline-variant);border-radius:8px;box-shadow:var(--shadow-lg);flex-direction:column;width:260px"></div>
+        </div>
         <select class="assign-type-select" title="变量类型" onchange="updateAssignment(${node.id}, ${i}, 'type', this.value); refreshAssignOutputVars(${node.id})">
           ${typeOptions.map(t => `<option value="${t}"${curType === t ? ' selected' : ''}>${t}</option>`).join('')}
         </select>
@@ -1776,6 +1782,7 @@ function renderAssignConfig(node) {
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
         </button>` : ''}
       </div>
+      ${isOverwrite ? `<div id="${targetId}_warn" class="assign-overwrite-warn">⚠ 将覆盖已有全局变量 <strong>${escHtml(a.target)}</strong></div>` : `<div id="${targetId}_warn" class="assign-overwrite-warn" style="display:none">⚠ 将覆盖已有全局变量</div>`}
       <div class="assign-rule-hint">变量名将作为下游节点引用路径，仅允许字母、数字和下划线</div>
     </div>`;
     }).join('')}
@@ -5321,6 +5328,102 @@ function showCondLeftVarPicker(leftInputId, nodeId, updateFnPfx) {
 
   const groups = getAvailableVariables(nodeId);
   _showCondPickerAt(picker, anchorEl, groups, leftInputId, 'selectCondLeftVar', JSON.stringify(updateFnPfx));
+}
+
+/**
+ * 赋值节点目标变量名选择器 —— 仅展示全局变量供"覆盖赋值"选择
+ * 选中后只填入变量名（不是 {{...}} 引用路径）
+ */
+function showAssignTargetPicker(inputId, nodeId, ruleIndex) {
+  const picker = document.getElementById(inputId + '_picker');
+  const input  = document.getElementById(inputId);
+  if (!picker || !input) return;
+
+  if (picker.style.display === 'flex') { picker.style.display = 'none'; return; }
+
+  // 只取全局变量
+  const globalVars = designerVariables;
+  if (globalVars.length === 0) {
+    // 无全局变量时给出提示
+    picker.style.display = 'flex';
+    picker.style.flexDirection = 'column';
+    picker.innerHTML = `<div style="padding:12px;font-size:12px;color:var(--md-on-surface-variant);text-align:center">暂无全局变量<br><span style="font-size:11px;opacity:0.7">可在底部变量面板中添加</span></div>`;
+    const r0 = input.getBoundingClientRect();
+    picker.style.left = Math.min(r0.left, window.innerWidth - 270) + 'px';
+    picker.style.top = (r0.bottom + 4) + 'px';
+    const close = () => { picker.style.display = 'none'; document.removeEventListener('mousedown', close); };
+    setTimeout(() => document.addEventListener('mousedown', close), 0);
+    return;
+  }
+
+  picker.style.display = 'flex';
+  picker.style.flexDirection = 'column';
+  picker.innerHTML = `
+    <div style="padding:6px 8px 4px;font-size:10px;font-weight:600;color:var(--md-on-surface-variant);border-bottom:1px solid var(--md-outline-variant);margin-bottom:2px">
+      📦 全局变量 <span style="font-weight:400;opacity:0.7">— 选中将覆盖该变量的值</span>
+    </div>
+    ${globalVars.map(v => `
+      <div class="var-picker-item" onclick="selectAssignTarget('${inputId}', ${nodeId}, ${ruleIndex}, '${escHtml(v.name)}')">
+        <span class="var-icon type-${v.type || 'String'}" style="flex-shrink:0">${(v.type || 'S').charAt(0)}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12px;font-family:var(--font-family-mono);font-weight:500">${escHtml(v.name)}</div>
+          ${v.desc ? `<div style="font-size:10px;color:var(--md-on-surface-variant)">${escHtml(v.desc)}</div>` : ''}
+        </div>
+        <span style="font-size:10px;color:var(--md-outline);margin-left:4px">${v.type || 'String'}</span>
+      </div>
+    `).join('')}
+  `;
+  const rect = input.getBoundingClientRect();
+  const spaceBelow = window.innerHeight - rect.bottom;
+  picker.style.left = Math.min(rect.left, window.innerWidth - 270) + 'px';
+  picker.style.top = spaceBelow >= 200 ? (rect.bottom + 4) + 'px' : (rect.top - 244) + 'px';
+  picker.style.bottom = '';
+  const close = (e) => {
+    if (!picker.contains(e.target) && e.target !== input) {
+      picker.style.display = 'none';
+      document.removeEventListener('mousedown', close);
+    }
+  };
+  setTimeout(() => document.addEventListener('mousedown', close), 0);
+}
+
+/**
+ * 选中全局变量后填入赋值目标名，并同步类型
+ */
+function selectAssignTarget(inputId, nodeId, ruleIndex, varName) {
+  const input = document.getElementById(inputId);
+  const picker = document.getElementById(inputId + '_picker');
+  if (input) {
+    input.value = varName;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+  if (picker) picker.style.display = 'none';
+
+  // 同步全局变量类型到赋值规则
+  const globalVar = designerVariables.find(v => v.name === varName);
+  if (globalVar?.type) {
+    updateAssignment(nodeId, ruleIndex, 'type', globalVar.type);
+  }
+  updateAssignment(nodeId, ruleIndex, 'target', varName);
+  refreshAssignOutputVars(nodeId);
+  checkAssignOverwrite(inputId);
+}
+
+/**
+ * 实时检测目标变量名是否与全局变量重名，显示/隐藏覆盖警告
+ */
+function checkAssignOverwrite(inputId) {
+  const input = document.getElementById(inputId);
+  const warn  = document.getElementById(inputId + '_warn');
+  if (!input || !warn) return;
+  const name = input.value.trim();
+  const matched = name && designerVariables.find(v => v.name === name);
+  if (matched) {
+    warn.innerHTML = `⚠ 将覆盖已有全局变量 <strong>${escHtml(matched.name)}</strong>（${matched.type || 'String'}）`;
+    warn.style.display = 'flex';
+  } else {
+    warn.style.display = 'none';
+  }
 }
 
 /**
