@@ -3585,12 +3585,11 @@ function onConnectionContextMenu(e, connId) {
   e.preventDefault();
   e.stopPropagation();
   if (designerDebugMode || designerReadonly) return;
+  // Right-click on connection = select it (shows toolbar), no separate context menu
   designerSelectedConnId = connId;
   designerSelectedNodeId = null;
   designerSelectedNodeIds = [];
-  const shell = document.getElementById('designerShell');
-  const rect = shell.getBoundingClientRect();
-  designerContextMenu = { x: e.clientX - rect.left, y: e.clientY - rect.top, connId };
+  designerContextMenu = null;
   renderDesigner();
 }
 
@@ -4595,23 +4594,6 @@ function renderContextMenu() {
       <div class="context-menu-divider"></div>
       <div class="context-menu-item" onclick="designerResetZoom();closeContextMenu()">🔍 重置缩放</div>
     </div>`;
-  }
-
-  // Connection context menu (right-click on a connection)
-  if (m.connId) {
-    const conn = designerConnections.find(c => c.id === m.connId);
-    if (!conn) return '';
-    const fromNode = designerNodes.find(n => n.id === conn.from);
-    const toNode = designerNodes.find(n => n.id === conn.to);
-    const fromName = fromNode ? fromNode.name : '未知';
-    const toName = toNode ? toNode.name : '未知';
-    return `<div class="designer-context-menu" style="left:${m.x}px;top:${m.y}px" onclick="event.stopPropagation()">
-    <div class="context-menu-item context-menu-info">${icons.workflow || '🔗'} ${fromName} → ${toName}</div>
-    <div class="context-menu-divider"></div>
-    <div class="context-menu-item" onclick="reconnectConnectionTo(${m.connId});closeContextMenu()">🔄 重新连接到其他节点</div>
-    <div class="context-menu-divider"></div>
-    <div class="context-menu-item danger" onclick="deleteSelectedConnection();closeContextMenu()">${icons.trash} 删除连线 <span class="context-menu-shortcut">Delete</span></div>
-  </div>`;
   }
 
   // Node context menu
