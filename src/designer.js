@@ -160,10 +160,9 @@ function forceCloseDesigner() {
   designerRedoStack = [];
   designerDirty = false;
   designerFullscreen = false;
-  // Exit fullscreen if active
-  if (document.fullscreenElement) {
-    document.exitFullscreen().catch(() => {});
-  }
+  // Exit immersive mode if active
+  const _shell = document.getElementById('designerShell');
+  if (_shell) _shell.classList.remove('fullscreen');
   stopAutoSave();
   document.removeEventListener('keyup', designerKeyUpHandler);
   const shell = document.getElementById('designerShell');
@@ -499,7 +498,7 @@ function renderDesigner() {
           <input class="canvas-zoom-input" id="canvasZoomInput" type="text" value="${Math.round(designerZoom * 100)}%" onfocus="onZoomInputFocus(this)" onblur="onZoomInputBlur(this)" onkeydown="onZoomInputKey(event, this)" title="输入精确缩放值 (25%-200%)" />
           <button class="canvas-control-btn" onclick="designerZoomIn()" title="放大视图">${icons.arrowUp}</button>
           <span style="width:1px;height:16px;background:var(--md-outline-variant);margin:0 4px"></span>
-          <button class="canvas-control-btn" onclick="designerFitCanvas()" title="自适应画布大小">${icons.workflow}</button>
+          <button class="canvas-control-btn" onclick="designerFitCanvas()" title="自适应画布大小">${icons.fitView}</button>
         </div>
         ${designerMinimapVisible ? renderMinimap() : ''}
       </div>
@@ -2972,17 +2971,10 @@ function designerRedo() {
 
 // --- Fullscreen Toggle ---
 function toggleDesignerFullscreen() {
-  const shell = document.getElementById('shell');
+  const shell = document.getElementById('designerShell');
   if (!shell) return;
-  if (!designerFullscreen) {
-    if (shell.requestFullscreen) shell.requestFullscreen();
-    else if (shell.webkitRequestFullscreen) shell.webkitRequestFullscreen();
-    designerFullscreen = true;
-  } else {
-    if (document.exitFullscreen) document.exitFullscreen();
-    else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
-    designerFullscreen = false;
-  }
+  designerFullscreen = !designerFullscreen;
+  shell.classList.toggle('fullscreen', designerFullscreen);
   renderDesigner();
 }
 

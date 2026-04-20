@@ -21,6 +21,11 @@
   visibility: visible;
 }
 
+/* --- Immersive / Fullscreen Mode --- */
+.designer-shell.fullscreen .designer-toolbar {
+  display: none;
+}
+
 /* --- Top Toolbar --- */
 .designer-toolbar {
   height: 52px;
