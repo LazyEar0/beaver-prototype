@@ -944,9 +944,26 @@ function renderOverviewPanel() {
   const wf = designerWf;
   if (!wf) return '';
   const nodeCount = designerNodes.length;
-  const connCount = designerConnections.length;
-  const varCount = designerVariables.length;
   const problems = getProblems();
+
+  // 解析负责人名称
+  const ownerNames = (wf.owners || []).map(ownerId => {
+    const u = (typeof ssoUsers !== 'undefined' ? ssoUsers : []).find(u => u.id === ownerId);
+    return u ? u.name : String(ownerId);
+  });
+  const ownersDisplay = ownerNames.length > 0 ? ownerNames.join('、') : '-';
+
+  // 版本状态
+  const currentVer = (wf.versions || []).find(v => v.status === 'current');
+  const hasDraft = !currentVer || wf.version === 0;
+  const versionDisplay = wf.version > 0
+    ? `<span class="version-badge" style="font-size:11px">v${wf.version}</span>${hasDraft ? '' : '<span style="margin-left:6px;font-size:var(--font-size-xs);color:var(--md-outline)">（有未发布改动）</span>'}`
+    : '<span style="color:var(--md-outline-variant);font-size:var(--font-size-xs)">未发布</span>';
+
+  // 允许被引用
+  const allowRefDisplay = wf.allowRef
+    ? `<span style="color:var(--md-success);font-size:var(--font-size-xs)">● 已开启</span>`
+    : `<span style="color:var(--md-outline);font-size:var(--font-size-xs)">● 已关闭</span>`;
 
   return `
     <div class="right-panel-header">
@@ -959,17 +976,21 @@ function renderOverviewPanel() {
         <div class="wf-overview-desc">${wf.desc || '暂无描述'}</div>
         <div class="wf-overview-stats">
           <div class="wf-stat-card"><div class="wf-stat-card-label">节点数</div><div class="wf-stat-card-value">${nodeCount}</div></div>
-          <div class="wf-stat-card"><div class="wf-stat-card-label">连线数</div><div class="wf-stat-card-value">${connCount}</div></div>
-          <div class="wf-stat-card"><div class="wf-stat-card-label">变量数</div><div class="wf-stat-card-value">${varCount}</div></div>
           <div class="wf-stat-card"><div class="wf-stat-card-label">问题</div><div class="wf-stat-card-value" style="${problems.length > 0 ? 'color:var(--md-error)' : 'color:var(--md-success)'}">${problems.length}</div></div>
+          <div class="wf-stat-card"><div class="wf-stat-card-label">调试</div><div class="wf-stat-card-value" style="font-size:11px;${wf.debugPassed ? 'color:var(--md-success)' : 'color:var(--md-error)'}">${wf.debugPassed ? '通过' : '未通过'}</div></div>
         </div>
         <div class="config-section">
           <div class="config-section-title">基本信息</div>
           <div class="config-field"><div class="config-field-label">编号</div><div style="font-size:var(--font-size-sm);color:var(--md-on-surface);font-family:var(--font-family-mono)">${wf.code}</div></div>
-          <div class="config-field"><div class="config-field-label">类型</div><div style="font-size:var(--font-size-sm);color:var(--md-on-surface)">${wf.type === 'app' ? '应用流' : '对话流'}</div></div>
+          <div class="config-field"><div class="config-field-label">类型</div><div style="font-size:var(--font-size-sm);color:var(--md-on-surface)">${wf.type === 'app' ? '应用流' : (wf.type === 'chat' ? '对话流' : wf.type)}</div></div>
           <div class="config-field"><div class="config-field-label">创建者</div><div style="font-size:var(--font-size-sm);color:var(--md-on-surface)">${wf.creator}</div></div>
-          <div class="config-field"><div class="config-field-label">版本</div><div style="font-size:var(--font-size-sm);color:var(--md-on-surface)">${wf.version > 0 ? 'v' + wf.version : '未发布'}</div></div>
-          <div class="config-field"><div class="config-field-label">调试状态</div><div style="font-size:var(--font-size-sm);color:${wf.debugPassed ? 'var(--md-success)' : 'var(--md-error)'}">${wf.debugPassed ? '已通过' : '未通过'}</div></div>
+          <div class="config-field"><div class="config-field-label">负责人</div><div style="font-size:var(--font-size-sm);color:var(--md-on-surface)">${ownersDisplay}</div></div>
+          <div class="config-field"><div class="config-field-label">最近修改</div><div style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant)">${wf.editedAt || '-'}</div></div>
+        </div>
+        <div class="config-section">
+          <div class="config-section-title">版本与发布</div>
+          <div class="config-field"><div class="config-field-label">当前版本</div><div style="font-size:var(--font-size-sm)">${versionDisplay}</div></div>
+          <div class="config-field"><div class="config-field-label">允许被引用</div><div style="font-size:var(--font-size-sm)">${allowRefDisplay}</div></div>
         </div>
         ${designerVariables.length > 0 ? `
         <div class="config-section">

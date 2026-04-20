@@ -5866,6 +5866,131 @@ img { display: block; max-width: 100%; }
   color: var(--md-on-primary);
 }
 
+/* Version Tags */
+.version-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.version-tag svg {
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+}
+.version-tag-rollback {
+  background: rgba(139, 92, 246, 0.12);
+  color: #7c3aed;
+}
+.version-tag-unverified {
+  background: rgba(245, 158, 11, 0.12);
+  color: #b45309;
+}
+
+/* Version Status Current */
+.version-status-current {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--md-primary);
+  background: var(--md-primary-container, rgba(0,90,193,0.08));
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+}
+
+/* Version History List (Timeline) */
+.version-history-list {
+  padding: var(--space-3);
+}
+.version-history-item {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  transition: var(--transition-fast);
+}
+.version-history-item:hover {
+  background: var(--color-bg-hover, rgba(0,0,0,0.04));
+}
+.version-history-current {
+  background: rgba(0,90,193,0.04);
+}
+
+/* Version Timeline */
+.version-history-timeline {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 12px;
+  flex-shrink: 0;
+  padding-top: 6px;
+}
+.version-timeline-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid var(--md-outline-variant, #c4c7c9);
+  background: var(--md-surface, white);
+  flex-shrink: 0;
+}
+.version-timeline-dot.active {
+  border-color: var(--md-primary);
+  background: var(--md-primary);
+}
+.version-timeline-line {
+  width: 2px;
+  flex: 1;
+  min-height: 20px;
+  background: var(--md-outline-variant, #e0e0e0);
+  margin: 2px 0;
+}
+
+/* Version History Content */
+.version-history-content {
+  flex: 1;
+  min-width: 0;
+  padding-bottom: var(--space-2);
+}
+.version-history-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: 2px;
+}
+.version-history-info {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.version-history-actions {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.version-history-actions .btn.btn-ghost {
+  height: 24px;
+  font-size: 11px;
+  padding: 0 6px;
+  min-width: auto;
+}
+.version-history-meta {
+  font-size: 11px;
+  color: var(--md-outline);
+  line-height: 1.4;
+}
+.version-history-note {
+  font-size: 11px;
+  color: var(--md-on-surface-variant);
+  margin-top: 2px;
+  line-height: 1.4;
+}
+
 /* Data source name cell */
 .ds-name-cell {
   display: flex;
