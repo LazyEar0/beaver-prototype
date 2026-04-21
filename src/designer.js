@@ -3353,8 +3353,8 @@ function renderDebugPanel(logs) {
   if (filtered.length === 0) return `<div style="text-align:center;color:var(--md-outline);padding:var(--space-6);font-size:var(--font-size-sm)">无 ${designerDebugLogFilter.toUpperCase()} 级别的日志</div>`;
   return filtered.map((log, i) => {
     const hasDetail = log.detail && (typeof log.detail === 'object' && Object.keys(log.detail).length > 0);
-    const detailId = `debug-detail-${Date.now()}-${i}`;
     const evIcon = eventGroupIcon[log.event] || '●';
+    const hasErrorInfo = log.level === 'error' && (log.errorMessage || log.suggestedFix);
     return `<div class="debug-log-item debug-log-${log.level}" onclick="${hasDetail ? `this.querySelector('.debug-log-detail')?.classList.toggle('open')` : ''}">
       <span class="debug-log-time">${log.time.split('.')[0].split(' ')[1] || log.time}</span>
       <span class="debug-log-level ${log.level}">${levelLabel[log.level] || log.level.toUpperCase()}</span>
@@ -3362,6 +3362,10 @@ function renderDebugPanel(logs) {
       <span class="debug-log-ev">${evIcon}</span>
       <span class="debug-log-msg">${escHtml(log.message)}</span>
       ${hasDetail ? `<span class="debug-log-expand-hint">▸</span>` : ''}
+      ${hasErrorInfo ? `<div class="debug-log-error-info">
+        ${log.errorMessage ? `<div class="debug-log-error-reason"><span class="debug-log-error-label">原因</span><span>${escHtml(log.errorMessage)}</span></div>` : ''}
+        ${log.suggestedFix ? `<div class="debug-log-error-fix"><span class="debug-log-error-label">建议</span><span>${escHtml(log.suggestedFix)}</span></div>` : ''}
+      </div>` : ''}
       ${hasDetail ? `<div class="debug-log-detail"><pre class="debug-log-detail-pre">${escHtml(JSON.stringify(log.detail, null, 2))}</pre></div>` : ''}
     </div>`;
   }).join('');
@@ -4756,7 +4760,11 @@ function startDebugExecution() {
             logs.push({ time: nextTs(), level: 'info', node: node.name, event: 'node.completed', message: `HTTP 请求完成，状态码 ${statusCode}，耗时 ${dur}ms` });
           } else {
             const errMsg = 'Internal Server Error';
-            logs.push({ time: nextTs(), level: 'error', node: node.name, event: 'http.error', message: `HTTP ${statusCode} ${errMsg}，耗时 ${dur}ms`, detail: { statusCode, error: errMsg, url } });
+            logs.push({ time: nextTs(), level: 'error', node: node.name, event: 'http.error',
+              message: `HTTP ${statusCode} ${errMsg}，耗时 ${dur}ms`,
+              errorMessage: `远端服务器返回 ${statusCode} 错误：${errMsg}。可能原因：目标服务故障、请求参数格式错误或权限不足。`,
+              suggestedFix: `1. 检查请求 URL 是否正确：${url}\n2. 确认请求参数/Body格式符合接口要求\n3. 检查鉴权 Header（如 Authorization）是否已配置\n4. 联系接口提供方确认服务状态`,
+              detail: { statusCode, error: errMsg, url, method, requestHeaders: headers.length > 0 ? headers : '无自定义请求头', errorMessage: `远端服务器返回 ${statusCode}：${errMsg}`, suggestedFix: '检查URL/参数/鉴权Header，确认目标服务正常运行' } });
             logs.push({ time: nextTs(), level: 'warn', node: node.name, event: 'node.retry', message: '正在重试 (1/3)...' });
             logs.push({ time: nextTs(), level: 'info', node: node.name, event: 'node.completed', message: `重试成功，HTTP 200，耗时 ${dur + 120}ms` });
           }
@@ -4827,7 +4835,27 @@ function startDebugExecution() {
         case 'output': {
           const level = node.config?.level || 'INFO';
           const outputMode = node.config?.outputMode || 'variables';
-          logs.push({ time: nextTs(), level: level === 'ERROR' ? 'error' : level === 'WARN' ? 'warn' : 'info', node: node.name, event: 'output.write', message: `输出级别: ${level}，模式: ${outputMode}` });
+          const outputTemplate = node.config?.template || '';
+          const logLevel = level === 'ERROR' ? 'error' : level === 'WARN' ? 'warn' : 'info';
+          if (level === 'ERROR') {
+            const errScenarios = [
+              {
+                errorMessage: `输出内容为空：节点配置的输出模板未返回有效内容（当前模式: ${outputMode}）`,
+                suggestedFix: `确认「输出内容」配置：${outputMode === 'variables' ? '确认引用的变量不为空，可在全局变量面板查看变量当前值' : '确认模板表达式语法正确，如 ${变量名} 格式'}`,
+                detail: { outputLevel: level, outputMode, template: outputTemplate || '（未配置）', resolvedValue: null, errorMessage: '输出内容为空：节点配置的输出模板未返回有效内容', suggestedFix: '确认引用的变量不为空，上游节点是否已正确赋値' }
+              },
+              {
+                errorMessage: `变量引用无效：输出模板中引用的变量 \`output_content\` 在当前执行上下文中未定义`,
+                suggestedFix: `在「全局变量」面板中新增变量 output_content，或修改输出模板改为引用已存在的变量（如上游赋値节点的输出变量）`,
+                detail: { outputLevel: level, outputMode, template: outputTemplate || '${output_content}', resolvedValue: undefined, errorMessage: '变量引用无效：output_content 在当前执行上下文中未定义', suggestedFix: '在全局变量面板中新增该变量，或修改模板引用已存在的变量' }
+              }
+            ];
+            const sc = errScenarios[Math.floor(Math.random() * errScenarios.length)];
+            logs.push({ time: nextTs(), level: 'error', node: node.name, event: 'output.write', message: `输出级别: ${level}，模式: ${outputMode}`, errorMessage: sc.errorMessage, suggestedFix: sc.suggestedFix, detail: sc.detail });
+          } else {
+            const outputPreview = outputMode === 'variables' ? '{ result: "操作成功", count: 42 }' : (outputTemplate || '输出内容');
+            logs.push({ time: nextTs(), level: logLevel, node: node.name, event: 'output.write', message: `输出级别: ${level}，模式: ${outputMode}`, detail: { outputLevel: level, outputMode, template: outputTemplate || '（使用默认模板）', resolvedValue: outputPreview } });
+          }
           logs.push({ time: nextTs(), level: 'info', node: node.name, event: 'node.completed', message: `输出完成，耗时 ${dur}ms` });
           break;
         }
