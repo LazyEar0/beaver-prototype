@@ -1130,10 +1130,7 @@ function renderWsDetailPage(ws) {
       <div class="ws-detail-compact-meta">
         <span class="ws-detail-meta-item">${icons.hash} ${ws.code}</span>
         ${ws.desc ? `<span class="ws-detail-meta-sep">·</span><span class="ws-detail-meta-item" style="color:var(--md-on-surface-variant)">${ws.desc}</span>` : ''}
-        <span class="ws-detail-meta-sep">·</span>
-        <span class="ws-detail-meta-item">${icons.calendar} ${ws.createdAt}</span>
-        <span class="ws-detail-meta-sep">·</span>
-        <span class="ws-detail-meta-item">${icons.clock} 活跃 ${ws.lastActiveAt}</span>
+
       </div>
     </div>
     <div class="tabs-container">
