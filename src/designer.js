@@ -3115,7 +3115,7 @@ function renderDesignerSettingsPanel() {
 
       <div class="settings-section" style="border:1px solid var(--md-error-container,#ffdad6);border-radius:var(--radius-md);background:var(--md-error-container,#fff8f7);margin-top:var(--space-4)">
         <div class="settings-section-title" style="color:var(--md-error)">${icons.trash} 危险操作</div>
-        <div style="font-size:var(--font-size-xs);color:var(--md-on-surface-variant);margin-bottom:var(--space-3);line-height:1.6">删除后，该工作流的所有版本和执行记录将被一并删除，此操作不可恢复。</div>
+        <div style="font-size:var(--font-size-xs);color:var(--md-on-surface-variant);margin-bottom:var(--space-3);line-height:1.6">删除后，该工作流的所有版本将被删除，此操作不可恢复。执行记录将保留。</div>
         <button class="btn btn-danger" style="width:100%" onclick="showDeleteWfFromDesigner(${wf.id})">${icons.trash} 删除此工作流</button>
       </div>
     </div>`;
@@ -3134,7 +3134,7 @@ function toggleSettingsSection(titleEl) {
 function showDeleteWfFromDesigner(wfId) {
   const wf = (wsWorkflows[designerWsId] || []).find(x => x.id === wfId); if (!wf) return;
   showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">删除工作流</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
-<div class="delete-warning"><span class="delete-warning-icon">${icons.alertTriangle}</span><div class="delete-warning-text">删除后，该工作流的所有版本和 ${wf.execCount} 条执行记录将被一并删除，此操作不可恢复。${wf.runningCount > 0 ? `<br><br><strong style="color:var(--md-error)">当前有 ${wf.runningCount} 个运行中实例，删除后将被终止。</strong>` : ''}</div></div>
+<div class="delete-warning"><span class="delete-warning-icon">${icons.alertTriangle}</span><div class="delete-warning-text">删除后，该工作流的所有版本将被删除，此操作不可恢复。执行记录将保留。${wf.runningCount > 0 ? `<br><br><strong style="color:var(--md-error)">当前有 ${wf.runningCount} 个运行中实例，删除后将被终止。</strong>` : ''}</div></div>
 <div class="delete-confirm-input" style="margin-top:var(--space-4)"><label class="delete-confirm-label">请输入工作流编号以确认删除：<strong>${wf.code}</strong></label><input type="text" class="form-input" id="deleteWfConfirmDesigner" placeholder="请输入工作流编号" oninput="onDeleteWfConfirmInputDesigner(${wfId})" style="width:100%" /></div>
 </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-danger" id="confirmDeleteWfBtnDesigner" disabled style="opacity:0.5;cursor:not-allowed;pointer-events:none" onclick="deleteWfFromDesigner(${wfId})">确认删除</button></div></div>`);
   setTimeout(() => document.getElementById('deleteWfConfirmDesigner')?.focus(), 300);
@@ -3149,9 +3149,8 @@ function onDeleteWfConfirmInputDesigner(wfId) {
 function deleteWfFromDesigner(wfId) {
   const wf = (wsWorkflows[designerWsId] || []).find(x => x.id === wfId); if (!wf) return;
   wsWorkflows[designerWsId] = (wsWorkflows[designerWsId] || []).filter(x => x.id !== wfId);
-  wsExecutions[designerWsId] = (wsExecutions[designerWsId] || []).filter(e => e.wfId !== wfId);
   closeModal();
-  showToast('success', '删除成功', `工作流「${wf.name}」已删除`);
+  showToast('success', '删除成功', `工作流「${wf.name}」已删除，执行记录已保留`);
   designerDirty = false;
   setTimeout(forceCloseDesigner, 800);
 }
