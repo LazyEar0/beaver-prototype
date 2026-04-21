@@ -2697,13 +2697,11 @@ function renderMemberTabContent(ws, isAdmin) {
 function switchMemberTab(tab) { wsMemberTab = tab; wsMemberSearch = ''; render(); }
 function filterMemberSearch(val) {
   wsMemberSearch = val;
-  const ws = workspaces.find(w => w.id === wsCurrentId); if (!ws) return;
-  const isAdmin = ws.myRole === 'admin';
-  const tabContent = document.querySelector('.tab-content'); if (!tabContent) return;
-  const cursorPos = document.getElementById('member-search-input')?.selectionStart;
-  tabContent.innerHTML = renderMemberTabContent(ws, isAdmin);
-  const inp = document.getElementById('member-search-input');
-  if (inp) { inp.focus(); if (cursorPos != null) inp.setSelectionRange(cursorPos, cursorPos); }
+  render();
+  requestAnimationFrame(() => {
+    const inp = document.getElementById('member-search-input');
+    if (inp) { inp.focus(); inp.setSelectionRange(val.length, val.length); }
+  });
 }
 
 // --- Workspace CRUD ---
