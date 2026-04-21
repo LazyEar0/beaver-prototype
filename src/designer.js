@@ -65,14 +65,13 @@ const nodeTypes = [
   { type: 'if', name: 'IF 条件', icon: '🔀', color: 'node-color-logic', category: '流程控制', desc: '根据条件表达式判断，将流程分为 TRUE / FALSE 两个分支', code: 'if' },
   { type: 'switch', name: 'Switch', icon: '🔃', color: 'node-color-logic', category: '流程控制', desc: '多条件分支路由，支持首次匹配或全部匹配，含 Default 分支', code: 'switch' },
   { type: 'loop', name: '循环', icon: '🔄', color: 'node-color-logic', category: '流程控制', desc: '循环执行，支持 ForEach 遍历、While 条件循环、Break 中断', code: 'loop' },
-  { type: 'break', name: 'Break', icon: '🛑', color: 'node-color-break', category: '流程控制', desc: '跳出当前循环，只能放在循环节点的循环体内', code: 'break' },
   { type: 'delay', name: '延迟', icon: '⏱️', color: 'node-color-logic', category: '流程控制', desc: '延迟执行后续节点，支持固定时长或到达指定时间', code: 'delay' },
-  { type: 'assign', name: '赋值', icon: '📝', color: 'node-color-data', category: '数据处理', desc: '变量赋值操作，支持表达式计算和 ${变量名} 引用', code: 'assign' },
-  { type: 'output', name: '输出', icon: '📤', color: 'node-color-data', category: '数据处理', desc: '输出数据到下游节点，支持变量模式（结构化输出）和文本模式（模板输出）', code: 'output' },
-  { type: 'code', name: '代码', icon: '💻', color: 'node-color-data', category: '数据处理', desc: '编写自定义脚本（JS / Python），实现复杂数据处理逻辑', code: 'code' },
+  { type: 'assign', name: '赋值', icon: '📝', color: 'node-color-data', category: '数据与执行', desc: '变量赋值操作，支持表达式计算和 ${变量名} 引用', code: 'assign' },
+  { type: 'output', name: '输出', icon: '📤', color: 'node-color-data', category: '数据与执行', desc: '输出数据到下游节点，支持变量模式（结构化输出）和文本模式（模板输出）', code: 'output' },
+  { type: 'code', name: '代码', icon: '💻', color: 'node-color-data', category: '数据与执行', desc: '编写自定义脚本（JS / Python），实现复杂数据处理逻辑', code: 'code' },
   { type: 'http', name: 'HTTP 请求', icon: '🌐', color: 'node-color-integration', category: '集成', desc: 'HTTP 请求调用，支持 GET/POST/PUT/DELETE，可配置请求头和请求体', code: 'http' },
   { type: 'mq', name: 'MQ 发送', icon: '📨', color: 'node-color-integration', category: '集成', desc: '向消息队列发送消息，需配置 Topic，支持消息 Key 和属性', code: 'mq' },
-  { type: 'workflow', name: '工作流', icon: '🔗', color: 'node-color-flow', category: '集成', desc: '调用被授权且支持引用的工作流，支持输入参数映射', code: 'wf' },
+  { type: 'workflow', name: '工作流', icon: '🔗', color: 'node-color-flow', category: '扩展能力', desc: '调用被授权且支持引用的工作流，支持输入参数映射', code: 'wf' },
   { type: 'placeholder', name: '占位节点', icon: '⬜', color: 'node-color-placeholder', category: '其他', desc: '标记待完善的流程分支，可后续转换为具体节点类型', code: 'placeholder' },
 ];
 
@@ -447,6 +446,10 @@ function renderDesigner() {
       <div class="designer-toolbar-left">
         <button class="designer-back-btn" onclick="closeDesigner()" title="返回">${icons.arrowLeft}</button>
         <span class="designer-wf-name" title="${wf.name}">${wf.name}</span>
+        ${wf.type === 'chat'
+          ? `<span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;padding:2px 8px;border-radius:var(--radius-full);background:linear-gradient(135deg,#eff6ff,#dbeafe);color:#1d4ed8;border:1px solid #93c5fd">💬 对话流</span>`
+          : `<span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;padding:2px 8px;border-radius:var(--radius-full);background:linear-gradient(135deg,#f0fdf4,#dcfce7);color:#15803d;border:1px solid #86efac">⚙️ 应用流</span>`
+        }
         <span class="designer-wf-status status-badge ${statusClass[wf.status]}">${statusLabel[wf.status]}</span>
         ${wf.version > 0 ? `<span class="version-badge">v${wf.version}</span>` : ''}
         <span class="designer-save-indicator" id="designerSaveIndicator">${icons.check} <span>已保存</span></span>
@@ -1207,12 +1210,23 @@ function parseCronToText(expr) {
 
 function renderTriggerConfig(node) {
   // Support multiple trigger types with Tab + independent enable switches (PRD requirement)
-  const enabledTypes = node.config?.enabledTypes || { manual: true, scheduled: false, event: false, webhook: false };
+  const wfType = designerWf?.type || 'app';
+  const isChat = wfType === 'chat';
+  const defaultEnabledTypes = isChat
+    ? { message: true, manual: false, scheduled: false, event: false, webhook: false }
+    : { manual: true, scheduled: false, event: false, webhook: false };
+  const enabledTypes = node.config?.enabledTypes || defaultEnabledTypes;
   // Active tab for configuration detail display
-  const activeTab = node.config?.activeTriggerTab || 'manual';
+  const activeTab = node.config?.activeTriggerTab || (isChat ? 'message' : 'manual');
   const inputParams = node.config?.inputParams || [];
 
-  const triggerTabs = [
+  const triggerTabs = isChat ? [
+    { key: 'message', label: '消息触发', icon: '💬' },
+    { key: 'manual', label: '手动触发', icon: '👆' },
+    { key: 'scheduled', label: '定时触发', icon: '🕐' },
+    { key: 'event', label: '事件触发', icon: '📡' },
+    { key: 'webhook', label: 'Webhook', icon: '🔗' },
+  ] : [
     { key: 'manual', label: '手动触发', icon: '👆' },
     { key: 'scheduled', label: '定时触发', icon: '🕐' },
     { key: 'event', label: '事件触发', icon: '📡' },
@@ -1223,7 +1237,7 @@ function renderTriggerConfig(node) {
 
   let html = `<div class="config-section">
     <div class="config-section-title">触发方式</div>
-    <div class="config-field-help" style="margin-bottom:var(--space-2)">至少启用一种触发方式，可同时启用多种，任一满足即可触发工作流</div>
+    <div class="config-field-help" style="margin-bottom:var(--space-2)">${isChat ? '对话流默认启用消息触发，由用户发送消息启动流程；也可启用其他触发方式用于自动化场景' : '至少启用一种触发方式，可同时启用多种，任一满足即可触发工作流'}</div>
     ${enabledCount === 0 ? '<div style="padding:6px 10px;background:var(--md-error-container,rgba(179,38,30,0.1));border-radius:var(--radius-sm);font-size:var(--font-size-xs);color:var(--md-error);margin-bottom:var(--space-2)">⚠ 至少启用一种触发方式</div>' : ''}
     <div class="trigger-tabs">
       ${triggerTabs.map(t => {
@@ -1244,6 +1258,36 @@ function renderTriggerConfig(node) {
   // Render the active tab's configuration detail
   html += `<div class="config-section">
     <div class="config-section-title">${triggerTabs.find(t => t.key === activeTab)?.icon || ''} ${triggerTabs.find(t => t.key === activeTab)?.label || ''}配置</div>`;
+
+  if (activeTab === 'message') {
+    html += `<div class="config-field-help" style="margin-bottom:var(--space-2)">适用于对话场景，由用户发送消息触发流程执行，支持多轮对话</div>
+    <div class="config-field">
+      <div class="config-field-label">内置变量</div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--md-surface-container);border-radius:var(--radius-sm);font-size:var(--font-size-xs)">
+          <span style="font-family:var(--font-family-mono);color:var(--md-primary);min-width:120px">query</span>
+          <span style="color:var(--md-on-surface-variant)">用户当前输入的消息内容</span>
+          <span style="margin-left:auto;color:var(--md-outline);font-size:10px">String</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--md-surface-container);border-radius:var(--radius-sm);font-size:var(--font-size-xs)">
+          <span style="font-family:var(--font-family-mono);color:var(--md-primary);min-width:120px">files</span>
+          <span style="color:var(--md-on-surface-variant)">用户上传的文件列表</span>
+          <span style="margin-left:auto;color:var(--md-outline);font-size:10px">Array[File]</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--md-surface-container);border-radius:var(--radius-sm);font-size:var(--font-size-xs)">
+          <span style="font-family:var(--font-family-mono);color:var(--md-primary);min-width:120px">conversation_id</span>
+          <span style="color:var(--md-on-surface-variant)">当前会话的唯一标识，跨轮次保持不变</span>
+          <span style="margin-left:auto;color:var(--md-outline);font-size:10px">String</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--md-surface-container);border-radius:var(--radius-sm);font-size:var(--font-size-xs)">
+          <span style="font-family:var(--font-family-mono);color:var(--md-primary);min-width:120px">user_id</span>
+          <span style="color:var(--md-on-surface-variant)">当前对话用户的唯一标识</span>
+          <span style="margin-left:auto;color:var(--md-outline);font-size:10px">String</span>
+        </div>
+      </div>
+      <div class="config-field-help">内置变量可在下游节点中通过 \${trigger_1.query\} 等方式引用</div>
+    </div>`;
+  }
 
   if (activeTab === 'manual') {
     html += `<div class="config-field-help" style="margin-bottom:var(--space-2)">适用于需要人工手动启动的场景，如数据处理任务、报表生成、临时数据修复</div>`;
@@ -1921,7 +1965,7 @@ function renderCodeConfig(node) {
     node.config.codeOutputVars = [{ name: 'result', type: 'Object', desc: '代码 return 返回的结果' }];
   }
   const codeOutputVars = node.config.codeOutputVars;
-  const typeOptions = ['String', 'Number', 'Boolean', 'Object', 'Array', 'DateTime'];
+  const typeOptions = ['String', 'Integer', 'Double', 'Boolean', 'DateTime', 'Object', 'File'];
   
   const outputDeclHtml = `
     <div class="config-section" style="margin-top:var(--space-2)">
@@ -2113,7 +2157,7 @@ function renderAssignConfig(node) {
   const upstreamPreview = renderUpstreamOutputPreview(node.id);
   const outputVarsSection = renderOutputVariablesSection(node);
   const assignments = node.config?.assignments || [{ target: 'processedData', source: '', type: 'String' }];
-  const typeOptions = ['String', 'Number', 'Boolean', 'Object', 'Array'];
+  const typeOptions = ['String', 'Integer', 'Double', 'Boolean', 'DateTime', 'Object', 'File'];
   
   return `<div class="config-section">
     <div class="config-section-title">赋值规则</div>
@@ -2278,8 +2322,10 @@ function removeOutputVar(nodeId, index) {
 function renderOutputConfig(node) {
   const upstreamPreview = renderUpstreamOutputPreview(node.id);
   const outputVarsSection = renderOutputVariablesSection(node);
+  const wfType = designerWf?.type || 'app';
+  const isChat = wfType === 'chat';
   const mode = node.config?.outputMode || 'variables';
-  const typeOptions = ['String', 'Number', 'Boolean', 'Object', 'Array[String]', 'Array[Object]'];
+  const typeOptions = ['String', 'Integer', 'Double', 'Boolean', 'DateTime', 'Object', 'File'];
 
   // Variable mode content
   const outputVars = node.config?.outputVars || [{ name: 'result', type: 'String', source: '' }];
@@ -2330,6 +2376,48 @@ function renderOutputConfig(node) {
       })}
     </div>
     <div class="config-field-help" style="margin-top:2px">文本模式下，所有内容合并输出为一个 <code style="background:var(--md-surface-container);padding:0 3px;border-radius:2px">text</code> 变量</div>`;
+
+  // Chat flow reply mode content
+  const replyMode = node.config?.replyMode || 'streaming';
+  const chatOutputHtml = `
+    <div class="config-field-help" style="background:linear-gradient(135deg,#ecfdf5 0%,#f0fdf4 100%);border:1px solid #86efac;border-radius:var(--radius-md);padding:var(--space-2) var(--space-3);margin-bottom:var(--space-3);color:#166534;font-size:var(--font-size-xs)">
+      💬 <strong>对话流回复模式</strong> — 此节点向用户发送回复内容，流程继续执行（非终止性）
+    </div>
+    <div class="config-field">
+      <div class="config-field-label">回复模式</div>
+      <div style="display:flex;gap:var(--space-2);margin-top:var(--space-1)">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:var(--font-size-xs);padding:6px 10px;border:1px solid ${replyMode === 'streaming' ? 'var(--md-primary)' : 'var(--md-outline-variant)'};border-radius:var(--radius-md);background:${replyMode === 'streaming' ? 'var(--md-primary-container)' : 'transparent'};color:${replyMode === 'streaming' ? 'var(--md-primary)' : 'var(--md-on-surface-variant)'}">
+          <input type="radio" name="replyMode_${node.id}" value="streaming" ${replyMode === 'streaming' ? 'checked' : ''} onchange="updateNodeConfig(${node.id},'replyMode',this.value)" style="display:none" />
+          <span>⚡ 流式文本</span>
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:var(--font-size-xs);padding:6px 10px;border:1px solid ${replyMode === 'rich' ? 'var(--md-primary)' : 'var(--md-outline-variant)'};border-radius:var(--radius-md);background:${replyMode === 'rich' ? 'var(--md-primary-container)' : 'transparent'};color:${replyMode === 'rich' ? 'var(--md-primary)' : 'var(--md-on-surface-variant)'}">
+          <input type="radio" name="replyMode_${node.id}" value="rich" ${replyMode === 'rich' ? 'checked' : ''} onchange="updateNodeConfig(${node.id},'replyMode',this.value)" style="display:none" />
+          <span>📄 富文本</span>
+        </label>
+      </div>
+      <div class="config-field-help">流式文本逐字输出，适合 LLM 回复；富文本一次性发送，支持 Markdown 格式</div>
+    </div>
+    <div class="config-field">
+      <div class="config-field-label">回复内容</div>
+      ${renderExprEditor({
+        id: `output_reply_${node.id}`,
+        value: node.config?.replyContent || '',
+        placeholder: '输入回复内容，支持 {{节点.变量路径}} 引用上游变量',
+        nodeId: node.id,
+        minHeight: 80,
+        hint: '此内容将直接发送给对话用户，支持变量插值',
+        onChange: `updateNodeConfig(${node.id}, 'replyContent', this.value)`
+      })}
+    </div>`;
+
+  if (isChat) {
+    return `<div class="config-section">
+    <div class="config-section-title">输出配置</div>
+    ${chatOutputHtml}
+    ${upstreamPreview}
+  </div>
+  ${outputVarsSection}`;
+  }
 
   return `<div class="config-section">
     <div class="config-section-title" style="display:flex;align-items:center;justify-content:space-between">
@@ -2655,7 +2743,7 @@ function renderSubWfConfig(node) {
     node.config.wfOutputVars = [{ name: node.config.outputVar || 'wfResult', type: 'Object', desc: '被调用工作流的返回结果' }];
   }
   const wfOutputVars = node.config.wfOutputVars;
-  const wfTypeOptions = ['String', 'Number', 'Boolean', 'Object', 'Array', 'DateTime'];
+  const wfTypeOptions = ['String', 'Integer', 'Double', 'Boolean', 'DateTime', 'Object', 'File'];
   
   const wfOutputDeclHtml = `
     <div class="config-section" style="margin-top:var(--space-2)">
@@ -2790,12 +2878,23 @@ function removeWfOutputVar(nodeId, index) {
 }
 
 function renderEndConfig(node) {
+  const wfType = designerWf?.type || 'app';
+  const isChat = wfType === 'chat';
   return `<div class="config-section">
     <div class="config-section-title">结束配置</div>
+    ${isChat ? `
+    <div class="config-field-help" style="background:linear-gradient(135deg,#eff6ff 0%,#f0f9ff 100%);border:1px solid #93c5fd;border-radius:var(--radius-md);padding:var(--space-2) var(--space-3);margin-bottom:var(--space-3);color:#1e3a8a;font-size:var(--font-size-xs)">
+      💭 <strong>对话流结束语义</strong> — 结束当前轮次执行，会话上下文保持，等待用户下一轮输入
+    </div>
+    <div class="config-field">
+      <div class="config-field-label">最终回复 <span style="font-size:10px;color:var(--md-outline);font-weight:400">(可选)</span></div>
+      <textarea class="config-textarea" rows="2" placeholder="轮次结束时额外发送的收尾语，留空则不发送" onchange="updateNodeConfig(${node.id}, 'finalReply', this.value)">${escHtml(node.config?.finalReply || '')}</textarea>
+      <div class="config-field-help">留空表示本轮最后一条回复已由 Output 节点发送</div>
+    </div>` : `
     <div class="config-field">
       <div class="config-field-label">输出变量映射</div>
       <textarea class="expr-editor" placeholder='{"result": "processedData"}'>${node.config?.outputMapping || ''}</textarea>
-    </div>
+    </div>`}
   </div>`;
 }
 
