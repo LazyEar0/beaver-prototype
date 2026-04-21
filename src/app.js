@@ -2669,15 +2669,18 @@ function renderMemberTabContent(ws, isAdmin) {
   const membersByRole = ws.members.filter(m => m.role === wsMemberTab);
   const q = (wsMemberSearch || '').trim().toLowerCase();
   const membersBySearch = q ? membersByRole.filter(m => m.name.toLowerCase().includes(q)) : membersByRole;
-  const searchBar = `<div style="display:flex;align-items:center;gap:var(--space-2);margin-bottom:var(--space-3);">
-    <div class="search-box" style="flex:1;max-width:300px;">
-      ${icons.search}
-      <input id="member-search-input" class="search-input" placeholder="搜索用户名..." value="${wsMemberSearch || ''}" oninput="filterMemberSearch(this.value)" style="padding-left:36px;" />
-    </div>
-    ${isAdmin ? `<button class="btn btn-primary btn-sm" onclick="showAddMemberModal()">${icons.plus}<span>添加${roleLabels[wsMemberTab]}</span></button>` : ''}
+
+  const toolbar = `<div class="tab-toolbar">
+    <div class="tab-toolbar-left"><span class="item-count">共 <strong>${membersBySearch.length}</strong> 位${roleLabels[wsMemberTab]}</span></div>
+    <div class="tab-toolbar-right">${isAdmin ? `<button class="btn btn-primary btn-sm" onclick="showAddMemberModal()">${icons.plus}<span>添加${roleLabels[wsMemberTab]}</span></button>` : ''}</div>
   </div>`;
+  const searchBar = `<div class="filter-search" style="margin-bottom:var(--space-4);height:36px;padding:0 var(--space-3);">
+    ${icons.search}
+    <input id="member-search-input" placeholder="搜索用户名..." value="${wsMemberSearch || ''}" oninput="filterMemberSearch(this.value)" />
+  </div>`;
+
   if (membersByRole.length === 0) {
-    return searchBar + `<div class="empty-state" style="padding:var(--space-10) var(--space-8)"><img src="./public/images/empty-members.png" alt="暂无成员" style="width:140px;margin-bottom:var(--space-4);opacity:0.7;" /><div class="empty-state-title">暂无${roleLabels[wsMemberTab]}</div><div class="empty-state-desc">当前角色分组暂无成员</div></div>`;
+    return toolbar + `<div class="empty-state" style="padding:var(--space-10) var(--space-8)"><img src="./public/images/empty-members.png" alt="暂无成员" style="width:140px;margin-bottom:var(--space-4);opacity:0.7;" /><div class="empty-state-title">暂无${roleLabels[wsMemberTab]}</div><div class="empty-state-desc">当前角色分组暂无成员</div></div>`;
   }
   const listHtml = membersBySearch.length === 0
     ? `<div class="empty-state" style="padding:var(--space-8)"><div class="empty-state-title">未找到匹配的成员</div><div class="empty-state-desc">请尝试其他用户名关键词</div></div>`
@@ -2687,7 +2690,7 @@ function renderMemberTabContent(ws, isAdmin) {
     ${isAdmin ? `<div class="member-actions"><select class="member-role-select" onchange="changeMemberRole(${ws.id}, ${m.userId}, this.value)"><option value="admin" ${m.role === 'admin' ? 'selected' : ''}>管理员</option><option value="member" ${m.role === 'member' ? 'selected' : ''}>成员</option><option value="viewer" ${m.role === 'viewer' ? 'selected' : ''}>只读查看者</option></select><button class="btn btn-ghost btn-sm" style="color:var(--md-error)" onclick="showRemoveMemberModal(${ws.id}, ${m.userId})">${icons.removeUser}<span>移除</span></button></div>` : ''}
     </div>`;
   }).join('')}</div>`;
-  return `<div class="tab-toolbar"><div class="tab-toolbar-left"><span class="item-count">共 <strong>${membersBySearch.length}</strong> 位${roleLabels[wsMemberTab]}</span></div></div>${searchBar}${listHtml}`;
+  return toolbar + searchBar + listHtml;
 }
 function switchMemberTab(tab) { wsMemberTab = tab; wsMemberSearch = ''; render(); }
 function filterMemberSearch(val) {
