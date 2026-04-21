@@ -201,6 +201,8 @@ let wsExecPageSize = 10;
 let wsExecStatusFilter = 'all';
 let wsExecTriggerFilter = 'all';
 let wsExecTimeRange = 'all';
+let wsExecDateFrom = '';
+let wsExecDateTo = '';
 let wsExecDetailId = null;
 let wsExecSelectedNodeIdx = null; // right panel: selected node index
 let wsExecNodeSearch = ''; // node timeline search filter
@@ -304,7 +306,7 @@ let wsExecutions = {
         { name: '订单校验', type: '代码节点', status: 'success', duration: '1.2秒', startTime: '13:45:00', inputData: { orderId: 'ORD-2025041300128' }, outputData: { valid: true, orderStatus: 'pending', amount: 1376 }, variables: { traceId: 'tr-7b2e-d412', orderId: 'ORD-2025041300128' } },
         { name: '供应商确认', type: 'HTTP请求', status: 'running', duration: '进行中', startTime: '13:45:01', inputData: { url: 'https://api.supplier.com/confirm', method: 'POST', body: { orderId: 'ORD-2025041300128' } }, outputData: null, variables: { traceId: 'tr-7b2e-d412', orderId: 'ORD-2025041300128', confirmAttempt: 1 } },
       ], alerts: [] },
-    { id: 2003, wfId: 2, wfName: '酒店预订确认', wfCode: 'HTL_CONFIRM', version: 2, trigger: 'event', status: 'running', startTime: '2025-04-13 12:30:00', endTime: '-', duration: '1小时+', triggerUser: '系统', archived: false,
+    { id: 2003, wfId: 2, wfName: '酒店预订确认', wfCode: 'HTL_CONFIRM', version: 2, trigger: 'webhook', status: 'running', startTime: '2025-04-13 12:30:00', endTime: '-', duration: '1小时+', triggerUser: '系统',
       inputs: { orderId: { label: '订单编号', type: 'String', value: 'ORD-2025041300096' }, eventType: { label: '触发事件', type: 'String', value: 'order.created' } },
       nodes: [
         { name: '事件触发', type: '事件触发', status: 'success', duration: '0.1秒', startTime: '12:30:00', inputData: { eventType: 'order.created', eventId: 'evt-9c4d' }, outputData: { orderId: 'ORD-2025041300096' }, variables: { traceId: 'tr-5a1c-e003' } },
@@ -347,11 +349,11 @@ let wsExecutions = {
         { name: 'Booking同步', type: 'HTTP请求', status: 'success', duration: '6分', startTime: '02:05:00', inputData: { url: 'https://api.booking.com/prices', method: 'GET' }, outputData: { records: 560, updated: 32 }, variables: { env: 'production', supplier: 'booking' } },
         { name: '数据整合', type: '代码节点', status: 'success', duration: '20秒', startTime: '02:15:00', inputData: { sources: ['expedia', 'booking'] }, outputData: { mergedRecords: 1240, conflicts: 3, resolved: 3 }, variables: { env: 'production', totalRecords: 1240 } },
       ], alerts: [] },
-    { id: 2008, wfId: 7, wfName: '预订数据报表', wfCode: 'HTL_REPORT', version: 1, trigger: 'scheduled', status: 'paused', startTime: '2025-04-05 06:00:00', endTime: '-', duration: '8天+', triggerUser: '系统', archived: false, stale: true,
+    { id: 2008, wfId: 7, wfName: '预订数据报表', wfCode: 'HTL_REPORT', version: 1, trigger: 'scheduled', status: 'suspended', startTime: '2025-04-05 06:00:00', endTime: '-', duration: '8天+', triggerUser: '系统', stale: true,
       inputs: { reportType: { label: '报表类型', type: 'String', value: 'daily_booking' }, dateRange: { label: '数据范围', type: 'String', value: '2025-04-04' }, schedule: { label: '执行计划', type: 'String', value: '0 6 * * * (每日早晨6点)' } },
       nodes: [
         { name: '定时触发', type: '定时触发', status: 'success', duration: '0.1秒', startTime: '06:00:00', inputData: { schedule: '0 6 * * *' }, outputData: { triggerTime: '2025-04-05T06:00:00Z' }, variables: { env: 'production' } },
-        { name: '报表生成', type: '代码节点', status: 'paused', duration: '已暂停', startTime: '06:02:00', inputData: { reportType: 'daily_booking', dateRange: '2025-04-04' }, outputData: null, variables: { env: 'production', reportType: 'daily_booking' } },
+        { name: '报表生成', type: '代码节点', status: 'suspended', duration: '已挂起', startTime: '06:02:00', inputData: { reportType: 'daily_booking', dateRange: '2025-04-04' }, outputData: null, variables: { env: 'production', reportType: 'daily_booking' } },
       ], alerts: [
         { time: '2025-04-12 06:00:00', type: '执行异常滞留', level: '警告', pushStatus: 'success' },
         { time: '2025-04-05 06:30:00', type: '流程执行超时', level: '严重', pushStatus: 'success' },
@@ -374,7 +376,7 @@ let wsExecutions = {
         { name: '调用搜索API', type: 'HTTP请求', status: 'success', duration: '1分15秒', startTime: '10:00:01', inputData: { url: 'https://api.hotel-supplier.com/v2/search', method: 'POST', body: { city_code: 'SZX', checkin: '2025-01-20', checkout: '2025-01-21' } }, outputData: { statusCode: 200, resultCount: 8, responseSize: '5.1KB' }, variables: { env: 'production', traceId: 'tr-1a3b-0115', apiCallCount: 1 } },
         { name: '返回结果', type: '结束节点', status: 'success', duration: '0.1秒', startTime: '10:01:29', inputData: { hotelCount: 8 }, outputData: { success: true }, variables: { env: 'production', traceId: 'tr-1a3b-0115' } },
       ], alerts: [] },
-    { id: 2011, wfId: 2, wfName: '酒店预订确认', wfCode: 'HTL_CONFIRM', version: 3, trigger: 'event', status: 'completed', startTime: '2025-04-14 09:00:00', endTime: '2025-04-14 09:08:45', duration: '8分45秒', triggerUser: '系统',  archived: false,
+    { id: 2011, wfId: 2, wfName: '酒店预订确认', wfCode: 'HTL_CONFIRM', version: 3, trigger: 'webhook', status: 'completed', startTime: '2025-04-14 09:00:00', endTime: '2025-04-14 09:08:45', duration: '8分45秒', triggerUser: '系统',
       inputs: { orderId: { label: '订单编号', type: 'String', value: 'ORD-2025041400201' }, guestName: { label: '入住人', type: 'String', value: 'Zhang Wei' }, hotelId: { label: '酒店ID', type: 'String', value: 'HTL-00582' }, roomType: { label: '房型', type: 'String', value: 'Deluxe King' }, checkIn: { label: '入住日期', type: 'DateTime', value: '2025-04-20 14:00:00' }, checkOut: { label: '退房日期', type: 'DateTime', value: '2025-04-23 12:00:00' }, totalAmount: { label: '总金额', type: 'Double', value: '3280.00' } },
       outputs: { confirmNo: { label: '确认号', type: 'String', value: 'CNF-20250414-00582-A' }, voucherUrl: { label: '确认函链接', type: 'String', value: 'https://docs.beaver.com/voucher/CNF-20250414-00582-A.pdf' }, notifyStatus: { label: '通知状态', type: 'String', value: '邮件+短信已发送' } },
       nodes: [
@@ -391,7 +393,7 @@ let wsExecutions = {
         { name: '邮件通知客人', type: '消息通知', status: 'success', duration: '1.5秒', startTime: '09:05:25', inputData: { to: 'zhangwei@example.com', template: 'booking_confirmation', attachments: ['voucher.pdf'] }, outputData: { messageId: 'MSG-e7a1', channel: 'email', delivered: true }, variables: { traceId: 'tr-e1b4-f201', emailSent: true } },
         { name: '短信通知客人', type: '消息通知', status: 'success', duration: '0.8秒', startTime: '09:05:27', inputData: { to: '+86-138****7890', template: 'booking_sms_confirm', content: '您的预订已确认，确认号：CNF-20250414-00582-A' }, outputData: { messageId: 'SMS-b3f2', channel: 'sms', delivered: true }, variables: { traceId: 'tr-e1b4-f201', smsSent: true } },
         { name: '积分发放', type: 'HTTP请求', status: 'success', duration: '0.6秒', startTime: '09:05:28', inputData: { url: 'https://api.internal.com/loyalty/credit', method: 'POST', body: { guestId: 'USR-10482', points: 312, reason: 'booking_reward' } }, outputData: { newBalance: 13112, transactionId: 'LYL-c4d8' }, variables: { traceId: 'tr-e1b4-f201', pointsCredited: true } },
-        { name: '数据归档与日志', type: '代码节点', status: 'success', duration: '0.3秒', startTime: '09:05:28', inputData: { orderId: 'ORD-2025041400201', archiveTarget: 'data-warehouse' }, outputData: { archived: true, logEntries: 14, traceCompleted: true }, variables: { traceId: 'tr-e1b4-f201', flowCompleted: true } },
+        { name: '数据归档与日志', type: '代码节点', status: 'success', duration: '0.3秒', startTime: '09:05:28', inputData: { orderId: 'ORD-2025041400201', archiveTarget: 'data-warehouse' }, outputData: { logEntries: 14, traceCompleted: true }, variables: { traceId: 'tr-e1b4-f201', flowCompleted: true } },
         { name: '流程结束', type: '结束节点', status: 'success', duration: '0.1秒', startTime: '09:08:45', inputData: { confirmNo: 'CNF-20250414-00582-A' }, outputData: { success: true, totalDuration: '8分45秒' }, variables: { traceId: 'tr-e1b4-f201' } },
       ], alerts: [] },
     { id: 2012, wfId: 3, wfName: '订单取消处理', wfCode: 'HTL_CANCEL', version: 2, trigger: 'manual', status: 'completed', startTime: '2025-04-14 11:00:00', endTime: '2025-04-14 11:05:20', duration: '5分20秒', triggerUser: 'Sukey Wu', archived: false,
@@ -671,7 +673,7 @@ function renderEmptyState(type) {
     executions: { img: './public/images/empty-executions.png', title: '暂无执行记录', desc: '执行工作流后将在此展示运行历史', btn: '' },
     searchNoResult: { img: './public/images/empty-folder-content.png', title: '未找到匹配的工作流', desc: '请调整搜索条件', btn: '' },
     execSearchNoResult: { img: './public/images/empty-executions.png', title: '未找到匹配的执行记录', desc: '请调整搜索条件', btn: '' },
-    archiveEmpty: { img: './public/images/empty-executions.png', title: '暂无归档记录', desc: '超过90天的已终结记录将自动归档', btn: '' },
+    
   }[type] || { img: '', title: '暂无内容', desc: '', btn: '' };
   return `<div class="empty-state"><img src="${s.img}" alt="${s.title}" class="empty-state-img" /><div class="empty-state-title">${s.title}</div><div class="empty-state-desc">${s.desc}</div>${s.btn}</div>`;
 }
@@ -2037,7 +2039,7 @@ function confirmExecuteWf(wfId) {
   if (!wsExecutions[wsCurrentId]) wsExecutions[wsCurrentId] = [];
   const now = new Date(); const ts = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
   const execId = 3000 + wsExecutions[wsCurrentId].length;
-  wsExecutions[wsCurrentId].unshift({ id: execId, wfId: wf.id, wfName: wf.name, wfCode: wf.code, version: wf.version, trigger: 'manual', status: 'running', startTime: ts, endTime: '-', duration: '进行中', triggerUser: 'Sukey Wu', archived: false, nodes: [{ name: '触发节点', type: '手动触发', status: 'success', duration: '0.1秒', startTime: ts.slice(11) }, { name: '执行中...', type: '处理节点', status: 'running', duration: '进行中', startTime: ts.slice(11) }] });
+  wsExecutions[wsCurrentId].unshift({ id: execId, wfId: wf.id, wfName: wf.name, wfCode: wf.code, version: wf.version, trigger: 'manual', status: 'running', startTime: ts, endTime: '-', duration: '进行中', triggerUser: 'Sukey Wu', nodes: [{ name: '触发节点', type: '手动触发', status: 'success', duration: '0.1秒', startTime: ts.slice(11) }, { name: '执行中...', type: '处理节点', status: 'running', duration: '进行中', startTime: ts.slice(11) }] });
   wf.runningCount++; wf.lastRun = 'running';
   closeModal(); showToast('success', '工作流已启动', `实例 ID: ${execId}`); render();
 }
@@ -2252,7 +2254,9 @@ function renderWsExecutionsTab(ws) {
     else if (wsExecTimeRange === '24h') from = new Date(now - 86400000);
     else if (wsExecTimeRange === '7d') from = new Date(now - 7 * 86400000);
     else if (wsExecTimeRange === '30d') from = new Date(now - 30 * 86400000);
+if (wsExecTimeRange === 'custom' && wsExecDateFrom) from = new Date(wsExecDateFrom);
     if (from) execs = execs.filter(e => new Date(e.startTime) >= from);
+    if (wsExecTimeRange === 'custom' && wsExecDateTo) { const to = new Date(wsExecDateTo); to.setHours(23,59,59); execs = execs.filter(e => new Date(e.startTime) <= to); }
   }
 
   // Sort: stale first, then by startTime desc
@@ -2265,9 +2269,9 @@ function renderWsExecutionsTab(ws) {
   const execStart = (wsExecPage - 1) * wsExecPageSize;
   const pagedExecs = execs.slice(execStart, execStart + wsExecPageSize);
 
-  const statusLabel = { running: '运行中', paused: '已暂停', completed: '已完成', failed: '失败', cancelled: '已取消' };
-  const statusClass = { running: 'exec-running', paused: 'exec-paused', completed: 'exec-completed', failed: 'exec-failed', cancelled: 'exec-cancelled' };
-  const triggerLabel = { manual: '手动', scheduled: '定时', event: '事件触发', subflow: '工作流调用' };
+  const statusLabel = { running: '执行中', suspended: '挂起', completed: '已完成', failed: '失败', cancelled: '已取消' };
+  const statusClass = { running: 'exec-running', suspended: 'exec-suspended', completed: 'exec-completed', failed: 'exec-failed', cancelled: 'exec-cancelled' };
+  const triggerLabel = { manual: '手动', api: 'API', scheduled: '定时', webhook: 'Webhook', subflow: '工作流调用' };
 
   // Pagination controls HTML
   let execPaginationHtml = '';
@@ -2283,8 +2287,8 @@ function renderWsExecutionsTab(ws) {
       <div class="filter-actions" style="display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap">
         <select class="form-input" style="width:auto;padding:4px 8px;font-size:var(--font-size-sm)" onchange="onExecStatusFilter(this.value)">
           <option value="all" ${wsExecStatusFilter === 'all' ? 'selected' : ''}>全部状态</option>
-          <option value="running" ${wsExecStatusFilter === 'running' ? 'selected' : ''}>运行中</option>
-          <option value="paused" ${wsExecStatusFilter === 'paused' ? 'selected' : ''}>已暂停</option>
+          <option value="running" ${wsExecStatusFilter === 'running' ? 'selected' : ''}>执行中</option>
+          <option value="suspended" ${wsExecStatusFilter === 'suspended' ? 'selected' : ''}>挂起</option>
           <option value="completed" ${wsExecStatusFilter === 'completed' ? 'selected' : ''}>已完成</option>
           <option value="failed" ${wsExecStatusFilter === 'failed' ? 'selected' : ''}>失败</option>
           <option value="cancelled" ${wsExecStatusFilter === 'cancelled' ? 'selected' : ''}>已取消</option>
@@ -2293,8 +2297,9 @@ function renderWsExecutionsTab(ws) {
         <select class="form-input" style="width:auto;padding:4px 8px;font-size:var(--font-size-sm)" onchange="onExecTriggerFilter(this.value)">
           <option value="all" ${wsExecTriggerFilter === 'all' ? 'selected' : ''}>全部触发方式</option>
           <option value="manual" ${wsExecTriggerFilter === 'manual' ? 'selected' : ''}>手动</option>
+          <option value="api" ${wsExecTriggerFilter === 'api' ? 'selected' : ''}>API</option>
           <option value="scheduled" ${wsExecTriggerFilter === 'scheduled' ? 'selected' : ''}>定时</option>
-          <option value="event" ${wsExecTriggerFilter === 'event' ? 'selected' : ''}>事件触发</option>
+          <option value="webhook" ${wsExecTriggerFilter === 'webhook' ? 'selected' : ''}>Webhook</option>
           <option value="subflow" ${wsExecTriggerFilter === 'subflow' ? 'selected' : ''}>工作流调用</option>
         </select>
         <select class="form-input" style="width:auto;padding:4px 8px;font-size:var(--font-size-sm)" onchange="onExecTimeRange(this.value)">
@@ -2303,12 +2308,14 @@ function renderWsExecutionsTab(ws) {
           <option value="24h" ${wsExecTimeRange === '24h' ? 'selected' : ''}>最近24小时</option>
           <option value="7d" ${wsExecTimeRange === '7d' ? 'selected' : ''}>最近7天</option>
           <option value="30d" ${wsExecTimeRange === '30d' ? 'selected' : ''}>最近30天</option>
+          <option value="custom" ${wsExecTimeRange === 'custom' ? 'selected' : ''}>自定义</option>
         </select>
+        ${wsExecTimeRange === 'custom' ? `<input type="date" class="form-input" style="width:140px;padding:4px 8px;font-size:var(--font-size-sm)" value="${wsExecDateFrom}" onchange="onExecDateFrom(this.value)" /> <span style="color:var(--md-outline)">至</span> <input type="date" class="form-input" style="width:140px;padding:4px 8px;font-size:var(--font-size-sm)" value="${wsExecDateTo}" onchange="onExecDateTo(this.value)" />` : ''}
         <span class="item-count">共 <strong>${totalExecs}</strong> 条</span>
       </div>
     </div>
     ${totalExecs === 0 ? (wsExecSearch ? renderEmptyState('execSearchNoResult') : renderEmptyState('executions')) : `
-    <div class="table-wrapper"><table class="exec-table"><thead><tr><th>实例ID</th><th>工作流</th><th>发布版本</th><th>触发方式</th><th>状态</th><th>开始时间</th><th>结束时间</th><th>耗时</th><th>触发人</th><th>操作</th></tr></thead><tbody>
+    <div class="table-wrapper"><table class="exec-table"><thead><tr><th>执行 ID</th><th>工作流</th><th>发布版本</th><th>触发方式</th><th>状态</th><th>开始时间</th><th>结束时间</th><th>耗时</th><th>触发人</th><th>操作</th></tr></thead><tbody>
     ${pagedExecs.map(e => `<tr onclick="viewExecDetail(${e.id})" style="cursor:pointer${e.stale ? ';background:rgba(234,179,8,0.05)' : ''}">
       <td><code style="font-size:var(--font-size-xs)">#${e.id}</code></td>
       <td style="font-weight:500">${e.wfName}</td>
@@ -2321,9 +2328,9 @@ function renderWsExecutionsTab(ws) {
       <td>${e.triggerUser}</td>
       <td onclick="event.stopPropagation()"><div class="table-actions">
         <button class="table-action-btn" title="查看详情" onclick="viewExecDetail(${e.id})">${icons.eye}</button>
-        ${(e.status === 'running' || e.status === 'paused') && ws.myRole !== 'viewer' ? `<button class="table-action-btn danger" title="取消" onclick="showCancelExecModal(${e.id})">${icons.stop}</button>` : ''}
-        ${e.status === 'running' && ws.myRole !== 'viewer' ? `<button class="table-action-btn" title="暂停" onclick="showPauseExecModal(${e.id})">${icons.pause}</button>` : ''}
-        ${e.status === 'paused' && ws.myRole !== 'viewer' ? `<button class="table-action-btn" title="恢复" onclick="showResumeExecModal(${e.id})">${icons.play}</button>` : ''}
+        ${(e.status === 'running' || e.status === 'suspended') && ws.myRole !== 'viewer' ? `<button class="table-action-btn danger" title="取消" onclick="showCancelExecModal(${e.id})">${icons.stop}</button>` : ''}
+        ${e.status === 'running' && ws.myRole !== 'viewer' ? `<button class="table-action-btn" title="挂起" onclick="showSuspendExecModal(${e.id})">${icons.pause}</button>` : ''}
+        ${e.status === 'suspended' && ws.myRole !== 'viewer' ? `<button class="table-action-btn" title="恢复" onclick="showResumeExecModal(${e.id})">${icons.play}</button>` : ''}
         ${['completed','failed','cancelled'].includes(e.status) && ws.myRole !== 'viewer' ? `<button class="table-action-btn" title="重新执行" onclick="showReExecuteModal(${e.id})">${icons.redo}</button>` : ''}
       </div></td>
     </tr>`).join('')}
@@ -2339,7 +2346,9 @@ function onExecSearch(val) {
 }
 function onExecStatusFilter(val) { wsExecStatusFilter = val; wsExecPage = 1; render(); }
 function onExecTriggerFilter(val) { wsExecTriggerFilter = val; wsExecPage = 1; render(); }
-function onExecTimeRange(val) { wsExecTimeRange = val; wsExecPage = 1; render(); }
+function onExecTimeRange(val) { wsExecTimeRange = val; if (val !== 'custom') { wsExecDateFrom = ''; wsExecDateTo = ''; } wsExecPage = 1; render(); }
+function onExecDateFrom(val) { wsExecDateFrom = val; wsExecPage = 1; render(); }
+function onExecDateTo(val) { wsExecDateTo = val; wsExecPage = 1; render(); }
 function goToExecPage(p) { wsExecPage = p; render(); }
 function onExecPageSizeChange(val) { wsExecPageSize = parseInt(val); wsExecPage = 1; render(); }
 function viewExecDetail(execId) { wsExecDetailId = execId; wsExecSelectedNodeIdx = null; wsExecNodeSearch = ''; wsExecLogFilter = 'all'; render(); }
@@ -2348,11 +2357,11 @@ function renderExecDetail(ws) {
   const exec = (wsExecutions[ws.id] || []).find(e => e.id === wsExecDetailId);
   if (!exec) { wsExecDetailId = null; render(); return ''; }
 
-  const statusLabel = { running: '运行中', paused: '已暂停', completed: '已完成', failed: '失败', cancelled: '已取消' };
-  const statusClass = { running: 'exec-running', paused: 'exec-paused', completed: 'exec-completed', failed: 'exec-failed', cancelled: 'exec-cancelled' };
-  const triggerLabel = { manual: '手动', scheduled: '定时', event: '事件触发', subflow: '工作流调用' };
-  const nodeStatusClass = { success: 'success', failed: 'failed', running: 'running', skipped: 'skipped', paused: 'running', cancelled: 'failed' };
-  const nodeStatusLabel = { success: '成功', failed: '失败', running: '运行中', skipped: '跳过', paused: '已暂停', cancelled: '已取消' };
+  const statusLabel = { running: '执行中', suspended: '挂起', completed: '已完成', failed: '失败', cancelled: '已取消' };
+  const statusClass = { running: 'exec-running', suspended: 'exec-suspended', completed: 'exec-completed', failed: 'exec-failed', cancelled: 'exec-cancelled' };
+  const triggerLabel = { manual: '手动', api: 'API', scheduled: '定时', webhook: 'Webhook', subflow: '工作流调用' };
+  const nodeStatusClass = { success: 'success', failed: 'failed', running: 'running', skipped: 'skipped', suspended: 'running', cancelled: 'failed' };
+  const nodeStatusLabel = { success: '成功', failed: '失败', running: '执行中', skipped: '跳过', suspended: '挂起', cancelled: '已取消' };
   const hasPanel = wsExecSelectedNodeIdx !== null && exec.nodes && exec.nodes[wsExecSelectedNodeIdx];
   const selectedNode = hasPanel ? exec.nodes[wsExecSelectedNodeIdx] : null;
 
@@ -2384,7 +2393,7 @@ function renderExecDetail(ws) {
   function generateExecLogs(exec) {
     const logs = [];
     const baseDate = exec.startTime.split(' ')[0];
-    const trigLbl = { manual: '手动', scheduled: '定时', event: '事件触发', subflow: '工作流调用' };
+    const trigLbl = { manual: '手动', api: 'API', scheduled: '定时', webhook: 'Webhook', subflow: '工作流调用' };
     logs.push({ time: exec.startTime + '.000', level: 'info', event: 'workflow.started', node: null, message: '工作流开始执行，触发方式: ' + (trigLbl[exec.trigger]||exec.trigger) + '，触发人: ' + exec.triggerUser });
     if (exec.nodes) {
       exec.nodes.forEach(node => {
@@ -2404,8 +2413,8 @@ function renderExecDetail(ws) {
           logs.push({ time: st + '.100', level: 'error', event: 'node.failed', node: node.name, message: '节点执行失败: ' + (node.error || '未知错误') + '，耗时 ' + node.duration });
         } else if (node.status === 'running') {
           logs.push({ time: st + '.050', level: 'info', event: 'node.running', node: node.name, message: '节点执行中...' });
-        } else if (node.status === 'paused') {
-          logs.push({ time: st + '.100', level: 'warn', event: 'node.paused', node: node.name, message: '节点已暂停' });
+        } else if (node.status === 'suspended') {
+          logs.push({ time: st + '.100', level: 'warn', event: 'node.suspended', node: node.name, message: '节点已挂起' });
         } else if (node.status === 'cancelled') {
           logs.push({ time: st + '.100', level: 'warn', event: 'node.cancelled', node: node.name, message: '节点已取消' });
         } else if (node.status === 'skipped') {
@@ -2448,9 +2457,9 @@ function renderExecDetail(ws) {
         <span class="version-badge">v${exec.version}</span>
       </div>
       <div class="ed-topbar-actions">
-        ${exec.status === 'running' && ws.myRole !== 'viewer' ? `<button class="btn btn-secondary btn-sm" onclick="showPauseExecModal(${exec.id})">${icons.pause}<span>暂停</span></button>` : ''}
-        ${exec.status === 'paused' && ws.myRole !== 'viewer' ? `<button class="btn btn-primary btn-sm" onclick="showResumeExecModal(${exec.id})">${icons.play}<span>恢复</span></button>` : ''}
-        ${(exec.status === 'running' || exec.status === 'paused') && ws.myRole !== 'viewer' ? `<button class="btn btn-danger btn-sm" onclick="showCancelExecModal(${exec.id})">${icons.stop}<span>取消</span></button>` : ''}
+        ${exec.status === 'running' && ws.myRole !== 'viewer' ? `<button class="btn btn-secondary btn-sm" onclick="showSuspendExecModal(${exec.id})">${icons.pause}<span>挂起</span></button>` : ''}
+        ${exec.status === 'suspended' && ws.myRole !== 'viewer' ? `<button class="btn btn-primary btn-sm" onclick="showResumeExecModal(${exec.id})">${icons.play}<span>恢复</span></button>` : ''}
+        ${(exec.status === 'running' || exec.status === 'suspended') && ws.myRole !== 'viewer' ? `<button class="btn btn-danger btn-sm" onclick="showCancelExecModal(${exec.id})">${icons.stop}<span>取消</span></button>` : ''}
         ${['completed','failed','cancelled'].includes(exec.status) && ws.myRole !== 'viewer' ? `<button class="btn btn-primary btn-sm" onclick="showReExecuteModal(${exec.id})">${icons.redo}<span>重新执行</span></button>` : ''}
       </div>
     </div>`;
@@ -2472,13 +2481,13 @@ function renderExecDetail(ws) {
     const nFailed = exec.nodes.filter(n => n.status === 'failed' || n.status === 'cancelled').length;
     const nRunning = exec.nodes.filter(n => n.status === 'running').length;
     const nSkipped = exec.nodes.filter(n => n.status === 'skipped').length;
-    const nPaused = exec.nodes.filter(n => n.status === 'paused').length;
+    const nSuspended = exec.nodes.filter(n => n.status === 'suspended').length;
     const showSummary = exec.nodes.length >= 6;
     const summaryHtml = showSummary ? `<div class="ed-node-summary">
       ${nSuccess ? `<span class="ed-node-summary-item success">${icons.checkCircle} ${nSuccess} 成功</span>` : ''}
       ${nFailed ? `<span class="ed-node-summary-item failed">${icons.xCircle} ${nFailed} 失败/取消</span>` : ''}
       ${nRunning ? `<span class="ed-node-summary-item running">${icons.sync} ${nRunning} 运行中</span>` : ''}
-      ${nPaused ? `<span class="ed-node-summary-item running">${icons.pause} ${nPaused} 已暂停</span>` : ''}
+      ${nSuspended ? `<span class="ed-node-summary-item running">${icons.pause} ${nSuspended} 挂起</span>` : ''}
       ${nSkipped ? `<span class="ed-node-summary-item skipped">${nSkipped} 跳过</span>` : ''}
     </div>` : '';
     // Node search filter
@@ -2709,12 +2718,12 @@ function cancelExec(execId) {
   const wf = (wsWorkflows[wsCurrentId] || []).find(x => x.id === exec.wfId); if (wf && wf.runningCount > 0) wf.runningCount--;
   closeModal(); showToast('success', '取消成功', '执行已取消'); render();
 }
-function showPauseExecModal(execId) {
-  showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">暂停执行</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body"><p style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant)">确定暂停该执行实例吗？暂停后当前正在执行的节点将完成后挂起，后续节点不再执行。</p></div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">关闭</button><button class="btn btn-primary" onclick="pauseExec(${execId})">确认暂停</button></div></div>`);
+function showSuspendExecModal(execId) {
+  showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">挂起执行</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body"><p style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant)">确定挂起该执行实例吗？挂起后当前正在执行的节点将完成后挂起，后续节点不再执行。</p></div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">关闭</button><button class="btn btn-primary" onclick="suspendExec(${execId})">确认挂起</button></div></div>`);
 }
-function pauseExec(execId) {
+function suspendExec(execId) {
   const exec = (wsExecutions[wsCurrentId] || []).find(e => e.id === execId); if (!exec) return;
-  exec.status = 'paused'; closeModal(); showToast('success', '暂停成功', '执行已暂停'); render();
+  exec.status = 'suspended'; closeModal(); showToast('success', '挂起成功', '执行已挂起'); render();
 }
 function resumeExec(execId) {
   const exec = (wsExecutions[wsCurrentId] || []).find(e => e.id === execId); if (!exec) return;
@@ -2723,7 +2732,7 @@ function resumeExec(execId) {
 function showResumeExecModal(execId) {
   const exec = (wsExecutions[wsCurrentId] || []).find(e => e.id === execId); if (!exec) return;
   showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">确认恢复执行</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
-  <p style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant)">确定恢复执行实例 <strong>#${exec.id}</strong>（${exec.wfName}）吗？恢复后将继续从暂停点执行。</p>
+  <p style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant)">确定恢复执行实例 <strong>#${exec.id}</strong>（${exec.wfName}）吗？恢复后将从挂起点继续执行。</p>
   </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="resumeExec(${execId})">确认恢复</button></div></div>`);
 }
 function reExecute(execId) {
@@ -2740,8 +2749,19 @@ function showReExecuteModal(execId) {
   const exec = (wsExecutions[wsCurrentId] || []).find(e => e.id === execId); if (!exec) return;
   const wf = (wsWorkflows[wsCurrentId] || []).find(x => x.id === exec.wfId);
   if (!wf || wf.status !== 'published') { showToast('warning', '无法执行', '工作流当前状态不支持执行'); return; }
+  const hasInputs = exec.inputs && Object.keys(exec.inputs).length > 0;
+  const inputsHtml = hasInputs ? `
+  <div style="margin-top:var(--space-4)">
+    <div style="font-size:var(--font-size-sm);font-weight:500;margin-bottom:var(--space-2)">输入参数</div>
+    ${Object.entries(exec.inputs).map(([key, p]) => `
+    <div style="margin-bottom:var(--space-2)">
+      <label style="font-size:var(--font-size-xs);color:var(--md-on-surface-variant);display:block;margin-bottom:2px">${p.label || key} <span style="color:var(--md-outline)">(${p.type})</span></label>
+      <input class="form-input" style="width:100%" data-reexec-key="${key}" value="${escHtml(String(p.value))}" />
+    </div>`).join('')}
+  </div>` : '';
   showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">确认重新执行</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
   <p style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant)">确定基于工作流「${wf.name}」当前版本（v${wf.version}）重新执行吗？将创建一个新的执行实例。</p>
+  ${inputsHtml}
   </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="reExecute(${execId})">确认执行</button></div></div>`);
 }
 

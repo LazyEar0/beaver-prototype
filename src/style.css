@@ -4603,7 +4603,7 @@ img { display: block; max-width: 100%; }
 }
 
 .exec-running { background: var(--md-primary-container); color: var(--md-primary); border: 1px solid rgba(103,80,164,0.2); }
-.exec-paused { background: var(--md-warning-container); color: var(--md-warning); border: 1px solid rgba(227,116,0,0.2); }
+.exec-suspended { background: var(--md-warning-container); color: var(--md-warning); border: 1px solid rgba(227,116,0,0.2); }
 .exec-completed { background: var(--md-success-container); color: var(--md-success); border: 1px solid rgba(24,128,56,0.2); }
 .exec-failed { background: var(--md-error-container); color: var(--md-error); border: 1px solid rgba(217,48,37,0.2); }
 .exec-cancelled { background: var(--md-surface-container-high); color: var(--md-outline); border: 1px solid rgba(154,160,166,0.2); }
