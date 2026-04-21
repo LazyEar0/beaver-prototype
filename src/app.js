@@ -1737,13 +1737,49 @@ function showCreateWfModal() {
   <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">工作流名称 <span class="required">*</span></label><input type="text" class="form-input" id="wfName" placeholder="请输入工作流名称" maxlength="50" oninput="this.classList.remove('error');document.getElementById('wfNameError').classList.add('hidden')" onblur="validateRequiredOnBlur(this,'wfNameError','请输入工作流名称')" /><div class="form-error hidden" id="wfNameError"></div></div>
   <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">工作流编号 <span class="required">*</span></label><input type="text" class="form-input" id="wfCode" placeholder="英文、数字、下划线、连字符" maxlength="30" oninput="this.classList.remove('error');document.getElementById('wfCodeError').classList.add('hidden')" onblur="validateRequiredOnBlur(this,'wfCodeError','请输入工作流编号')" /><div class="form-error hidden" id="wfCodeError"></div></div>
   <div style="display:flex;gap:var(--space-4);margin-bottom:var(--space-4)">
-    <div class="form-group" style="flex:1"><label class="form-label">工作流类型 <span class="required">*</span></label><select class="form-input" id="wfType"><option value="app">应用流</option><option value="chat">对话流</option></select></div>
+    <div class="form-group" style="flex:1"><label class="form-label">工作流类型 <span class="required">*</span></label>
+      <div style="display:flex;gap:var(--space-3);margin-top:var(--space-1)" id="wfTypeCards">
+        <label style="flex:1;cursor:pointer" onclick="selectWfTypeCard('app')">
+          <input type="radio" name="wfTypeRadio" id="wfTypeApp" value="app" checked style="display:none" />
+          <div id="wfTypeCard_app" style="padding:12px 10px;border:2px solid var(--md-primary);border-radius:var(--radius-lg);background:var(--md-primary-container);transition:all 0.15s">
+            <div style="font-size:20px;margin-bottom:4px">⚙️</div>
+            <div style="font-size:12px;font-weight:600;color:var(--md-primary)">应用流</div>
+            <div style="font-size:10px;color:var(--md-on-surface-variant);margin-top:2px;line-height:1.4">单次触发式执行，适合数据处理、自动化任务</div>
+          </div>
+        </label>
+        <label style="flex:1;cursor:pointer" onclick="selectWfTypeCard('chat')">
+          <input type="radio" name="wfTypeRadio" id="wfTypeChat" value="chat" style="display:none" />
+          <div id="wfTypeCard_chat" style="padding:12px 10px;border:2px solid var(--md-outline-variant);border-radius:var(--radius-lg);background:transparent;transition:all 0.15s">
+            <div style="font-size:20px;margin-bottom:4px">💬</div>
+            <div style="font-size:12px;font-weight:600;color:var(--md-on-surface-variant)">对话流</div>
+            <div style="font-size:10px;color:var(--md-on-surface-variant);margin-top:2px;line-height:1.4">多轮对话式执行，适合智能问答、工作流助手</div>
+          </div>
+        </label>
+      </div>
+      <input type="hidden" id="wfType" value="app" />
+    </div>
     <div class="form-group" style="flex:1"><label class="form-label">流程负责人 <span class="required">*</span></label>${buildPersonPickerHtml('wfOwner', [101], true)}</div>
   </div>
   <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">描述</label><textarea class="form-textarea" id="wfDesc" placeholder="选填，500字以内" maxlength="500" rows="2"></textarea></div>
   <div class="form-group"><label class="form-label">允许被引用</label><div style="display:flex;align-items:center;gap:10px"><label class="toggle-sm"><input type="checkbox" id="wfAllowRef" /><span class="toggle-sm-slider"></span></label><span style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant)">开启后该流程可被其他空间的工作流调用（授权空间可在设计器设置中配置）</span></div></div>
   </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="createWf()">保存</button></div></div>`);
   setTimeout(() => document.getElementById('wfName')?.focus(), 300);
+}
+function selectWfTypeCard(type) {
+  document.getElementById('wfType').value = type;
+  ['app', 'chat'].forEach(t => {
+    const card = document.getElementById(`wfTypeCard_${t}`);
+    if (!card) return;
+    if (t === type) {
+      card.style.border = '2px solid var(--md-primary)';
+      card.style.background = 'var(--md-primary-container)';
+      card.querySelector('div:nth-child(2)').style.color = 'var(--md-primary)';
+    } else {
+      card.style.border = '2px solid var(--md-outline-variant)';
+      card.style.background = 'transparent';
+      card.querySelector('div:nth-child(2)').style.color = 'var(--md-on-surface-variant)';
+    }
+  });
 }
 function createWf() {
   const rawName = document.getElementById('wfName').value, rawCode = document.getElementById('wfCode').value;
