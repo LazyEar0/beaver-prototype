@@ -1736,23 +1736,27 @@ function showCreateWfModal() {
   showModal(`<div class="modal" style="max-width:520px"><div class="modal-header"><h2 class="modal-title">新建工作流</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
   <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">工作流名称 <span class="required">*</span></label><input type="text" class="form-input" id="wfName" placeholder="请输入工作流名称" maxlength="50" oninput="this.classList.remove('error');document.getElementById('wfNameError').classList.add('hidden')" onblur="validateRequiredOnBlur(this,'wfNameError','请输入工作流名称')" /><div class="form-error hidden" id="wfNameError"></div></div>
   <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">工作流编号 <span class="required">*</span></label><input type="text" class="form-input" id="wfCode" placeholder="英文、数字、下划线、连字符" maxlength="30" oninput="this.classList.remove('error');document.getElementById('wfCodeError').classList.add('hidden')" onblur="validateRequiredOnBlur(this,'wfCodeError','请输入工作流编号')" /><div class="form-error hidden" id="wfCodeError"></div></div>
-  <div style="display:flex;gap:var(--space-4);margin-bottom:var(--space-4)">
+  <div style="display:flex;gap:var(--space-4);margin-bottom:var(--space-4);align-items:flex-start">
     <div class="form-group" style="flex:1"><label class="form-label">工作流类型 <span class="required">*</span></label>
-      <div style="display:flex;gap:var(--space-3);margin-top:var(--space-1)" id="wfTypeCards">
-        <label style="flex:1;cursor:pointer" onclick="selectWfTypeCard('app')">
+      <div style="display:flex;flex-direction:column;gap:var(--space-2);margin-top:var(--space-1)" id="wfTypeCards">
+        <label style="cursor:pointer" onclick="selectWfTypeCard('app')">
           <input type="radio" name="wfTypeRadio" id="wfTypeApp" value="app" checked style="display:none" />
-          <div id="wfTypeCard_app" style="padding:12px 10px;border:2px solid var(--md-primary);border-radius:var(--radius-lg);background:var(--md-primary-container);transition:all 0.15s">
-            <div style="font-size:20px;margin-bottom:4px">⚙️</div>
-            <div style="font-size:12px;font-weight:600;color:var(--md-primary)">应用流</div>
-            <div style="font-size:10px;color:var(--md-on-surface-variant);margin-top:2px;line-height:1.4">单次触发式执行，适合数据处理、自动化任务</div>
+          <div id="wfTypeCard_app" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:2px solid var(--md-primary);border-radius:var(--radius-md);background:var(--md-primary-container);transition:all 0.15s">
+            <span style="font-size:18px;flex-shrink:0">⚙️</span>
+            <div style="min-width:0">
+              <div style="font-size:13px;font-weight:600;color:var(--md-primary)">应用流</div>
+              <div style="font-size:11px;color:var(--md-on-surface-variant);margin-top:1px">单次触发，适合数据处理、自动化任务</div>
+            </div>
           </div>
         </label>
-        <label style="flex:1;cursor:pointer" onclick="selectWfTypeCard('chat')">
+        <label style="cursor:pointer" onclick="selectWfTypeCard('chat')">
           <input type="radio" name="wfTypeRadio" id="wfTypeChat" value="chat" style="display:none" />
-          <div id="wfTypeCard_chat" style="padding:12px 10px;border:2px solid var(--md-outline-variant);border-radius:var(--radius-lg);background:transparent;transition:all 0.15s">
-            <div style="font-size:20px;margin-bottom:4px">💬</div>
-            <div style="font-size:12px;font-weight:600;color:var(--md-on-surface-variant)">对话流</div>
-            <div style="font-size:10px;color:var(--md-on-surface-variant);margin-top:2px;line-height:1.4">多轮对话式执行，适合智能问答、工作流助手</div>
+          <div id="wfTypeCard_chat" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:2px solid var(--md-outline-variant);border-radius:var(--radius-md);background:transparent;transition:all 0.15s">
+            <span style="font-size:18px;flex-shrink:0">💬</span>
+            <div style="min-width:0">
+              <div style="font-size:13px;font-weight:600;color:var(--md-on-surface-variant)">对话流</div>
+              <div style="font-size:11px;color:var(--md-on-surface-variant);margin-top:1px">多轮对话，适合智能问答、流程助手</div>
+            </div>
           </div>
         </label>
       </div>
@@ -1770,14 +1774,18 @@ function selectWfTypeCard(type) {
   ['app', 'chat'].forEach(t => {
     const card = document.getElementById(`wfTypeCard_${t}`);
     if (!card) return;
+    const nameEl = card.querySelector('div > div:first-child');
+    const descEl = card.querySelector('div > div:last-child');
     if (t === type) {
       card.style.border = '2px solid var(--md-primary)';
       card.style.background = 'var(--md-primary-container)';
-      card.querySelector('div:nth-child(2)').style.color = 'var(--md-primary)';
+      if (nameEl) nameEl.style.color = 'var(--md-primary)';
+      if (descEl) descEl.style.color = 'var(--md-on-surface-variant)';
     } else {
       card.style.border = '2px solid var(--md-outline-variant)';
       card.style.background = 'transparent';
-      card.querySelector('div:nth-child(2)').style.color = 'var(--md-on-surface-variant)';
+      if (nameEl) nameEl.style.color = 'var(--md-on-surface-variant)';
+      if (descEl) descEl.style.color = 'var(--md-on-surface-variant)';
     }
   });
 }
