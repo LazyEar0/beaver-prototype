@@ -2671,12 +2671,14 @@ function renderMemberTabContent(ws, isAdmin) {
   const membersBySearch = q ? membersByRole.filter(m => m.name.toLowerCase().includes(q)) : membersByRole;
 
   const toolbar = `<div class="tab-toolbar">
-    <div class="tab-toolbar-left"><span class="item-count">共 <strong>${membersBySearch.length}</strong> 位${roleLabels[wsMemberTab]}</span></div>
+    <div class="tab-toolbar-left">
+      <span class="item-count">共 <strong>${membersBySearch.length}</strong> 位${roleLabels[wsMemberTab]}</span>
+      <div class="filter-search" style="height:32px;padding:0 var(--space-3);min-width:220px;">
+        ${icons.search}
+        <input id="member-search-input" placeholder="搜索用户名..." value="${wsMemberSearch || ''}" oninput="filterMemberSearch(this.value)" />
+      </div>
+    </div>
     <div class="tab-toolbar-right">${isAdmin ? `<button class="btn btn-primary btn-sm" onclick="showAddMemberModal()">${icons.plus}<span>添加${roleLabels[wsMemberTab]}</span></button>` : ''}</div>
-  </div>`;
-  const searchBar = `<div class="filter-search" style="margin-bottom:var(--space-4);height:36px;padding:0 var(--space-3);">
-    ${icons.search}
-    <input id="member-search-input" placeholder="搜索用户名..." value="${wsMemberSearch || ''}" oninput="filterMemberSearch(this.value)" />
   </div>`;
 
   if (membersByRole.length === 0) {
@@ -2690,7 +2692,7 @@ function renderMemberTabContent(ws, isAdmin) {
     ${isAdmin ? `<div class="member-actions"><select class="member-role-select" onchange="changeMemberRole(${ws.id}, ${m.userId}, this.value)"><option value="admin" ${m.role === 'admin' ? 'selected' : ''}>管理员</option><option value="member" ${m.role === 'member' ? 'selected' : ''}>成员</option><option value="viewer" ${m.role === 'viewer' ? 'selected' : ''}>只读查看者</option></select><button class="btn btn-ghost btn-sm" style="color:var(--md-error)" onclick="showRemoveMemberModal(${ws.id}, ${m.userId})">${icons.removeUser}<span>移除</span></button></div>` : ''}
     </div>`;
   }).join('')}</div>`;
-  return toolbar + searchBar + listHtml;
+  return toolbar + listHtml;
 }
 function switchMemberTab(tab) { wsMemberTab = tab; wsMemberSearch = ''; render(); }
 function filterMemberSearch(val) {
