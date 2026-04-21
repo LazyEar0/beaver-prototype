@@ -3498,7 +3498,6 @@ function renderProblemsPanel(problems) {
   `).join('');
 }
 
-let designerDebugLogFilter = 'all';
 function setDebugLogFilter(f) { designerDebugLogFilter = f; renderDesigner(); }
 
 function renderDebugPanel(logs) {
