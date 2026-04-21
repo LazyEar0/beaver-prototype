@@ -1736,34 +1736,32 @@ function showCreateWfModal() {
   showModal(`<div class="modal" style="max-width:520px"><div class="modal-header"><h2 class="modal-title">新建工作流</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
   <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">工作流名称 <span class="required">*</span></label><input type="text" class="form-input" id="wfName" placeholder="请输入工作流名称" maxlength="50" oninput="this.classList.remove('error');document.getElementById('wfNameError').classList.add('hidden')" onblur="validateRequiredOnBlur(this,'wfNameError','请输入工作流名称')" /><div class="form-error hidden" id="wfNameError"></div></div>
   <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">工作流编号 <span class="required">*</span></label><input type="text" class="form-input" id="wfCode" placeholder="英文、数字、下划线、连字符" maxlength="30" oninput="this.classList.remove('error');document.getElementById('wfCodeError').classList.add('hidden')" onblur="validateRequiredOnBlur(this,'wfCodeError','请输入工作流编号')" /><div class="form-error hidden" id="wfCodeError"></div></div>
-  <div style="display:flex;gap:var(--space-4);margin-bottom:var(--space-4);align-items:flex-start">
-    <div class="form-group" style="flex:1"><label class="form-label">工作流类型 <span class="required">*</span></label>
-      <div style="display:flex;flex-direction:column;gap:var(--space-2);margin-top:var(--space-1)" id="wfTypeCards">
-        <label style="cursor:pointer" onclick="selectWfTypeCard('app')">
-          <input type="radio" name="wfTypeRadio" id="wfTypeApp" value="app" checked style="display:none" />
-          <div id="wfTypeCard_app" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:2px solid var(--md-primary);border-radius:var(--radius-md);background:var(--md-primary-container);transition:all 0.15s">
-            <span style="font-size:18px;flex-shrink:0">⚙️</span>
-            <div style="min-width:0">
-              <div style="font-size:13px;font-weight:600;color:var(--md-primary)">应用流</div>
-              <div style="font-size:11px;color:var(--md-on-surface-variant);margin-top:1px">单次触发，适合数据处理、自动化任务</div>
-            </div>
+  <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">工作流类型 <span class="required">*</span></label>
+    <div style="display:flex;gap:var(--space-3);margin-top:var(--space-1)" id="wfTypeCards">
+      <label style="flex:1;cursor:pointer" onclick="selectWfTypeCard('app')">
+        <input type="radio" name="wfTypeRadio" id="wfTypeApp" value="app" checked style="display:none" />
+        <div id="wfTypeCard_app" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:2px solid var(--md-primary);border-radius:var(--radius-md);background:var(--md-primary-container);transition:all 0.15s">
+          <span style="font-size:18px;flex-shrink:0">⚙️</span>
+          <div style="min-width:0">
+            <div style="font-size:13px;font-weight:600;color:var(--md-primary)">应用流</div>
+            <div style="font-size:11px;color:var(--md-on-surface-variant);margin-top:1px">单次触发，适合数据处理、自动化任务</div>
           </div>
-        </label>
-        <label style="cursor:pointer" onclick="selectWfTypeCard('chat')">
-          <input type="radio" name="wfTypeRadio" id="wfTypeChat" value="chat" style="display:none" />
-          <div id="wfTypeCard_chat" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:2px solid var(--md-outline-variant);border-radius:var(--radius-md);background:transparent;transition:all 0.15s">
-            <span style="font-size:18px;flex-shrink:0">💬</span>
-            <div style="min-width:0">
-              <div style="font-size:13px;font-weight:600;color:var(--md-on-surface-variant)">对话流</div>
-              <div style="font-size:11px;color:var(--md-on-surface-variant);margin-top:1px">多轮对话，适合智能问答、流程助手</div>
-            </div>
+        </div>
+      </label>
+      <label style="flex:1;cursor:pointer" onclick="selectWfTypeCard('chat')">
+        <input type="radio" name="wfTypeRadio" id="wfTypeChat" value="chat" style="display:none" />
+        <div id="wfTypeCard_chat" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:2px solid var(--md-outline-variant);border-radius:var(--radius-md);background:transparent;transition:all 0.15s">
+          <span style="font-size:18px;flex-shrink:0">💬</span>
+          <div style="min-width:0">
+            <div style="font-size:13px;font-weight:600;color:var(--md-on-surface-variant)">对话流</div>
+            <div style="font-size:11px;color:var(--md-on-surface-variant);margin-top:1px">多轮对话，适合智能问答、流程助手</div>
           </div>
-        </label>
-      </div>
-      <input type="hidden" id="wfType" value="app" />
+        </div>
+      </label>
     </div>
-    <div class="form-group" style="flex:1"><label class="form-label">流程负责人 <span class="required">*</span></label>${buildPersonPickerHtml('wfOwner', [101], true)}</div>
+    <input type="hidden" id="wfType" value="app" />
   </div>
+  <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">流程负责人 <span class="required">*</span></label>${buildPersonPickerHtml('wfOwner', [101], true)}</div>
   <div class="form-group" style="margin-bottom:var(--space-4)"><label class="form-label">描述</label><textarea class="form-textarea" id="wfDesc" placeholder="选填，500字以内" maxlength="500" rows="2"></textarea></div>
   <div class="form-group"><label class="form-label">允许被引用</label><div style="display:flex;align-items:center;gap:10px"><label class="toggle-sm"><input type="checkbox" id="wfAllowRef" /><span class="toggle-sm-slider"></span></label><span style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant)">开启后该流程可被其他空间的工作流调用（授权空间可在设计器设置中配置）</span></div></div>
   </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="createWf()">保存</button></div></div>`);
