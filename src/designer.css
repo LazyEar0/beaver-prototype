@@ -494,6 +494,16 @@
   border-color: var(--md-error);
 }
 
+.canvas-node.node-paused {
+  border-color: #F59E0B;
+  animation: nodePaused 1.5s ease-in-out infinite;
+}
+
+@keyframes nodePaused {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.2); }
+  50% { box-shadow: 0 0 0 6px rgba(245, 158, 11, 0.1); }
+}
+
 .canvas-node.node-placeholder {
   border-style: dashed;
   border-color: var(--md-outline);
@@ -696,6 +706,17 @@
   background: var(--md-info-container);
   color: var(--md-info);
   animation: spin 1s linear infinite;
+}
+
+.canvas-node-debug-status.debug-paused {
+  background: #FEF3C7;
+  color: #D97706;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
 }
 
 @keyframes spin {
@@ -1635,11 +1656,56 @@
 
 .debug-mode-bar.active {
   display: flex;
+  gap: var(--space-2);
 }
 
 .debug-mode-bar svg {
   width: 16px;
   height: 16px;
+}
+
+/* Debug control buttons */
+.debug-btn-resume,
+.debug-btn-step {
+  height: 24px;
+  padding: 0 10px;
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.debug-btn-resume {
+  background: rgba(0, 90, 193, 0.12);
+  color: var(--md-info);
+}
+
+.debug-btn-resume:hover {
+  background: rgba(0, 90, 193, 0.22);
+}
+
+.debug-btn-resume svg {
+  width: 12px;
+  height: 12px;
+}
+
+.debug-btn-step {
+  background: rgba(245, 158, 11, 0.12);
+  color: #D97706;
+}
+
+.debug-btn-step:hover {
+  background: rgba(245, 158, 11, 0.22);
+}
+
+.debug-btn-step svg {
+  width: 12px;
+  height: 12px;
 }
 
 /* --- Connection Animation --- */
@@ -5087,6 +5153,98 @@
 .code-snippet-desc {
   font-size: 11px;
   color: var(--md-on-surface-variant);
+}
+
+/* ===== Code Editor: Test Run Button ===== */
+.code-test-run-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--md-primary);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--md-primary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition-fast);
+  margin-right: 4px;
+}
+
+.code-test-run-btn:hover:not(:disabled) {
+  background: var(--md-primary-container);
+}
+
+.code-test-run-btn:disabled,
+.code-test-run-btn.running {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ===== Code Editor: Test Result Area ===== */
+.code-test-result-area {
+  flex-shrink: 0;
+  border-top: 1px solid var(--md-outline-variant);
+  background: var(--md-surface-container);
+  max-height: 160px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.code-test-result-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  border-bottom: 1px solid var(--md-outline-variant);
+}
+
+.code-test-result-area.running .code-test-result-header {
+  color: var(--md-on-surface-variant);
+}
+
+.code-test-result-area.success .code-test-result-header {
+  background: #e8f5e9;
+  color: #2e7d32;
+  border-bottom-color: #c8e6c9;
+}
+
+.code-test-result-area.error .code-test-result-header {
+  background: #ffebee;
+  color: #c62828;
+  border-bottom-color: #ffcdd2;
+}
+
+.code-test-result-close {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: inherit;
+  opacity: 0.6;
+  display: flex;
+  align-items: center;
+  padding: 2px;
+  border-radius: 3px;
+}
+
+.code-test-result-close:hover { opacity: 1; }
+
+.code-test-result-output {
+  margin: 0;
+  padding: 8px 12px;
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  line-height: 1.6;
+  overflow-y: auto;
+  flex: 1;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: var(--md-on-surface);
 }
 
 /* ===== Code Editor: Autocomplete Dropdown ===== */

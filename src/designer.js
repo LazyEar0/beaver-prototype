@@ -7580,6 +7580,12 @@ function openCodeEditorModal(editorId, nodeId, language) {
           ${langTag} 代码编辑器
         </div>
         <div class="expr-expand-header-actions">
+          <button class="code-test-run-btn" id="codeTestRunBtn" onclick="runCodeTest()" title="测试运行">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13">
+              <polygon points="5 3 19 12 5 21 5 3"/>
+            </svg>
+            测试运行
+          </button>
           <button class="expr-expand-close" onclick="closeCodeEditorModal('${editorId}', false)" title="取消（Esc）">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
@@ -7615,6 +7621,15 @@ function openCodeEditorModal(editorId, nodeId, language) {
             onkeydown="handleCodeExpandKeydown(event)"
             spellcheck="false"
           >${escHtml(currentValue)}</textarea>
+          <div id="codeTestResultArea" class="code-test-result-area" style="display:none">
+            <div class="code-test-result-header">
+              <span id="codeTestResultStatus" class="code-test-result-status"></span>
+              <button class="code-test-result-close" onclick="document.getElementById('codeTestResultArea').style.display='none'" title="关闭">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+            <pre id="codeTestResultOutput" class="code-test-result-output"></pre>
+          </div>
         </div>
       </div>
       <div class="expr-expand-footer">
@@ -7693,6 +7708,85 @@ function closeCodeEditorModal(editorId, confirm) {
   _hideCodeAutocomplete();
   container.remove();
   _codeExpandState = null;
+}
+
+/**
+ * 测试运行代码（全屏编辑器内）
+ */
+function runCodeTest() {
+  const ta = document.getElementById('codeExpandTextarea');
+  const resultArea = document.getElementById('codeTestResultArea');
+  const resultStatus = document.getElementById('codeTestResultStatus');
+  const resultOutput = document.getElementById('codeTestResultOutput');
+  const runBtn = document.getElementById('codeTestRunBtn');
+  if (!ta || !resultArea || !resultStatus || !resultOutput) return;
+
+  const code = ta.value.trim();
+  if (!code) {
+    showToast('warning', '代码为空', '请先编写代码再运行测试');
+    return;
+  }
+
+  // Show running state
+  resultArea.style.display = 'block';
+  resultArea.className = 'code-test-result-area running';
+  resultStatus.textContent = '执行中...';
+  resultOutput.textContent = '';
+  if (runBtn) { runBtn.disabled = true; runBtn.classList.add('running'); }
+
+  const lang = _codeExpandState?.language || 'JavaScript';
+  const startTime = Date.now();
+
+  // Mock test execution (prototype simulation)
+  setTimeout(() => {
+    const elapsed = Date.now() - startTime;
+    if (runBtn) { runBtn.disabled = false; runBtn.classList.remove('running'); }
+    try {
+      let result;
+      if (lang === 'JavaScript') {
+        // Sandbox-lite: wrap in function, inject mock inputs
+        const mockInputs = _buildMockInputs();
+        const fn = new Function('inputs', 'getVariable', 'setVariable', 'getInput', 'getOutputFrom', 'toJson', 'newGuidString', 'setOutcome', 'isNullOrEmpty', code);
+        result = fn(
+          mockInputs,
+          (n) => null,
+          (n, v) => {},
+          (n) => mockInputs[n],
+          (nc, on) => null,
+          (o) => JSON.stringify(o),
+          () => '00000000-0000-0000-0000-000000000000',
+          (n) => {},
+          (v) => (v === null || v === undefined || v === '')
+        );
+      } else {
+        // Python: prototype cannot run natively, show friendly message
+        result = { note: 'Python 代码在原型中模拟执行，实际运行需在后端环境中执行' };
+      }
+      resultArea.className = 'code-test-result-area success';
+      resultStatus.innerHTML = `✓ 执行成功 · ${elapsed}ms`;
+      resultOutput.textContent = result === undefined
+        ? '(undefined)'
+        : JSON.stringify(result, null, 2);
+    } catch (e) {
+      resultArea.className = 'code-test-result-area error';
+      resultStatus.innerHTML = '✗ 执行失败';
+      resultOutput.textContent = e.message || String(e);
+    }
+  }, 400 + Math.random() * 300);
+}
+
+function _buildMockInputs() {
+  if (!_codeExpandState) return {};
+  const { nodeId } = _codeExpandState;
+  const varGroups = getAvailableVariables(nodeId);
+  const mock = {};
+  varGroups.forEach(g => {
+    g.variables.forEach(v => {
+      const key = v.path.replace(/^.*\./, '');
+      mock[key] = `<${v.type || 'String'}>`;
+    });
+  });
+  return mock;
 }
 
 /**
