@@ -27,6 +27,10 @@ let designerBottomPanelHeight = 240; // Draggable height
 let designerNodePanelExpanded = false;
 let designerDebugMode = false;
 let designerDebugLog = [];
+let designerDebugPaused = false;       // Is debug paused at a breakpoint?
+let designerDebugPausedNodeId = null;  // Which node is paused
+let _debugAnimState = null;           // Animation state for resume/step
+let designerDebugLogFilter = 'all';
 let designerDraggingNodeType = null;
 let designerDraggingExistingNode = null;
 let designerDragOffset = { x: 0, y: 0 };
@@ -96,6 +100,9 @@ function openDesigner(wsId, wfId) {
   designerPanY = 0;
   designerDebugMode = false;
   designerDebugLog = [];
+  designerDebugPaused = false;
+  designerDebugPausedNodeId = null;
+  _debugAnimState = null;
   designerNodePanelExpanded = false;
   designerClipboard = [];
   designerContextMenu = null;
@@ -442,7 +449,7 @@ function renderDesigner() {
   const statusClass = { draft: 'status-draft', published: 'status-published', disabled: 'status-disabled' };
 
   shell.innerHTML = `
-    ${designerDebugMode ? `<div class="debug-mode-bar active">${icons.play} <span>调试模式 - 画布只读</span> <button class="btn btn-sm" style="height:24px;padding:0 12px;background:rgba(0,90,193,0.15);color:var(--md-info);border-radius:var(--radius-full);font-size:11px" onclick="exitDebugMode()">退出调试</button></div>` : ''}
+    ${designerDebugMode ? `<div class="debug-mode-bar active">${designerDebugPaused ? icons.pause : icons.play} <span>${designerDebugPaused ? '调试已暂停 - 断点命中' : '调试模式 - 画布只读'}</span> ${designerDebugPaused ? `<button class="btn btn-sm debug-btn-resume" onclick="resumeDebug()" title="继续执行到下一个断点或结束">${icons.play}<span>继续执行</span></button><button class="btn btn-sm debug-btn-step" onclick="stepDebug()" title="单步执行下一个节点">${icons.chevronRight}<span>单步执行</span></button>` : ''} <button class="btn btn-sm" style="height:24px;padding:0 12px;background:rgba(239,68,68,0.1);color:var(--md-error);border-radius:var(--radius-full);font-size:11px" onclick="exitDebugMode()">终止调试</button></div>` : ''}
     ${designerFullscreen ? `<button class="fullscreen-exit-btn" onclick="toggleDesignerFullscreen()" title="退出全屏 (F11)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="4 14 4 20 10 20"/><polyline points="20 10 20 4 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg> 退出全屏</button>` : ''}
     <div class="designer-toolbar">
       <div class="designer-toolbar-left">
@@ -757,7 +764,7 @@ function getNodeDebugClass(node) {
 function renderNodeDebugStatus(node) {
   if (!node._debugStatus) return '';
   const cls = `debug-${node._debugStatus}`;
-  const iconMap = { success: icons.check, failed: icons.xCircle, running: icons.sync };
+  const iconMap = { success: icons.check, failed: icons.xCircle, running: icons.sync, paused: icons.pause };
   return `<div class="canvas-node-debug-status ${cls}">${iconMap[node._debugStatus] || ''}</div>`;
 }
 
@@ -3189,18 +3196,48 @@ function renderDesignerSettingsPanel() {
         <div class="settings-section-title" onclick="toggleSettingsSection(this)" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between">${icons.alertTriangle} 告警配置 <span class="settings-toggle-icon">${icons.chevronDown || icons.arrowDown}</span></div>
         <div class="settings-section-body">
           <div class="config-field">
-            <div class="config-field-label" style="display:flex;justify-content:space-between;align-items:center">启用告警 <label class="toggle-sm"><input type="checkbox" checked /><span class="toggle-sm-slider"></span></label></div>
+            <div class="config-field-label" style="display:flex;justify-content:space-between;align-items:center">启用告警 <label class="toggle-sm"><input type="checkbox" /><span class="toggle-sm-slider"></span></label></div>
+            <div class="config-field-help">开启后，满足触发条件时将向 Phoenix 系统推送告警通知</div>
           </div>
           <div class="config-field">
-            <div class="config-field-label">触发条件</div>
+            <div class="config-field-label">触发条件 <span class="required">*</span></div>
             <div style="display:flex;flex-direction:column;gap:6px;font-size:var(--font-size-xs)">
               <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" checked style="accent-color:var(--md-primary)"> 流程执行失败</label>
               <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" checked style="accent-color:var(--md-primary)"> 流程执行超时</label>
               <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" style="accent-color:var(--md-primary)"> 节点执行异常</label>
               <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" style="accent-color:var(--md-primary)"> 节点转人工处理</label>
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" style="accent-color:var(--md-primary)"> 节点挂起等待超时</label>
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" style="accent-color:var(--md-primary)"> 执行异常滞留</label>
             </div>
+            <div class="config-field-help">至少选择一个触发条件</div>
           </div>
-          <div class="config-field"><div class="config-field-label">静默期(分钟)</div><input class="config-input" type="number" value="5" min="1" /></div>
+          <div class="config-field">
+            <div class="config-field-label">告警级别 <span class="required">*</span></div>
+            <select class="config-select">
+              <option value="" disabled selected>选择 Phoenix 业务域优先级</option>
+              <option>P1 - 紧急</option><option>P2 - 重要</option><option>P3 - 一般</option><option>P4 - 低</option>
+            </select>
+            <div class="config-field-help">获取 Phoenix 中指定业务域的优先级，不同级别对应不同通知策略</div>
+          </div>
+          <div class="config-field">
+            <div class="config-field-label">通知人 <span class="required">*</span></div>
+            <div class="alert-notify-recipients">
+              <span class="alert-recipient-tag">${wf.owners && wf.owners.length > 0 ? (workspaces.find(w => w.id === wf.wsId)?.members?.find(m => m.id === wf.owners[0])?.name || '流程负责人') : '流程负责人'} <span style="color:var(--md-outline);font-size:9px">（默认）</span></span>
+              <button class="btn btn-ghost btn-sm" style="font-size:11px;padding:2px 8px;min-width:auto" onclick="showAlertRecipientPicker()">+ 添加</button>
+            </div>
+            <div class="config-field-help">默认为流程负责人，可添加其他空间成员</div>
+          </div>
+          <div class="config-field">
+            <div class="config-field-label">通知方式 <span class="required">*</span></div>
+            <div class="alert-notify-channels">
+              <label class="alert-channel-chip"><input type="checkbox" checked style="display:none" /><span class="alert-channel-label">飞书</span></label>
+              <label class="alert-channel-chip"><input type="checkbox" style="display:none" /><span class="alert-channel-label">短信</span></label>
+              <label class="alert-channel-chip"><input type="checkbox" style="display:none" /><span class="alert-channel-label">电话</span></label>
+              <label class="alert-channel-chip"><input type="checkbox" style="display:none" /><span class="alert-channel-label">邮件</span></label>
+            </div>
+            <div class="config-field-help">支持多选，同时通知多个方式</div>
+          </div>
+          <div class="config-field"><div class="config-field-label">通知周期(分钟)</div><input class="config-input" type="number" value="5" min="1" /><div class="config-field-help">同一告警不重复发送的时间窗口</div></div>
         </div>
       </div>
 
@@ -3230,6 +3267,18 @@ function toggleSettingsSection(titleEl) {
     body.style.display = isHidden ? 'block' : 'none';
     if (icon) icon.style.transform = isHidden ? '' : 'rotate(-90deg)';
   }
+}
+
+function showAlertRecipientPicker() {
+  const ws = workspaces.find(w => w.id === designerWsId);
+  const members = ws ? ws.members || [] : [];
+  const memberListHtml = members.length > 0 ? members.map(m => `
+    <label style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:var(--radius-sm);cursor:pointer;font-size:var(--font-size-sm)" onmouseover="this.style.background='var(--md-surface-container)'" onmouseout="this.style.background=''">
+      <input type="checkbox" style="accent-color:var(--md-primary)" />
+      <span style="font-weight:500">${m.name || m.userName || ''}</span>
+      <span style="margin-left:auto;font-size:var(--font-size-xs);color:var(--md-outline)">${m.role === 'admin' ? '管理员' : m.role === 'editor' ? '成员' : '查看者'}</span>
+    </label>`).join('') : '<div style="color:var(--md-outline);font-size:var(--font-size-sm)">暂无空间成员</div>';
+  showModal(`<div class="modal" style="max-width:400px"><div class="modal-header"><h2 class="modal-title">添加通知人</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">${memberListHtml}</div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="closeModal();showToast('success','已添加','通知人已更新')">确认</button></div></div>`);
 }
 
 function showDeleteWfFromDesigner(wfId) {
@@ -3468,7 +3517,8 @@ function renderDebugPanel(logs) {
     'assign.set': '📝', 'assign.empty': '⚠',
     'code.execute': '💻', 'code.output': '📤',
     'delay.wait': '⏱',
-    'output.write': '📤'
+    'output.write': '📤',
+    'breakpoint.hit': '🔴', 'step.paused': '👉'
   };
   if (filtered.length === 0) return `<div style="text-align:center;color:var(--md-outline);padding:var(--space-6);font-size:var(--font-size-sm)">无 ${designerDebugLogFilter.toUpperCase()} 级别的日志</div>`;
   return filtered.map((log, i) => {
@@ -4805,6 +4855,8 @@ function confirmDebugWithInputs() {
 
 function startDebugExecution() {
   designerDebugMode = true;
+  designerDebugPaused = false;
+  designerDebugPausedNodeId = null;
   designerDebugLog = [];
 
   const now = new Date();
@@ -4962,14 +5014,14 @@ function startDebugExecution() {
           if (level === 'ERROR') {
             const errScenarios = [
               {
-                errorMessage: `输出内容为空：节点配置的输出模板未返回有效内容（当前模式: ${outputMode}）`,
-                suggestedFix: `确认「输出内容」配置：${outputMode === 'variables' ? '确认引用的变量不为空，可在全局变量面板查看变量当前值' : '确认模板表达式语法正确，如 ${变量名} 格式'}`,
+                errorMessage: `输出内容为空：节点配置的输出模板未返回有效内容（当前模式: ${outputMode})`,
+                suggestedFix: `确认「输出内容」配置：${outputMode === 'variables' ? '确认引用的变量不为空，可在全局变量面板查看变量当前值' : '确认模板表达式语法正确，如 \${变量名} 格式'}`,
                 detail: { outputLevel: level, outputMode, template: outputTemplate || '（未配置）', resolvedValue: null, errorMessage: '输出内容为空：节点配置的输出模板未返回有效内容', suggestedFix: '确认引用的变量不为空，上游节点是否已正确赋値' }
               },
               {
                 errorMessage: `变量引用无效：输出模板中引用的变量 \`output_content\` 在当前执行上下文中未定义`,
                 suggestedFix: `在「全局变量」面板中新增变量 output_content，或修改输出模板改为引用已存在的变量（如上游赋値节点的输出变量）`,
-                detail: { outputLevel: level, outputMode, template: outputTemplate || '${output_content}', resolvedValue: undefined, errorMessage: '变量引用无效：output_content 在当前执行上下文中未定义', suggestedFix: '在全局变量面板中新增该变量，或修改模板引用已存在的变量' }
+                detail: { outputLevel: level, outputMode, template: outputTemplate || '\${output_content}', resolvedValue: undefined, errorMessage: '变量引用无效：output_content 在当前执行上下文中未定义', suggestedFix: '在全局变量面板中新增该变量，或修改模板引用已存在的变量' }
               }
             ];
             const sc = errScenarios[Math.floor(Math.random() * errScenarios.length)];
@@ -5006,11 +5058,14 @@ function startDebugExecution() {
   designerBottomTab = 'debug';
   renderDesigner();
 
-  // Phase 2: Animate through nodes progressively
+  // Phase 2: Animate through nodes progressively (with breakpoint support)
   let logIdx = 1;
   let nodePhaseIdx = 0;
   const middleNodes = designerNodes.filter(n => n.type !== 'trigger' && n.type !== 'end');
   const endNode = designerNodes.find(n => n.type === 'end');
+
+  // Store animation state so resumeDebug/stepDebug can continue
+  _debugAnimState = { allLogs, logIdx, nodePhaseIdx, middleNodes, endNode, triggerNode };
 
   function animateNextNode() {
     if (!designerDebugMode) return;
@@ -5023,6 +5078,8 @@ function startDebugExecution() {
         designerDebugLog.push(allLogs[logIdx++]);
       }
       nodePhaseIdx++;
+      _debugAnimState.logIdx = logIdx;
+      _debugAnimState.nodePhaseIdx = nodePhaseIdx;
       renderDesigner();
       _debugTimer1 = setTimeout(animateNextNode, 400);
       return;
@@ -5032,6 +5089,30 @@ function startDebugExecution() {
     const midIdx = nodePhaseIdx - 1;
     if (midIdx < middleNodes.length) {
       const node = middleNodes[midIdx];
+
+      // --- Check breakpoint BEFORE executing the node ---
+      if (node._breakpoint) {
+        node._debugStatus = 'paused';
+        designerDebugPaused = true;
+        designerDebugPausedNodeId = node.id;
+        // Add breakpoint-hit log
+        designerDebugLog.push({
+          time: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}.${String((seq + 1) * 37 % 1000).padStart(3, '0')}`,
+          level: 'warn',
+          node: node.name,
+          event: 'breakpoint.hit',
+          message: `断点命中: ${node.name} (${node.code})，执行已暂停`
+        });
+        // Highlight incoming connection
+        const inConn = designerConnections.find(c => c.to === node.id);
+        if (inConn) inConn._debugActive = true;
+        _debugAnimState.logIdx = logIdx;
+        _debugAnimState.nodePhaseIdx = nodePhaseIdx;
+        renderDesigner();
+        showToast('warning', '断点命中', `${node.name} 处已暂停，点击继续执行或单步执行`);
+        return; // Stop animation, wait for user action
+      }
+
       node._debugStatus = 'running';
       // Highlight incoming connection
       const inConn = designerConnections.find(c => c.to === node.id);
@@ -5049,6 +5130,8 @@ function startDebugExecution() {
         const outConn = designerConnections.find(c => c.from === node.id);
         if (outConn) outConn._debugActive = true;
         nodePhaseIdx++;
+        _debugAnimState.logIdx = logIdx;
+        _debugAnimState.nodePhaseIdx = nodePhaseIdx;
         renderDesigner();
         _debugTimer1 = setTimeout(animateNextNode, 300);
       }, 500);
@@ -5066,6 +5149,9 @@ function startDebugExecution() {
           designerDebugLog.push(allLogs[logIdx++]);
         }
         if (designerWf) designerWf.debugPassed = true;
+        designerDebugPaused = false;
+        designerDebugPausedNodeId = null;
+        _debugAnimState = null;
         designerBottomPanel = 'debug';
         designerBottomTab = 'debug';
         renderDesigner();
@@ -5080,11 +5166,204 @@ function startDebugExecution() {
 // Debug timer ID for cleanup
 let _debugTimer1 = null;
 
+// --- Resume debug: continue to next breakpoint or end ---
+function resumeDebug() {
+  if (!designerDebugMode || !designerDebugPaused || !_debugAnimState) return;
+
+  const s = _debugAnimState;
+  const { allLogs, middleNodes, endNode, triggerNode } = s;
+  let { logIdx, nodePhaseIdx } = s;
+
+  // Find the currently paused node and mark it as running then success
+  const pausedNode = designerNodes.find(n => n.id === designerDebugPausedNodeId);
+  if (pausedNode) {
+    pausedNode._debugStatus = 'running';
+    renderDesigner();
+  }
+
+  designerDebugPaused = false;
+  designerDebugPausedNodeId = null;
+
+  // Continue animation with breakpoint checks
+  function continueAnimate() {
+    if (!designerDebugMode) return;
+
+    // First, complete the paused node
+    if (pausedNode && pausedNode._debugStatus === 'running') {
+      pausedNode._debugStatus = 'success';
+      // Push logs for the paused node
+      while (logIdx < allLogs.length && allLogs[logIdx].node === pausedNode.name) {
+        designerDebugLog.push(allLogs[logIdx++]);
+      }
+      // Highlight outgoing connection
+      const outConn = designerConnections.find(c => c.from === pausedNode.id);
+      if (outConn) outConn._debugActive = true;
+      nodePhaseIdx++;
+      s.logIdx = logIdx;
+      s.nodePhaseIdx = nodePhaseIdx;
+      renderDesigner();
+      _debugTimer1 = setTimeout(continueAnimate, 300);
+      return;
+    }
+
+    // Continue with remaining middle nodes
+    const midIdx = nodePhaseIdx - 1;
+    if (midIdx < middleNodes.length) {
+      const node = middleNodes[midIdx];
+
+      // Check breakpoint
+      if (node._breakpoint) {
+        node._debugStatus = 'paused';
+        designerDebugPaused = true;
+        designerDebugPausedNodeId = node.id;
+        const now = new Date();
+        designerDebugLog.push({
+          time: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}.${String(now.getMilliseconds()).padStart(3, '0')}`,
+          level: 'warn',
+          node: node.name,
+          event: 'breakpoint.hit',
+          message: `断点命中: ${node.name} (${node.code})，执行已暂停`
+        });
+        const inConn = designerConnections.find(c => c.to === node.id);
+        if (inConn) inConn._debugActive = true;
+        s.logIdx = logIdx;
+        s.nodePhaseIdx = nodePhaseIdx;
+        renderDesigner();
+        showToast('warning', '断点命中', `${node.name} 处已暂停`);
+        return;
+      }
+
+      node._debugStatus = 'running';
+      const inConn = designerConnections.find(c => c.to === node.id);
+      if (inConn) inConn._debugActive = true;
+      renderDesigner();
+
+      _debugTimer1 = setTimeout(() => {
+        if (!designerDebugMode) return;
+        node._debugStatus = 'success';
+        while (logIdx < allLogs.length && allLogs[logIdx].node === node.name) {
+          designerDebugLog.push(allLogs[logIdx++]);
+        }
+        const outConn = designerConnections.find(c => c.from === node.id);
+        if (outConn) outConn._debugActive = true;
+        nodePhaseIdx++;
+        s.logIdx = logIdx;
+        s.nodePhaseIdx = nodePhaseIdx;
+        renderDesigner();
+        _debugTimer1 = setTimeout(continueAnimate, 300);
+      }, 500);
+      return;
+    }
+
+    // End node
+    if (endNode) {
+      endNode._debugStatus = 'running';
+      renderDesigner();
+      _debugTimer1 = setTimeout(() => {
+        if (!designerDebugMode) return;
+        endNode._debugStatus = 'success';
+        while (logIdx < allLogs.length) {
+          designerDebugLog.push(allLogs[logIdx++]);
+        }
+        if (designerWf) designerWf.debugPassed = true;
+        designerDebugPaused = false;
+        designerDebugPausedNodeId = null;
+        _debugAnimState = null;
+        designerBottomPanel = 'debug';
+        designerBottomTab = 'debug';
+        renderDesigner();
+        showToast('success', '调试通过', '所有节点执行成功');
+      }, 400);
+    }
+  }
+
+  _debugTimer1 = setTimeout(continueAnimate, 300);
+}
+
+// --- Step debug: execute exactly one node, then pause ---
+function stepDebug() {
+  if (!designerDebugMode || !designerDebugPaused || !_debugAnimState) return;
+
+  const s = _debugAnimState;
+  const { allLogs, middleNodes, endNode, triggerNode } = s;
+  let { logIdx, nodePhaseIdx } = s;
+
+  // Find the currently paused node and execute it
+  const pausedNode = designerNodes.find(n => n.id === designerDebugPausedNodeId);
+  if (pausedNode) {
+    pausedNode._debugStatus = 'running';
+    renderDesigner();
+  }
+
+  designerDebugPaused = false;
+  designerDebugPausedNodeId = null;
+
+  _debugTimer1 = setTimeout(() => {
+    if (!designerDebugMode) return;
+
+    // Complete the paused/stepped node
+    if (pausedNode && pausedNode._debugStatus === 'running') {
+      pausedNode._debugStatus = 'success';
+      while (logIdx < allLogs.length && allLogs[logIdx].node === pausedNode.name) {
+        designerDebugLog.push(allLogs[logIdx++]);
+      }
+      const outConn = designerConnections.find(c => c.from === pausedNode.id);
+      if (outConn) outConn._debugActive = true;
+      nodePhaseIdx++;
+    }
+
+    // Check if there's a next node to step into
+    const midIdx = nodePhaseIdx - 1;
+    if (midIdx < middleNodes.length) {
+      const nextNode = middleNodes[midIdx];
+      // Always pause on the next node in step mode
+      nextNode._debugStatus = 'paused';
+      designerDebugPaused = true;
+      designerDebugPausedNodeId = nextNode.id;
+      const inConn = designerConnections.find(c => c.to === nextNode.id);
+      if (inConn) inConn._debugActive = true;
+      const now = new Date();
+      designerDebugLog.push({
+        time: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}.${String(now.getMilliseconds()).padStart(3, '0')}`,
+        level: 'debug',
+        node: nextNode.name,
+        event: 'step.paused',
+        message: `单步执行: 暂停于 ${nextNode.name} (${nextNode.code})`
+      });
+      s.logIdx = logIdx;
+      s.nodePhaseIdx = nodePhaseIdx;
+      renderDesigner();
+    } else if (endNode) {
+      // No more middle nodes, execute end node
+      endNode._debugStatus = 'running';
+      renderDesigner();
+      _debugTimer1 = setTimeout(() => {
+        if (!designerDebugMode) return;
+        endNode._debugStatus = 'success';
+        while (logIdx < allLogs.length) {
+          designerDebugLog.push(allLogs[logIdx++]);
+        }
+        if (designerWf) designerWf.debugPassed = true;
+        designerDebugPaused = false;
+        designerDebugPausedNodeId = null;
+        _debugAnimState = null;
+        designerBottomPanel = 'debug';
+        designerBottomTab = 'debug';
+        renderDesigner();
+        showToast('success', '调试通过', '所有节点执行成功');
+      }, 400);
+    }
+  }, 500);
+}
+
 function exitDebugMode() {
   // Clear pending debug animation timers
   if (_debugTimer1) { clearTimeout(_debugTimer1); _debugTimer1 = null; }
 
   designerDebugMode = false;
+  designerDebugPaused = false;
+  designerDebugPausedNodeId = null;
+  _debugAnimState = null;
   designerDebugLogFilter = 'all';
   designerNodes.forEach(n => { n._debugStatus = null; });
   designerConnections.forEach(c => { c._debugActive = false; });
@@ -5983,7 +6262,7 @@ function checkHasAdvancedValues(node) {
   const c = node.config || {};
   // Common fields
   if (c._mergeStrategy || c._timeout || c._retryCount || c._retryInterval || c._retryDegradation ||
-      c._errorBehavior || c._note || c._suspendTimeout) return true;
+      c._errorBehavior || c._note || c._suspendTimeout || c._alertOverride) return true;
   // Type-specific fields
   switch (node.type) {
     case 'trigger':
@@ -6061,6 +6340,11 @@ function renderAdvancedConfig(node) {
       // if, switch, assign, output, code, placeholder
       html += renderCommonAdvancedConfig(node);
       break;
+  }
+
+  // All non-trigger/end nodes have an alert override section
+  if (node.type !== 'trigger' && node.type !== 'end') {
+    html += renderAlertOverrideSection(node);
   }
 
   // All nodes have a 备注 section
@@ -6142,6 +6426,38 @@ function renderMergeStrategyField(node) {
       </select>
       <div style="font-size:var(--font-size-xs);color:var(--md-on-surface-variant);margin-top:4px">当有多条输入连线时，决定何时执行此节点</div>
     </div>`;
+}
+
+// --- Shared: Alert Override Section (Node-level) ---
+function renderAlertOverrideSection(node) {
+  const alertOverride = node.config?._alertOverride || false;
+  let html = `
+    <div class="config-section">
+      <div class="config-section-title" style="display:flex;align-items:center;justify-content:space-between">${icons.alertTriangle} 告警 <span style="font-size:var(--font-size-xs);color:var(--md-on-surface-variant);font-weight:400;margin-right:auto;margin-left:4px">覆盖全局设置</span> <label class="toggle-sm" style="margin-left:auto"><input type="checkbox" ${alertOverride ? 'checked' : ''} onchange="updateNodeConfig(${node.id}, '_alertOverride', this.checked); renderDesigner()" /><span class="toggle-sm-slider"></span></label></div>
+      <div class="config-field-help" style="margin-bottom:var(--space-2)">开启后可覆盖工作流级告警配置，仅对此节点生效</div>
+      ${alertOverride ? `
+      <div class="config-field">
+        <div class="config-field-label">启用告警</div>
+        <div style="display:flex;align-items:center;gap:10px"><label class="toggle-sm"><input type="checkbox" checked /><span class="toggle-sm-slider"></span></label><span style="font-size:var(--font-size-xs);color:var(--md-on-surface-variant)">开启后，此节点异常时触发告警</span></div>
+      </div>
+      <div class="config-field">
+        <div class="config-field-label">触发条件</div>
+        <div style="display:flex;flex-direction:column;gap:6px;font-size:var(--font-size-xs)">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" style="accent-color:var(--md-primary)"> 节点执行异常</label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" style="accent-color:var(--md-primary)"> 节点转人工处理</label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" style="accent-color:var(--md-primary)"> 节点挂起等待超时</label>
+        </div>
+      </div>
+      <div class="config-field">
+        <div class="config-field-label">通知人</div>
+        <div class="alert-notify-recipients">
+          <span class="alert-recipient-tag">流程负责人 <span style="color:var(--md-outline);font-size:9px">（默认）</span></span>
+          <button class="btn btn-ghost btn-sm" style="font-size:11px;padding:2px 8px;min-width:auto" onclick="showToast('info','添加通知人','选择空间成员作为额外通知人')">+ 添加</button>
+        </div>
+      </div>
+      ` : ''}
+    </div>`;
+  return html;
 }
 
 // --- Common Advanced Config (if, switch, assign, output, code, placeholder) ---

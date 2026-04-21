@@ -320,6 +320,7 @@ let wsExecutions = {
       ], alerts: [
         { time: '2025-04-12 16:22:15', type: '流程执行失败', level: '严重', pushStatus: 'success' },
         { time: '2025-04-12 16:22:12', type: '节点执行异常', level: '警告', pushStatus: 'failed' },
+        { time: '2025-04-12 16:22:00', type: '节点挂起等待超时', level: '警告', pushStatus: 'success' },
       ] },
     { id: 2005, wfId: 1, wfName: '酒店搜索', wfCode: 'HTL_SEARCH', version: 3, trigger: 'scheduled', status: 'completed', startTime: '2025-04-12 08:00:00', endTime: '2025-04-12 08:01:45', duration: '1分45秒', triggerUser: '系统', archived: false,
       inputs: { city: { label: '目标城市', type: 'String', value: '北京' }, checkInDate: { label: '入住日期', type: 'DateTime', value: '2025-04-18 14:00:00' }, checkOutDate: { label: '退房日期', type: 'DateTime', value: '2025-04-19 12:00:00' }, guestCount: { label: '入住人数', type: 'Integer', value: '1' } },
@@ -353,6 +354,8 @@ let wsExecutions = {
         { name: '报表生成', type: '代码节点', status: 'paused', duration: '已暂停', startTime: '06:02:00', inputData: { reportType: 'daily_booking', dateRange: '2025-04-04' }, outputData: null, variables: { env: 'production', reportType: 'daily_booking' } },
       ], alerts: [
         { time: '2025-04-12 06:00:00', type: '执行异常滞留', level: '警告', pushStatus: 'success' },
+        { time: '2025-04-05 06:30:00', type: '流程执行超时', level: '严重', pushStatus: 'success' },
+        { time: '2025-04-05 06:05:00', type: '节点转人工处理', level: '提醒', pushStatus: 'success' },
       ] },
     { id: 2009, wfId: 1, wfName: '酒店搜索', wfCode: 'HTL_SEARCH', version: 2, trigger: 'manual', status: 'cancelled', startTime: '2025-04-10 15:30:00', endTime: '2025-04-10 15:30:45', duration: '45秒', triggerUser: '李四', archived: false,
       inputs: { city: { label: '目标城市', type: 'String', value: '广州' }, checkInDate: { label: '入住日期', type: 'DateTime', value: '2025-04-15 14:00:00' }, checkOutDate: { label: '退房日期', type: 'DateTime', value: '2025-04-16 12:00:00' }, guestCount: { label: '入住人数', type: 'Integer', value: '2' } },
@@ -390,6 +393,28 @@ let wsExecutions = {
         { name: '积分发放', type: 'HTTP请求', status: 'success', duration: '0.6秒', startTime: '09:05:28', inputData: { url: 'https://api.internal.com/loyalty/credit', method: 'POST', body: { guestId: 'USR-10482', points: 312, reason: 'booking_reward' } }, outputData: { newBalance: 13112, transactionId: 'LYL-c4d8' }, variables: { traceId: 'tr-e1b4-f201', pointsCredited: true } },
         { name: '数据归档与日志', type: '代码节点', status: 'success', duration: '0.3秒', startTime: '09:05:28', inputData: { orderId: 'ORD-2025041400201', archiveTarget: 'data-warehouse' }, outputData: { archived: true, logEntries: 14, traceCompleted: true }, variables: { traceId: 'tr-e1b4-f201', flowCompleted: true } },
         { name: '流程结束', type: '结束节点', status: 'success', duration: '0.1秒', startTime: '09:08:45', inputData: { confirmNo: 'CNF-20250414-00582-A' }, outputData: { success: true, totalDuration: '8分45秒' }, variables: { traceId: 'tr-e1b4-f201' } },
+      ], alerts: [] },
+    { id: 2012, wfId: 3, wfName: '订单取消处理', wfCode: 'HTL_CANCEL', version: 2, trigger: 'manual', status: 'completed', startTime: '2025-04-14 11:00:00', endTime: '2025-04-14 11:05:20', duration: '5分20秒', triggerUser: 'Sukey Wu', archived: false,
+      inputs: { orderId: { label: '订单编号', type: 'String', value: 'ORD-2025041400198' }, reason: { label: '取消原因', type: 'String', value: '客户临时取消行程' }, refundConfig: { label: '退款配置', type: 'Object', value: '{"ratio":1.0,"method":"original"}' } },
+      outputs: { cancelResult: { label: '取消结果', type: 'String', value: '已取消并全额退款' }, refundAmount: { label: '退款金额', type: 'Double', value: '2750.00' } },
+      nodes: [
+        { name: '触发节点', type: '手动触发', status: 'success', duration: '0.1秒', startTime: '11:00:00', inputData: { trigger: 'manual', user: 'Sukey Wu' }, outputData: { timestamp: '2025-04-14T11:00:00Z' }, variables: { traceId: 'tr-a1b2-3012' } },
+        { name: '订单查询', type: 'HTTP请求', status: 'success', duration: '1.2秒', startTime: '11:00:00', inputData: { url: 'https://api.internal.com/orders/ORD-2025041400198', method: 'GET' }, outputData: { orderId: 'ORD-2025041400198', status: 'confirmed', amount: 2750 }, variables: { traceId: 'tr-a1b2-3012', orderId: 'ORD-2025041400198' } },
+        { name: '退款审批', type: '工作流', status: 'success', duration: '3分15秒', startTime: '11:00:02', inputData: { orderId: 'ORD-2025041400198', amount: 2750, reason: '客户临时取消行程' }, outputData: { approved: true, approvalNo: 'APR-20250414-001', refundAmount: 2750 }, variables: { traceId: 'tr-a1b2-3012', refundApproved: true }, subWorkflowExecId: 2013 },
+        { name: '取消预订', type: 'HTTP请求', status: 'success', duration: '1分50秒', startTime: '11:03:17', inputData: { url: 'https://api.supplier.com/cancel', method: 'POST', body: { orderId: 'ORD-2025041400198', approvalNo: 'APR-20250414-001' } }, outputData: { cancelled: true, refundRef: 'RF-9821' }, variables: { traceId: 'tr-a1b2-3012', cancelled: true } },
+        { name: '通知客户', type: '消息通知', status: 'success', duration: '0.8秒', startTime: '11:05:07', inputData: { to: 'guest@example.com', template: 'cancel_confirmation' }, outputData: { messageId: 'MSG-f3d1', delivered: true }, variables: { traceId: 'tr-a1b2-3012' } },
+        { name: '流程结束', type: '结束节点', status: 'success', duration: '0.1秒', startTime: '11:05:19', inputData: { cancelResult: '已取消并全额退款' }, outputData: { success: true }, variables: { traceId: 'tr-a1b2-3012' } },
+      ], alerts: [] },
+    { id: 2013, wfId: 5, wfName: '退款审批', wfCode: 'HTL_REFUND', version: 1, trigger: 'subflow', status: 'completed', startTime: '2025-04-14 11:00:02', endTime: '2025-04-14 11:03:17', duration: '3分15秒', triggerUser: '系统', archived: false,
+      parentExecId: 2012, parentExecNodeName: '退款审批',
+      inputs: { orderId: { label: '订单编号', type: 'String', value: 'ORD-2025041400198' }, amount: { label: '退款金额', type: 'Double', value: '2750.00' }, reason: { label: '退款原因', type: 'String', value: '客户临时取消行程' } },
+      outputs: { approved: { label: '审批结果', type: 'Boolean', value: 'true' }, approvalNo: { label: '审批编号', type: 'String', value: 'APR-20250414-001' }, refundAmount: { label: '退款金额', type: 'Double', value: '2750.00' } },
+      nodes: [
+        { name: '触发节点', type: '子流程触发', status: 'success', duration: '0.1秒', startTime: '11:00:02', inputData: { trigger: 'subflow', parentExecId: 2012 }, outputData: { timestamp: '2025-04-14T11:00:02Z' }, variables: { traceId: 'tr-a1b2-3012', depth: 1 } },
+        { name: '金额校验', type: '代码节点', status: 'success', duration: '0.3秒', startTime: '11:00:02', inputData: { amount: 2750, threshold: 5000 }, outputData: { withinThreshold: true, requireApproval: false }, variables: { traceId: 'tr-a1b2-3012' } },
+        { name: '退款执行', type: 'HTTP请求', status: 'success', duration: '2分45秒', startTime: '11:00:03', inputData: { url: 'https://api.payment.com/refund', method: 'POST', body: { orderId: 'ORD-2025041400198', amount: 2750 } }, outputData: { refundRef: 'RF-9821', status: 'processing' }, variables: { traceId: 'tr-a1b2-3012', refundRef: 'RF-9821' } },
+        { name: '审批记录', type: '代码节点', status: 'success', duration: '0.2秒', startTime: '11:02:48', inputData: { approvalNo: 'APR-20250414-001', refundRef: 'RF-9821' }, outputData: { recorded: true, approvalNo: 'APR-20250414-001' }, variables: { traceId: 'tr-a1b2-3012', approvalRecorded: true } },
+        { name: '流程结束', type: '结束节点', status: 'success', duration: '0.1秒', startTime: '11:03:16', inputData: { approved: true, approvalNo: 'APR-20250414-001' }, outputData: { success: true }, variables: { traceId: 'tr-a1b2-3012' } },
       ], alerts: [] },
   ],
   2: [{ id: 2100, wfId: 20, wfName: '航班信息拉取', wfCode: 'FLT_PULL', version: 4, trigger: 'scheduled', status: 'completed', startTime: '2025-04-12 06:00:00', endTime: '2025-04-12 06:10:00', duration: '10分', triggerUser: '系统', archived: false,
@@ -2270,6 +2295,7 @@ function renderWsExecutionsTab(ws) {
           <option value="manual" ${wsExecTriggerFilter === 'manual' ? 'selected' : ''}>手动</option>
           <option value="scheduled" ${wsExecTriggerFilter === 'scheduled' ? 'selected' : ''}>定时</option>
           <option value="event" ${wsExecTriggerFilter === 'event' ? 'selected' : ''}>事件触发</option>
+          <option value="subflow" ${wsExecTriggerFilter === 'subflow' ? 'selected' : ''}>工作流调用</option>
         </select>
         <select class="form-input" style="width:auto;padding:4px 8px;font-size:var(--font-size-sm)" onchange="onExecTimeRange(this.value)">
           <option value="all" ${wsExecTimeRange === 'all' ? 'selected' : ''}>全部时间</option>
@@ -2287,7 +2313,7 @@ function renderWsExecutionsTab(ws) {
       <td><code style="font-size:var(--font-size-xs)">#${e.id}</code></td>
       <td style="font-weight:500">${e.wfName}</td>
       <td><span class="version-badge">v${e.version}</span></td>
-      <td>${triggerLabel[e.trigger] || e.trigger}</td>
+      <td>${triggerLabel[e.trigger] || e.trigger}${e.trigger === 'subflow' && e.parentExecId ? `<div style="font-size:var(--font-size-xs);color:var(--md-outline);margin-top:2px">来自 <a onclick="event.stopPropagation();viewExecDetail(${e.parentExecId})" style="color:var(--md-primary);text-decoration:none">#${e.parentExecId}</a>${e.parentExecNodeName ? ' · ' + e.parentExecNodeName : ''}</div>` : ''}</td>
       <td><span class="exec-status ${statusClass[e.status]}">${statusLabel[e.status]}</span>${e.stale ? '<span class="stale-mark">异常滞留</span>' : ''}</td>
       <td style="font-size:var(--font-size-xs)">${e.startTime}</td>
       <td style="font-size:var(--font-size-xs)">${e.endTime}</td>
@@ -2397,6 +2423,15 @@ function renderExecDetail(ws) {
     return logs;
   }
 
+  // --- Build: Call Chain Breadcrumb (for sub-workflow instances) ---
+  let callChainHtml = '';
+  if (exec.trigger === 'subflow' && exec.parentExecId) {
+    const parentExec = (wsExecutions[ws.id] || []).find(e => e.id === exec.parentExecId);
+    if (parentExec) {
+      callChainHtml = `<div class="ed-call-chain"><a class="ed-call-chain-item" onclick="viewExecDetail(${parentExec.id})">${parentExec.wfName} <code>#${parentExec.id}</code></a><span class="ed-call-chain-sep">→</span><span class="ed-call-chain-node">${exec.parentExecNodeName || '子流程节点'}</span><span class="ed-call-chain-sep">→</span><span class="ed-call-chain-current">${exec.wfName} <code>#${exec.id}</code></span></div>`;
+    }
+  }
+
   // --- Build: Compact Top Bar ---
   const topBarHtml = `
     <div class="ed-topbar">
@@ -2424,6 +2459,7 @@ function renderExecDetail(ws) {
   const overviewHtml = `
     <div class="ed-overview-strip">
       <div class="ed-overview-chip"><span class="ed-overview-chip-label">触发</span>${triggerLabel[exec.trigger]} · ${exec.triggerUser}</div>
+      ${exec.trigger === 'subflow' && exec.parentExecId ? `<div class="ed-overview-chip"><span class="ed-overview-chip-label">来源</span><a onclick="viewExecDetail(${exec.parentExecId})" style="color:var(--md-primary);text-decoration:none;cursor:pointer">#${exec.parentExecId}</a>${exec.parentExecNodeName ? ' · ' + exec.parentExecNodeName : ''}</div>` : ''}
       <div class="ed-overview-chip"><span class="ed-overview-chip-label">开始</span><span class="ed-mono">${exec.startTime}</span></div>
       <div class="ed-overview-chip"><span class="ed-overview-chip-label">结束</span><span class="ed-mono">${exec.endTime}</span></div>
       <div class="ed-overview-chip"><span class="ed-overview-chip-label">耗时</span><strong>${exec.duration}</strong></div>
@@ -2459,17 +2495,20 @@ function renderExecDetail(ws) {
           const idx = exec.nodes.indexOf(node);
           const q = wsExecNodeSearch ? wsExecNodeSearch.toLowerCase() : '';
           const highlightName = q && node.name.toLowerCase().includes(q) ? node.name.replace(new RegExp('(' + q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi'), '<mark class="ed-search-mark">$1</mark>') : node.name;
+          const isSubWorkflow = node.type === '工作流';
+          const subExec = isSubWorkflow && node.subWorkflowExecId ? (wsExecutions[ws.id] || []).find(e => e.id === node.subWorkflowExecId) : null;
           return `
-          <div class="node-item-v2 ${node.status === 'failed' ? 'node-item-failed' : ''} ${wsExecSelectedNodeIdx === idx ? 'active' : ''}" data-node-idx="${idx}" onclick="selectExecNode(${idx})">
-            <div class="node-dot ${nodeStatusClass[node.status] || ''}"></div>
+          <div class="node-item-v2 ${node.status === 'failed' ? 'node-item-failed' : ''} ${isSubWorkflow ? 'node-item-subworkflow' : ''} ${wsExecSelectedNodeIdx === idx ? 'active' : ''}" data-node-idx="${idx}" onclick="selectExecNode(${idx})">
+            <div class="node-dot ${nodeStatusClass[node.status] || ''} ${isSubWorkflow ? 'node-dot-subworkflow' : ''}"></div>
             <div class="node-main">
               <div class="node-header-row">
-                <span class="node-name-text">${highlightName}</span>
-                <span class="badge badge-type" style="font-size:10px">${node.type}</span>
+                <span class="node-name-text">${isSubWorkflow ? '🔗 ' : ''}${highlightName}</span>
+                <span class="badge badge-type ${isSubWorkflow ? 'badge-subworkflow' : ''}" style="font-size:10px">${node.type}</span>
                 <span class="exec-status ${statusClass[node.status] || ''}" style="font-size:11px">${nodeStatusLabel[node.status] || node.status}</span>
               </div>
               <div class="node-meta-row"><span>开始: ${node.startTime}</span><span>耗时: ${node.duration}</span></div>
-              ${node.error ? `<div class="node-error-brief">${node.error}</div>` : ''}
+              ${isSubWorkflow && subExec ? `<div class="node-subworkflow-link" onclick="event.stopPropagation();viewExecDetail(${subExec.id})">${icons.externalLink || '↗'} 查看子流程实例 #${subExec.id}</div>` : ''}
+              ${!isSubWorkflow && node.error ? `<div class="node-error-brief">${node.error}</div>` : ''}
             </div>
             <div class="node-select-arrow">${icons.chevronRight}</div>
           </div>`;
@@ -2547,6 +2586,8 @@ function renderExecDetail(ws) {
   // --- Build: Right Panel ---
   let panelHtml = '';
   if (hasPanel && selectedNode) {
+    const isSubWorkflowPanel = selectedNode.type === '工作流';
+    const subExecPanel = isSubWorkflowPanel && selectedNode.subWorkflowExecId ? (wsExecutions[ws.id] || []).find(e => e.id === selectedNode.subWorkflowExecId) : null;
     panelHtml = `
       <aside class="ed-panel">
         <div class="exec-panel-header">
@@ -2555,14 +2596,28 @@ function renderExecDetail(ws) {
         </div>
         <div class="exec-panel-body">
           <div class="panel-node-status">
-            <div class="node-dot ${nodeStatusClass[selectedNode.status] || ''}"></div>
+            <div class="node-dot ${nodeStatusClass[selectedNode.status] || ''} ${isSubWorkflowPanel ? 'node-dot-subworkflow' : ''}"></div>
             <div class="panel-node-status-info">
-              <div style="font-weight:500;font-size:var(--font-size-sm)">${selectedNode.name}</div>
+              <div style="font-weight:500;font-size:var(--font-size-sm)">${isSubWorkflowPanel ? '🔗 ' : ''}${selectedNode.name}</div>
               <div class="node-type">${selectedNode.type}</div>
               <div class="node-timing">开始: ${selectedNode.startTime} · 耗时: ${selectedNode.duration}</div>
             </div>
             <span class="exec-status ${statusClass[selectedNode.status] || ''}" style="font-size:11px">${nodeStatusLabel[selectedNode.status] || selectedNode.status}</span>
           </div>
+          ${isSubWorkflowPanel && subExecPanel ? `
+          <div class="panel-subworkflow-card" onclick="viewExecDetail(${subExecPanel.id})" style="cursor:pointer">
+            <div class="panel-subworkflow-card-header">
+              <span class="panel-subworkflow-card-icon">🔗</span>
+              <span class="panel-subworkflow-card-title">${subExecPanel.wfName}</span>
+              <span class="version-badge">v${subExecPanel.version}</span>
+            </div>
+            <div class="panel-subworkflow-card-body">
+              <div class="panel-subworkflow-card-row"><span>实例ID</span><code>#${subExecPanel.id}</code></div>
+              <div class="panel-subworkflow-card-row"><span>状态</span><span class="exec-status ${statusClass[subExecPanel.status]}" style="font-size:11px">${statusLabel[subExecPanel.status]}</span></div>
+              <div class="panel-subworkflow-card-row"><span>耗时</span><span>${subExecPanel.duration}</span></div>
+            </div>
+            <div class="panel-subworkflow-card-action">查看完整执行详情 ${icons.chevronRight}</div>
+          </div>` : ''}
           <div class="panel-section"><div class="panel-section-title">${icons.upload} 输入数据</div>${renderJsonBlock(selectedNode.inputData)}</div>
           <div class="panel-section"><div class="panel-section-title">${icons.checkCircle} 输出数据</div>${renderJsonBlock(selectedNode.outputData)}</div>
           <div class="panel-section"><div class="panel-section-title">${icons.database} 变量快照</div>${renderJsonBlock(selectedNode.variables)}</div>
@@ -2584,6 +2639,7 @@ function renderExecDetail(ws) {
     <div class="ed-page">
       <div class="ed-header">
         ${topBarHtml}
+        ${callChainHtml}
         ${overviewHtml}
       </div>
       <div class="ed-body ${hasPanel ? 'panel-open' : ''}">
