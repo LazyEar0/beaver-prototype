@@ -2650,6 +2650,17 @@ function renderWsSettingsTab(ws) {
       </div>
     </div>
 
+    <div style="background:var(--md-surface-container);border-radius:var(--radius-lg);padding:var(--space-4);margin-bottom:var(--space-5)">
+      <h4 style="font-size:var(--font-size-sm);font-weight:500;color:var(--md-on-surface-variant);margin:0 0 var(--space-3) 0">基本信息</h4>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:var(--space-3) var(--space-6)">
+        <div><div style="font-size:var(--font-size-xs);color:var(--md-outline);margin-bottom:4px">空间名称</div><div style="font-size:var(--font-size-sm);color:var(--md-on-surface)">${ws.name}</div></div>
+        <div><div style="font-size:var(--font-size-xs);color:var(--md-outline);margin-bottom:4px">空间编号</div><div style="font-size:var(--font-size-sm);color:var(--md-on-surface);font-family:monospace">${ws.code}</div></div>
+        <div><div style="font-size:var(--font-size-xs);color:var(--md-outline);margin-bottom:4px">创建人</div><div style="font-size:var(--font-size-sm);color:var(--md-on-surface)">${(ws.members.find(m => m.joinedAt === ws.createdAt && m.role === 'admin') || ws.members[0] || {}).name || '—'}</div></div>
+        <div><div style="font-size:var(--font-size-xs);color:var(--md-outline);margin-bottom:4px">创建时间</div><div style="font-size:var(--font-size-sm);color:var(--md-on-surface)">${ws.createdAt}</div></div>
+        ${ws.desc ? `<div style="grid-column:1/-1"><div style="font-size:var(--font-size-xs);color:var(--md-outline);margin-bottom:4px">空间描述</div><div style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant)">${ws.desc}</div></div>` : ''}
+      </div>
+    </div>
+
     <h3 style="font-size:var(--font-size-md);font-weight:500;margin-bottom:var(--space-3)">成员管理</h3>
     <div class="tabs-container">
       <div class="tabs-header">
