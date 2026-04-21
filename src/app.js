@@ -1527,7 +1527,7 @@ function deleteFolderKeepContent(folderId) {
 function showCascadeDeleteFolder(folderId) {
   closeModal();
   setTimeout(() => {
-    showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">确认级联删除</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body"><div class="delete-warning"><span class="delete-warning-icon">${icons.alertTriangle}</span><div class="delete-warning-text">此操作将删除文件夹内的所有工作流及其执行记录，不可恢复。是否继续？</div></div></div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-danger" onclick="cascadeDeleteFolder(${folderId})">确认删除</button></div></div>`);
+    showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">确认级联删除</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body"><div class="delete-warning"><span class="delete-warning-icon">${icons.alertTriangle}</span><div class="delete-warning-text">此操作将删除文件夹内的所有工作流，不可恢复。执行记录将保留。是否继续？</div></div></div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-danger" onclick="cascadeDeleteFolder(${folderId})">确认删除</button></div></div>`);
   }, 250);
 }
 function cascadeDeleteFolder(folderId) {
@@ -1813,7 +1813,7 @@ function createWf() {
 function showDeleteWfModal(wfId) {
   const wf = (wsWorkflows[wsCurrentId] || []).find(x => x.id === wfId); if (!wf) return;
   showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">删除工作流</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
-  <div class="delete-warning"><span class="delete-warning-icon">${icons.alertTriangle}</span><div class="delete-warning-text">删除后，该工作流的所有版本和 ${wf.execCount} 条执行记录将被一并删除，此操作不可恢复。${wf.runningCount > 0 ? `<br><br><strong style="color:var(--md-error)">当前有 ${wf.runningCount} 个运行中实例，删除后将被终止。</strong>` : ''}</div></div>
+  <div class="delete-warning"><span class="delete-warning-icon">${icons.alertTriangle}</span><div class="delete-warning-text">删除后，该工作流的所有版本将被删除，此操作不可恢复。执行记录将保留。${wf.runningCount > 0 ? `<br><br><strong style="color:var(--md-error)">当前有 ${wf.runningCount} 个运行中实例，删除后将被终止。</strong>` : ''}</div></div>
   <div class="delete-confirm-input" style="margin-top:var(--space-4)"><label class="delete-confirm-label">请输入工作流编号以确认删除：<strong>${wf.code}</strong></label><input type="text" class="form-input" id="deleteWfConfirm" placeholder="请输入工作流编号" oninput="onDeleteWfConfirmInput(${wfId})" style="width:100%" /></div>
   </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-danger" id="confirmDeleteWfBtn" disabled style="opacity:0.5;cursor:not-allowed;pointer-events:none" onclick="deleteWf(${wfId})">确认删除</button></div></div>`);
   setTimeout(() => document.getElementById('deleteWfConfirm')?.focus(), 300);
@@ -1826,8 +1826,7 @@ function onDeleteWfConfirmInput(wfId) {
 function deleteWf(wfId) {
   const wf = (wsWorkflows[wsCurrentId] || []).find(x => x.id === wfId);
   wsWorkflows[wsCurrentId] = (wsWorkflows[wsCurrentId] || []).filter(x => x.id !== wfId);
-  wsExecutions[wsCurrentId] = (wsExecutions[wsCurrentId] || []).filter(e => e.wfId !== wfId);
-  closeModal(); showToast('success', '删除成功', `工作流「${wf.name}」已删除`); render();
+  closeModal(); showToast('success', '删除成功', `工作流「${wf.name}」已删除，执行记录已保留`); render();
 }
 function showCopyWfModal(wfId) {
   const wf = (wsWorkflows[wsCurrentId] || []).find(x => x.id === wfId); if (!wf) return;
@@ -2159,7 +2158,6 @@ function batchDelete() {
 function confirmBatchDelete() {
   const ids = [...batchSelectedIds];
   wsWorkflows[wsCurrentId] = (wsWorkflows[wsCurrentId] || []).filter(wf => !ids.includes(wf.id));
-  ids.forEach(id => { wsExecutions[wsCurrentId] = (wsExecutions[wsCurrentId] || []).filter(e => e.wfId !== id); });
   batchSelectedIds.clear(); batchMode = false;
   closeModal(); showToast('success', '批量删除成功', `已删除 ${ids.length} 个工作流`); render();
 }
@@ -2803,7 +2801,7 @@ function showDeleteWsStep1(id) {
   const ws = workspaces.find(w => w.id === id); if (!ws) return;
   showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">删除空间</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
   <div class="delete-step-indicator"><div class="delete-step active"><span class="delete-step-num">1</span><span>确认风险</span></div><div class="delete-step-line"></div><div class="delete-step"><span class="delete-step-num">2</span><span>输入确认</span></div></div>
-  <div class="delete-warning"><span class="delete-warning-icon">${icons.alertTriangle}</span><div class="delete-warning-text">删除空间后，所有工作流和执行记录将被一并删除，不可恢复。${ws.runningInstances > 0 ? `<br><br><strong style="color:var(--md-error)">当前有 ${ws.runningInstances} 个运行中实例将被终止。</strong>` : ''}</div></div>
+  <div class="delete-warning"><span class="delete-warning-icon">${icons.alertTriangle}</span><div class="delete-warning-text">删除空间后，所有工作流将被一并删除，执行记录将保留。此操作不可恢复。${ws.runningInstances > 0 ? `<br><br><strong style="color:var(--md-error)">当前有 ${ws.runningInstances} 个运行中实例将被终止。</strong>` : ''}</div></div>
   </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-danger" onclick="showDeleteWsStep2(${id})">继续</button></div></div>`);
 }
 function showDeleteWsStep2(id) {
@@ -2823,8 +2821,8 @@ function onDeleteConfirmInput(id) {
 function deleteWorkspace(id) {
   const ws = workspaces.find(w => w.id === id);
   workspaces = workspaces.filter(w => w.id !== id);
-  delete wsFolders[id]; delete wsWorkflows[id]; delete wsExecutions[id];
-  closeModal(); showToast('success', '删除成功', `空间「${ws.name}」已删除`); wsNavigateTo('list');
+  delete wsFolders[id]; delete wsWorkflows[id];
+  closeModal(); showToast('success', '删除成功', `空间「${ws.name}」已删除，执行记录已保留`); wsNavigateTo('list');
 }
 
 // --- Member Management ---
