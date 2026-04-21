@@ -168,6 +168,7 @@ let workspaces = [
 let wsCurrentView = 'list';
 let wsCurrentId = null;
 let wsMemberTab = 'admin';
+let wsMemberSearch = '';
 let wsListState = { search: '', roleFilter: 'all', sortField: 'lastActiveAt', sortAsc: false, page: 1, pageSize: 12 };
 let wsNextId = 7;
 const wsCardColors = [
@@ -1061,7 +1062,7 @@ function renderWorkspaceModule(content, breadcrumb) {
 }
 function wsNavigateTo(view, wsId) {
   wsCurrentView = view; wsCurrentId = wsId || null;
-  if (view === 'detail') { wsInternalTab = 'workflows'; wsMemberTab = 'admin'; wsCurrentFolderId = null; wsFolderPath = []; wsContentSearch = ''; wsContentStatusFilter = 'all'; wsContentCreatorFilter = []; wsCreatorDropdownOpen = false; wsCreatorSearch = ''; wsContentOwnerFilter = []; wsOwnerDropdownOpen = false; wsOwnerSearch = ''; wsContentTypeFilter = 'all'; wsFilterPanelOpen = false; wsContentSortField = 'editedAt'; wsContentSortAsc = false; wsExecSearch = ''; wsExecStatusFilter = 'all'; wsExecTriggerFilter = 'all'; wsExecTimeRange = 'all'; wsExecDetailId = null; wsExecSelectedNodeIdx = null; wsExecPage = 1; }
+  if (view === 'detail') { wsInternalTab = 'workflows'; wsMemberTab = 'admin'; wsMemberSearch = ''; wsCurrentFolderId = null; wsFolderPath = []; wsContentSearch = ''; wsContentStatusFilter = 'all'; wsContentCreatorFilter = []; wsCreatorDropdownOpen = false; wsCreatorSearch = ''; wsContentOwnerFilter = []; wsOwnerDropdownOpen = false; wsOwnerSearch = ''; wsContentTypeFilter = 'all'; wsFilterPanelOpen = false; wsContentSortField = 'editedAt'; wsContentSortAsc = false; wsExecSearch = ''; wsExecStatusFilter = 'all'; wsExecTriggerFilter = 'all'; wsExecTimeRange = 'all'; wsExecDetailId = null; wsExecSelectedNodeIdx = null; wsExecPage = 1; }
   render();
 }
 
@@ -2664,20 +2665,41 @@ function renderWsSettingsTab(ws) {
 }
 
 function renderMemberTabContent(ws, isAdmin) {
-  const membersByRole = ws.members.filter(m => m.role === wsMemberTab);
   const roleLabels = { admin: '管理员', member: '成员', viewer: '只读查看者' };
+  const membersByRole = ws.members.filter(m => m.role === wsMemberTab);
+  const q = (wsMemberSearch || '').trim().toLowerCase();
+  const membersBySearch = q ? membersByRole.filter(m => m.name.toLowerCase().includes(q)) : membersByRole;
+  const searchBar = `<div style="display:flex;align-items:center;gap:var(--space-2);margin-bottom:var(--space-3);">
+    <div class="search-box" style="flex:1;max-width:300px;">
+      ${icons.search}
+      <input id="member-search-input" class="search-input" placeholder="搜索用户名..." value="${wsMemberSearch || ''}" oninput="filterMemberSearch(this.value)" style="padding-left:36px;" />
+    </div>
+    ${isAdmin ? `<button class="btn btn-primary btn-sm" onclick="showAddMemberModal()">${icons.plus}<span>添加${roleLabels[wsMemberTab]}</span></button>` : ''}
+  </div>`;
   if (membersByRole.length === 0) {
-    return `<div class="empty-state" style="padding:var(--space-10) var(--space-8)"><img src="./public/images/empty-members.png" alt="暂无成员" style="width:140px;margin-bottom:var(--space-4);opacity:0.7;" /><div class="empty-state-title">暂无${roleLabels[wsMemberTab]}</div><div class="empty-state-desc">当前角色分组暂无成员</div>${isAdmin ? `<button class="btn btn-primary btn-sm" onclick="showAddMemberModal()">${icons.plus}<span>添加${roleLabels[wsMemberTab]}</span></button>` : ''}</div>`;
+    return searchBar + `<div class="empty-state" style="padding:var(--space-10) var(--space-8)"><img src="./public/images/empty-members.png" alt="暂无成员" style="width:140px;margin-bottom:var(--space-4);opacity:0.7;" /><div class="empty-state-title">暂无${roleLabels[wsMemberTab]}</div><div class="empty-state-desc">当前角色分组暂无成员</div></div>`;
   }
-  return `<div class="tab-toolbar"><div class="tab-toolbar-left"><span class="item-count">共 <strong>${membersByRole.length}</strong> 位${roleLabels[wsMemberTab]}</span></div><div class="tab-toolbar-right">${isAdmin ? `<button class="btn btn-primary btn-sm" onclick="showAddMemberModal()">${icons.plus}<span>添加${roleLabels[wsMemberTab]}</span></button>` : ''}</div></div>
-  <div class="member-list">${membersByRole.map(m => {
+  const listHtml = membersBySearch.length === 0
+    ? `<div class="empty-state" style="padding:var(--space-8)"><div class="empty-state-title">未找到匹配的成员</div><div class="empty-state-desc">请尝试其他用户名关键词</div></div>`
+    : `<div id="member-list-body" class="member-list">${membersBySearch.map(m => {
     const ac = m.role === 'admin' ? 'avatar-admin' : m.role === 'member' ? 'avatar-member' : 'avatar-viewer';
     return `<div class="member-item"><div class="member-avatar ${ac}">${m.avatar}</div><div class="member-info"><div class="member-name">${m.name}</div><div class="member-joined">加入于 ${m.joinedAt}</div></div>
     ${isAdmin ? `<div class="member-actions"><select class="member-role-select" onchange="changeMemberRole(${ws.id}, ${m.userId}, this.value)"><option value="admin" ${m.role === 'admin' ? 'selected' : ''}>管理员</option><option value="member" ${m.role === 'member' ? 'selected' : ''}>成员</option><option value="viewer" ${m.role === 'viewer' ? 'selected' : ''}>只读查看者</option></select><button class="btn btn-ghost btn-sm" style="color:var(--md-error)" onclick="showRemoveMemberModal(${ws.id}, ${m.userId})">${icons.removeUser}<span>移除</span></button></div>` : ''}
     </div>`;
   }).join('')}</div>`;
+  return `<div class="tab-toolbar"><div class="tab-toolbar-left"><span class="item-count">共 <strong>${membersBySearch.length}</strong> 位${roleLabels[wsMemberTab]}</span></div></div>${searchBar}${listHtml}`;
 }
-function switchMemberTab(tab) { wsMemberTab = tab; render(); }
+function switchMemberTab(tab) { wsMemberTab = tab; wsMemberSearch = ''; render(); }
+function filterMemberSearch(val) {
+  wsMemberSearch = val;
+  const ws = workspaces.find(w => w.id === wsCurrentId); if (!ws) return;
+  const isAdmin = ws.myRole === 'admin';
+  const tabContent = document.querySelector('.tab-content'); if (!tabContent) return;
+  const cursorPos = document.getElementById('member-search-input')?.selectionStart;
+  tabContent.innerHTML = renderMemberTabContent(ws, isAdmin);
+  const inp = document.getElementById('member-search-input');
+  if (inp) { inp.focus(); if (cursorPos != null) inp.setSelectionRange(cursorPos, cursorPos); }
+}
 
 // --- Workspace CRUD ---
 function showCreateWsModal() {
