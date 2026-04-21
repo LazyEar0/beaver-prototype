@@ -258,7 +258,7 @@ let wsWorkflows = {
       { v: 2, status: 'history', publishedAt: '2025-04-05 09:30', publisher: 'Sukey Wu', note: '优化对话逻辑', tags: [] },
       { v: 1, status: 'history', publishedAt: '2025-03-10 14:00', publisher: 'Sukey Wu', note: '', tags: [] },
     ] },
-    { id: 6, name: '供应商价格同步', code: 'SUPPLIER_PRICE', desc: '定时同步各供应商最新价格', type: 'app', allowRef: false, status: 'disabled', version: 2, creator: 'Admin', owners: [102], folderId: 4, wsId: 1, createdAt: '2025-03-05', editedAt: '2025-04-06 16:00', lastRun: 'success', runningCount: 0, execCount: 60, debugPassed: true, versions: [
+    { id: 6, name: '供应商价格同步', code: 'SUPPLIER_PRICE', desc: '定时同步各供应商最新价格', type: 'app', allowRef: false, status: 'published', version: 2, creator: 'Admin', owners: [102], folderId: 4, wsId: 1, createdAt: '2025-03-05', editedAt: '2025-04-06 16:00', lastRun: 'success', runningCount: 0, execCount: 60, debugPassed: true, versions: [
       { v: 2, status: 'current', publishedAt: '2025-03-25 10:00', publisher: 'Admin', note: '增加Agoda接入', tags: [] },
       { v: 1, status: 'history', publishedAt: '2025-03-10 09:00', publisher: 'Admin', note: '', tags: [] },
     ] },
@@ -1217,8 +1217,8 @@ function renderWsWorkflowsTab(ws) {
   }
 
   // Status labels
-  const statusLabel = { draft: '草稿', published: '已发布', disabled: '已停用' };
-  const statusClass = { draft: 'status-draft', published: 'status-published', disabled: 'status-disabled' };
+  const statusLabel = { draft: '草稿', published: '已发布' };
+  const statusClass = { draft: 'status-draft', published: 'status-published' };
   const typeLabel = { app: '应用流', chat: '对话流' };
 
   // Multi-select creator dropdown trigger
@@ -1285,7 +1285,7 @@ function renderWsWorkflowsTab(ws) {
           <span class="filter-chip ${wsContentStatusFilter === 'all' ? 'active' : ''}" onclick="onWsStatusFilter('all')">全部</span>
           <span class="filter-chip ${wsContentStatusFilter === 'draft' ? 'active' : ''}" onclick="onWsStatusFilter('draft')">草稿</span>
           <span class="filter-chip ${wsContentStatusFilter === 'published' ? 'active' : ''}" onclick="onWsStatusFilter('published')">已发布</span>
-          <span class="filter-chip ${wsContentStatusFilter === 'disabled' ? 'active' : ''}" onclick="onWsStatusFilter('disabled')">已停用</span>
+
         </div></div>
         <div class="filter-group"><span class="filter-label">创建者</span><div class="creator-dropdown"><div class="creator-dropdown-trigger ${wsCreatorDropdownOpen ? 'open' : ''}" onclick="event.stopPropagation();toggleWsCreatorDropdown()">${creatorTriggerHtml}</div>${creatorPanelHtml}</div></div>
         <div class="filter-group"><span class="filter-label">负责人</span><div class="creator-dropdown"><div class="creator-dropdown-trigger ${wsOwnerDropdownOpen ? 'open' : ''}" onclick="event.stopPropagation();toggleWsOwnerDropdown()">${ownerTriggerHtml}</div>${ownerPanelHtml}</div></div>
@@ -1862,21 +1862,6 @@ function moveWf(wfId, targetFolderId) {
   wf.folderId = targetFolderId; wf.editedAt = new Date().toISOString().slice(0, 16).replace('T', ' ');
   closeModal(); showToast('success', '移动成功', '工作流已移动'); render();
 }
-function showDisableWfModal(wfId) {
-  const wf = (wsWorkflows[wsCurrentId] || []).find(x => x.id === wfId); if (!wf) return;
-  const hasRunning = wf.runningCount > 0;
-  showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">停用工作流</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
-  ${hasRunning ? `<div class="delete-warning"><span class="delete-warning-icon">${icons.alertTriangle}</span><div class="delete-warning-text">当前有 ${wf.runningCount} 个运行中实例，停用后不影响运行中的实例，但不允许启动新的实例。是否继续？</div></div>` : `<p style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant)">确定停用工作流「${wf.name}」吗？停用后将不允许启动新的执行实例。</p>`}
-  </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-danger" onclick="disableWf(${wfId})">确认停用</button></div></div>`);
-}
-function disableWf(wfId) {
-  const wf = (wsWorkflows[wsCurrentId] || []).find(x => x.id === wfId); if (!wf) return;
-  wf.status = 'disabled'; closeModal(); showToast('success', '停用成功', `工作流「${wf.name}」已停用`); render();
-}
-function enableWf(wfId) {
-  const wf = (wsWorkflows[wsCurrentId] || []).find(x => x.id === wfId); if (!wf) return;
-  wf.status = 'published'; showToast('success', '启用成功', `工作流「${wf.name}」已重新启用`); render();
-}
 function buildWfInputFormHtml(inputs) {
   const typeIcons = { String: '𝐓', Integer: '#', Double: '#.#', Boolean: '⊘', DateTime: '📅', Object: '{ }', File: '📎' };
   const requiredInputs = inputs.filter(inp => inp.required);
@@ -2159,14 +2144,7 @@ function confirmBatchMove(targetFolderId) {
   batchSelectedIds.clear(); batchMode = false;
   closeModal(); showToast('success', '批量移动成功', `已移动 ${ids.length} 个工作流`); render();
 }
-function batchDisable() {
-  if (batchSelectedIds.size === 0) return;
-  const wfs = (wsWorkflows[wsCurrentId] || []).filter(wf => batchSelectedIds.has(wf.id) && wf.status === 'published');
-  if (wfs.length === 0) { showToast('info', '提示', '选中的工作流中没有已发布状态的工作流'); return; }
-  wfs.forEach(wf => { wf.status = 'disabled'; });
-  batchSelectedIds.clear(); batchMode = false;
-  showToast('success', '批量停用成功', `已停用 ${wfs.length} 个工作流`); render();
-}
+// Removed: batchDisable — 停用/启用功能此版本不做
 
 // ============================================
 //   EXECUTIONS TAB
