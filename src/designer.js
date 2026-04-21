@@ -53,6 +53,7 @@ let designerSpaceDown = false; // Space key held for pan mode
 let designerUndoStack = []; // Undo state stack (max 50)
 let designerRedoStack = []; // Redo state stack
 let designerMoreMenuOpen = false; // "More" dropdown menu state
+let designerPublishMenuOpen = false; // Publish dropdown menu state
 let designerDirty = false; // Track unsaved changes
 let designerActiveConfigTab = 'basic'; // 'basic' | 'advanced' — persists across renderDesigner()
 let designerVarPickerOpen = null; // Active variable picker: { editorId, position }
@@ -165,6 +166,7 @@ function forceCloseDesigner() {
   designerActive = false;
   designerSpaceDown = false;
   designerMoreMenuOpen = false;
+  designerPublishMenuOpen = false;
   designerUndoStack = [];
   designerRedoStack = [];
   designerDirty = false;
@@ -495,7 +497,17 @@ function renderDesigner() {
             </div>
           </div>` : ''}
         </div>
-        <button class="btn btn-primary btn-sm" onclick="showPublishDialog()" ${wf.status === 'disabled' ? 'disabled style="opacity:0.5"' : ''} title="发布当前工作流版本">${icons.arrowUp || icons.check}<span>发布</span></button>
+        <div style="position:relative;display:flex">
+          <button class="btn btn-primary btn-sm" onclick="showPublishDialog()" ${wf.status === 'disabled' ? 'disabled style="opacity:0.5"' : ''} title="发布当前工作流版本">${icons.arrowUp || icons.check}<span>发布</span></button>
+          <button class="btn btn-primary btn-sm" style="padding:0 6px;min-width:auto;border-left:1px solid rgba(255,255,255,0.3)" onclick="designerPublishMenuOpen=!designerPublishMenuOpen;renderDesigner()" ${wf.status === 'disabled' ? 'disabled style="opacity:0.5"' : ''} title="更多发布选项">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+          ${designerPublishMenuOpen ? `<div class="designer-more-dropdown" style="right:0;min-width:160px" onclick="event.stopPropagation()">
+            <div class="more-dropdown-item" onclick="designerPublishMenuOpen=false;showForcePublishDialog()">
+              ${icons.alertTriangle || ''} <span>强制发布</span>
+            </div>
+          </div>` : ''}
+        </div>
       </div>
     </div>
 
@@ -723,7 +735,11 @@ function renderCanvasNodes() {
         ${node.type === 'mq' && node.config?.topic ? `<div style="margin-top:4px;font-size:10px;color:var(--md-on-surface-variant)">Topic: ${truncate(node.config.topic, 24)}</div>` : ''}
         ${node.type === 'workflow' ? (() => {
           const targetWf = Object.values(wsWorkflows).flat().find(wf => wf.id == node.config?.targetWfId);
-          return targetWf ? `<div style="margin-top:4px;font-size:10px;color:var(--md-on-surface-variant)">${truncate(targetWf.name, 28)}</div>` : '';
+          if (!targetWf) return '';
+          const refVer = node.config?.referencedVersion || targetWf.version || 0;
+          const latestVer = targetWf.latestPublishedVersion || refVer;
+          const hasNew = latestVer > refVer;
+          return `<div style="margin-top:4px;font-size:10px;color:var(--md-on-surface-variant)">${truncate(targetWf.name, 28)}${hasNew ? ` <span style="color:var(--md-primary);font-weight:500">↑v${latestVer}</span>` : ''}</div>`;
         })() : ''}
       </div>
       ${portsHtml}
@@ -2796,11 +2812,39 @@ function renderSubWfConfig(node) {
       : `<div style="text-align:center;padding:var(--space-3);color:var(--md-outline);font-size:var(--font-size-xs)">目标工作流无需输入参数</div>`)
     : `<div style="text-align:center;padding:var(--space-3);color:var(--md-outline);font-size:var(--font-size-xs)">请先选择目标工作流</div>`;
 
+  // Version info for the target workflow
+  const currentRefVersion = targetWf?.version || 0;
+  const latestPublishedVersion = targetWf?.latestPublishedVersion || currentRefVersion;
+  const hasNewVersion = targetWf && latestPublishedVersion > (node.config?.referencedVersion || currentRefVersion);
+  const versionPolicy = node.config?.versionPolicy || 'lock';
+
+  // Version info section
+  const versionInfoHtml = targetWf ? `
+    <div class="config-section" style="margin-top:var(--space-2)">
+      <div class="config-section-title">版本信息</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:var(--space-2) 0">
+        <div style="font-size:var(--font-size-sm)">
+          <span style="color:var(--md-on-surface-variant)">当前引用：</span>
+          <span style="font-weight:500">v${node.config?.referencedVersion || currentRefVersion}</span>
+          ${hasNewVersion ? `<span style="margin-left:var(--space-2);font-size:var(--font-size-xs);color:var(--md-primary);cursor:pointer" onclick="showVersionUpgradeDialog(${node.id})">↑ v${latestPublishedVersion} 可用</span>` : ''}
+        </div>
+        ${hasNewVersion ? `<button class="btn btn-ghost btn-sm" style="height:24px;font-size:11px" onclick="showVersionUpgradeDialog(${node.id})">升级</button>` : ''}
+      </div>
+      <div class="config-field">
+        <div class="config-field-label">版本策略</div>
+        <select class="config-select" onchange="updateNodeConfig(${node.id}, 'versionPolicy', this.value); renderDesigner()">
+          <option value="lock" ${versionPolicy === 'lock' ? 'selected' : ''}>锁定当前版本（推荐）</option>
+          <option value="follow" ${versionPolicy === 'follow' ? 'selected' : ''}>自动跟随最新发布版</option>
+        </select>
+        <div class="config-field-help">${versionPolicy === 'lock' ? '发布新版本时不会自动升级，由您手动确认升级' : '发布新版本时自动升级到最新发布版'}</div>
+      </div>
+    </div>` : '';
+
   return `<div class="config-section">
     <div class="config-section-title">工作流调用配置</div>
     <div class="config-field">
       <div class="config-field-label">选择工作流 <span class="required">*</span></div>
-      <select class="config-select" onchange="updateNodeConfig(${node.id}, 'targetWfId', this.value); syncSubWfInputMapping(${node.id}); renderDesigner()"><option value="">请选择...</option>
+      <select class="config-select" onchange="updateNodeConfig(${node.id}, 'targetWfId', this.value); onSubWfTargetChanged(${node.id}); renderDesigner()"><option value="">请选择...</option>
         ${availableWfs.map(wf => {
           const wsName = workspaces.find(ws => ws.id === wf.wsId)?.name || '';
           return `<option value="${wf.id}" ${node.config?.targetWfId == wf.id ? 'selected' : ''}>${wf.name} (${wf.code})${wsName ? ' - ' + wsName : ''}</option>`;
@@ -2809,6 +2853,7 @@ function renderSubWfConfig(node) {
       <div class="config-field-help">仅显示已发布、允许引用、且授权当前空间的工作流</div>
     </div>
     ${availableWfs.length === 0 ? `<div style="padding:var(--space-3);background:var(--md-surface-container);border-radius:var(--radius-sm);font-size:var(--font-size-xs);color:var(--md-outline);text-align:center">暂无可调用的工作流。请确认目标工作流已发布、开启"允许被引用"、并授权了当前空间。</div>` : ''}
+    ${versionInfoHtml}
     <div class="config-section" style="margin-top:var(--space-2)">
       <div class="config-section-title" style="display:flex;align-items:center;justify-content:space-between">输入参数映射 ${targetWf && inputMapping.length > 0 ? `<span style="font-size:10px;font-weight:400;color:var(--md-outline)">来自 ${escHtml(targetWf.name)}</span>` : ''}</div>
       <div class="config-field-help" style="margin-bottom:var(--space-2)">将当前流程变量映射为目标工作流的输入参数${targetWf ? '，必填项需提供值' : ''}</div>
@@ -2825,6 +2870,62 @@ function updateSubWfInputMapping(nodeId, index, value) {
   if (!node?.config?.inputMapping?.[index]) return;
   node.config.inputMapping[index].value = value;
   designerDirty = true;
+}
+
+function onSubWfTargetChanged(nodeId) {
+  const node = designerNodes.find(n => n.id === nodeId);
+  if (!node) return;
+  // Record the referenced version when a target is selected
+  const targetWf = Object.values(wsWorkflows).flat().find(wf => wf.id == node.config?.targetWfId);
+  if (targetWf) {
+    node.config.referencedVersion = targetWf.version || 1;
+    node.config.versionPolicy = node.config.versionPolicy || 'lock';
+  }
+  syncSubWfInputMapping(nodeId);
+}
+
+function showVersionUpgradeDialog(nodeId) {
+  const node = designerNodes.find(n => n.id === nodeId);
+  if (!node) return;
+  const targetWf = Object.values(wsWorkflows).flat().find(wf => wf.id == node.config?.targetWfId);
+  if (!targetWf) return;
+  const currentVer = node.config?.referencedVersion || 1;
+  const latestVer = targetWf.latestPublishedVersion || targetWf.version || currentVer;
+  // Simulate compatibility check
+  const compatResult = ['compatible', 'compatible', 'compatible', 'additions', 'breaking'][Math.floor(Math.random() * 5)];
+  const compatLabels = { compatible: '完全兼容', additions: '有新增参数', breaking: '接口不兼容' };
+  const compatColors = { compatible: 'var(--md-primary)', additions: '#f59e0b', breaking: 'var(--md-error)' };
+  const compatDescs = {
+    compatible: '新版本的输入输出接口与当前版本一致，可直接升级。',
+    additions: '新版本新增了可选输入参数，升级后可配置新参数。',
+    breaking: '新版本的输入输出接口有变更，升级后需手动调整参数映射。'
+  };
+  const label = compatLabels[compatResult];
+  const color = compatColors[compatResult];
+  const desc = compatDescs[compatResult];
+
+  showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">版本升级</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
+    <div style="display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-4)">
+      <div style="font-size:var(--font-size-sm)"><span style="color:var(--md-on-surface-variant)">当前版本</span> <strong>v${currentVer}</strong></div>
+      <svg style="width:20px;height:20px;color:var(--md-primary)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
+      <div style="font-size:var(--font-size-sm)"><span style="color:var(--md-on-surface-variant)">目标版本</span> <strong>v${latestVer}</strong></div>
+    </div>
+    <div style="padding:var(--space-3);background:var(--md-surface-container);border-radius:var(--radius-md);border-left:3px solid ${color}">
+      <div style="font-size:var(--font-size-sm);font-weight:500;color:${color};margin-bottom:4px">${label}</div>
+      <div style="font-size:var(--font-size-xs);color:var(--md-on-surface-variant)">${desc}</div>
+    </div>
+    ${compatResult === 'breaking' ? '<div style="margin-top:var(--space-3);padding:var(--space-3);background:rgba(239,68,68,0.08);border-radius:var(--radius-md);font-size:var(--font-size-xs);color:var(--md-error)">升级后请检查并调整输入参数映射和输出变量声明，否则可能导致运行时错误。</div>' : ''}
+  </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="confirmVersionUpgrade(${nodeId}, ${latestVer})">${compatResult === 'breaking' ? '我已了解，确认升级' : '确认升级'}</button></div></div>`);
+}
+
+function confirmVersionUpgrade(nodeId, newVersion) {
+  const node = designerNodes.find(n => n.id === nodeId);
+  if (!node) return;
+  node.config.referencedVersion = newVersion;
+  designerDirty = true;
+  closeModal();
+  showToast('success', '版本已升级', `已升级到 v${newVersion}`);
+  renderDesigner();
 }
 
 function syncSubWfInputMapping(nodeId) {
@@ -3133,7 +3234,27 @@ function toggleSettingsSection(titleEl) {
 
 function showDeleteWfFromDesigner(wfId) {
   const wf = (wsWorkflows[designerWsId] || []).find(x => x.id === wfId); if (!wf) return;
-  showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">删除工作流</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
+  // Check if this workflow is referenced by other workflows
+  const referencingWfs = [];
+  Object.entries(wsWorkflows).forEach(([wsId, wfs]) => {
+    wfs.forEach(w => {
+      if (w.id === wfId) return;
+      if (w._designerNodes) {
+        const hasRef = w._designerNodes.some(n => n.type === 'workflow' && n.config?.targetWfId == wfId);
+        if (hasRef) referencingWfs.push(w.name);
+      }
+    });
+  });
+  if (referencingWfs.length > 0) {
+    showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">无法删除</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
+      <div class="delete-warning"><span class="delete-warning-icon">${icons.alertTriangle}</span><div class="delete-warning-text">该工作流被以下工作流引用，请先移除所有引用后再删除：</div></div>
+      <div style="margin-top:var(--space-3);padding:var(--space-3);background:var(--md-surface-container);border-radius:var(--radius-md)">
+        ${referencingWfs.map(name => `<div style="font-size:var(--font-size-sm);padding:4px 0;display:flex;align-items:center;gap:var(--space-2)">${icons.workflow} ${name}</div>`).join('')}
+      </div>
+    </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">我知道了</button></div></div>`);
+    return;
+  }
+showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">删除工作流</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
 <div class="delete-warning"><span class="delete-warning-icon">${icons.alertTriangle}</span><div class="delete-warning-text">删除后，该工作流的所有版本将被删除，此操作不可恢复。执行记录将保留。${wf.runningCount > 0 ? `<br><br><strong style="color:var(--md-error)">当前有 ${wf.runningCount} 个运行中实例，删除后将被终止。</strong>` : ''}</div></div>
 <div class="delete-confirm-input" style="margin-top:var(--space-4)"><label class="delete-confirm-label">请输入工作流编号以确认删除：<strong>${wf.code}</strong></label><input type="text" class="form-input" id="deleteWfConfirmDesigner" placeholder="请输入工作流编号" oninput="onDeleteWfConfirmInputDesigner(${wfId})" style="width:100%" /></div>
 </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-danger" id="confirmDeleteWfBtnDesigner" disabled style="opacity:0.5;cursor:not-allowed;pointer-events:none" onclick="deleteWfFromDesigner(${wfId})">确认删除</button></div></div>`);
@@ -3568,6 +3689,7 @@ function onCanvasMouseDown(e) {
 
   // Close more menu if open
   if (designerMoreMenuOpen) { designerMoreMenuOpen = false; renderDesigner(); return; }
+  if (designerPublishMenuOpen) { designerPublishMenuOpen = false; renderDesigner(); return; }
 
   // Space+drag = force panning (PRD: space+drag canvas pan)
   if (designerSpaceDown) {
@@ -4539,6 +4661,7 @@ function toggleDesignerMoreMenu(e) {
 
 function closeDesignerMoreMenu() {
   designerMoreMenuOpen = false;
+  designerPublishMenuOpen = false;
   renderDesigner();
 }
 
@@ -4984,7 +5107,10 @@ function showPublishDialog() {
   }
 
   if (!wf.debugPassed) {
-    showToast('warning', '提示', '该工作流尚未通过调试，请先调试通过后再发布');
+    showModal(`<div class="modal" style="max-width:440px"><div class="modal-header"><h2 class="modal-title" style="color:var(--md-warning)">${icons.alertTriangle} 无法发布</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
+      <p style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant);line-height:1.6">该工作流尚未通过调试验证，请先完成调试后再发布。</p>
+      <p style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant);line-height:1.6;margin-top:var(--space-2)">如确需发布，可使用「强制发布」功能（需 LionKing 强制发布权限）。</p>
+    </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">关闭</button></div></div>`);
     return;
   }
 
@@ -4998,6 +5124,39 @@ function showPublishDialog() {
   }
 
   _showPublishForm();
+}
+
+function showForcePublishDialog() {
+  const wf = designerWf;
+  if (!wf) return;
+
+  const problems = getProblems().filter(p => p.level === 'error');
+  if (problems.length > 0) {
+    showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">无法发布</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
+      <p style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant);margin-bottom:var(--space-3)">以下问题需要修复后才能发布：</p>
+      ${problems.map(p => `<div class="problem-item" style="margin-bottom:6px"><span class="problem-icon error">${icons.xCircle}</span><span class="problem-text">${p.message}</span></div>`).join('')}
+    </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">关闭</button><button class="btn btn-primary" onclick="closeModal();designerBottomPanel='problems';designerBottomTab='problems';renderDesigner()">去修复</button></div></div>`);
+    return;
+  }
+
+  showModal(`<div class="modal" style="max-width:440px"><div class="modal-header"><h2 class="modal-title" style="color:var(--md-warning)">${icons.alertTriangle} 强制发布</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
+    <p style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant);line-height:1.6">确定强制发布吗？此版本未经调试验证，可能存在执行风险。</p>
+  </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-danger" onclick="closeModal();_doForcePublish()">确认强制发布</button></div></div>`);
+}
+
+function _doForcePublish() {
+  const wf = designerWf;
+  if (!wf) return;
+  const newVersion = (wf.version || 0) + 1;
+  if (!wf.versions) wf.versions = [];
+  wf.versions.unshift({ v: newVersion, status: 'current', publishedAt: new Date().toLocaleString('zh-CN', {year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}).replace(/\//g, '-'), publisher: 'Sukey Wu', note: '强制发布', tags: ['unverified'] });
+  wf.version = newVersion;
+  wf.status = 'published';
+  wf.debugPassed = false;
+  wf._baseVersion = newVersion;
+  designerDirty = false;
+  showToast('success', '发布成功', `工作流已强制发布为 v${newVersion}（未调试）`);
+  renderDesigner();
 }
 
 function _showVersionConflictDialog(baseVer, currentVer) {
@@ -5336,6 +5495,7 @@ function designerKeyHandler(e) {
   if (e.key === 'Escape') {
     if (designerConnecting) { cancelConnection(); }
     else if (designerMoreMenuOpen) { designerMoreMenuOpen = false; renderDesigner(); }
+    else if (designerPublishMenuOpen) { designerPublishMenuOpen = false; renderDesigner(); }
     else if (designerContextMenu) { designerContextMenu = null; renderDesigner(); }
     else if (designerSelectedConnId) { designerSelectedConnId = null; renderDesigner(); }
     else if (designerDebugMode) exitDebugMode();

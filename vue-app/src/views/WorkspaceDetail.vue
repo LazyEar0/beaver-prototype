@@ -571,9 +571,15 @@
           <div v-if="!publishTarget.debugPassed" class="delete-warning mt-3">
             <v-icon color="error" class="mr-2">mdi-alert-outline</v-icon>
             <div class="text-body-2" style="color:#DC2626"><strong>无法发布：</strong>当前流程尚未通过调试验证，请先完成调试后再发布。</div>
+            <div class="text-caption mt-2" style="color:var(--md-on-surface-variant)">如确需发布，可使用「强制发布」功能（需 LionKing 强制发布权限）。</div>
           </div>
         </v-card-text>
-        <v-card-actions class="px-4 pb-4"><v-spacer /><v-btn @click="showPublishWf = false">取消</v-btn><v-btn color="primary" :disabled="!publishTarget.debugPassed" @click="confirmPublishWf">确认发布</v-btn></v-card-actions>
+        <v-card-actions class="px-4 pb-4">
+          <v-spacer />
+          <v-btn v-if="!publishTarget.debugPassed" color="warning" variant="outlined" @click="confirmForcePublishWf">强制发布</v-btn>
+          <v-btn @click="showPublishWf = false">取消</v-btn>
+          <v-btn color="primary" :disabled="!publishTarget.debugPassed" @click="confirmPublishWf">确认发布</v-btn>
+        </v-card-actions>
       </v-card>
     </v-dialog>
 
@@ -1054,6 +1060,21 @@ function confirmPublishWf() {
   wf.editedAt = now.slice(0, 16).replace('T', ' ')
   showPublishWf.value = false
   store.showToast('success', '发布成功', `工作流 v${wf.version} 已发布`)
+}
+
+function confirmForcePublishWf() {
+  const wf = publishTarget.value
+  if (!wf) return
+  const now = new Date().toISOString()
+  wf.version++
+  if (wf.versions) wf.versions.forEach(v => { if (v.status === 'current') v.status = 'history' })
+  if (!wf.versions) wf.versions = []
+  wf.versions.unshift({ v: wf.version, status: 'current', publishedAt: now.slice(0, 16).replace('T', ' '), publisher: 'Sukey Wu', note: '强制发布', tags: ['unverified'] })
+  wf.status = 'published'
+  wf.debugPassed = false
+  wf.editedAt = now.slice(0, 16).replace('T', ' ')
+  showPublishWf.value = false
+  store.showToast('success', '发布成功', `工作流已强制发布为 v${wf.version}（未调试）`)
 }
 
 // Disable / Enable workflow

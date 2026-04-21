@@ -226,7 +226,7 @@ let wsFolders = {
 // Workflows per workspace
 let wsWorkflows = {
   1: [
-    { id: 1, name: '酒店搜索', code: 'HTL_SEARCH', desc: '根据条件搜索可用酒店列表', type: 'app', allowRef: true, status: 'published', version: 5, creator: 'Sukey Wu', lastEditor: '张三', owners: [101, 103], folderId: 2, wsId: 1, createdAt: '2025-01-20', editedAt: '2025-04-13 14:30', lastRun: 'success', runningCount: 0, execCount: 45, debugPassed: true, inputs: [
+    { id: 1, name: '酒店搜索', code: 'HTL_SEARCH', desc: '根据条件搜索可用酒店列表', type: 'app', allowRef: true, status: 'published', version: 5, latestPublishedVersion: 6, creator: 'Sukey Wu', lastEditor: '张三', owners: [101, 103], folderId: 2, wsId: 1, createdAt: '2025-01-20', editedAt: '2025-04-13 14:30', lastRun: 'success', runningCount: 0, execCount: 45, debugPassed: true, inputs: [
       { name: 'city', label: '目标城市', type: 'String', required: true, desc: '搜索的目标城市名称' },
       { name: 'checkInDate', label: '入住日期', type: 'DateTime', required: true, desc: '预期入住日期时间' },
       { name: 'checkOutDate', label: '退房日期', type: 'DateTime', required: true, desc: '预期退房日期时间' },
@@ -247,7 +247,7 @@ let wsWorkflows = {
       { v: 2, status: 'current', publishedAt: '2025-04-10 16:00', publisher: 'Admin', note: '增加短信通知', tags: [] },
       { v: 1, status: 'history', publishedAt: '2025-02-05 14:00', publisher: 'Admin', note: '', tags: [] },
     ] },
-    { id: 3, name: '订单取消处理', code: 'HTL_CANCEL', desc: '自动化处理客户取消订单请求', type: 'app', allowRef: true, status: 'published', version: 1, creator: 'Sukey Wu', owners: [101], folderId: 3, wsId: 1, createdAt: '2025-02-15', editedAt: '2025-04-08 09:15', lastRun: 'failed', runningCount: 0, execCount: 18, debugPassed: true, inputs: [
+    { id: 3, name: '订单取消处理', code: 'HTL_CANCEL', desc: '自动化处理客户取消订单请求', type: 'app', allowRef: true, status: 'published', version: 1, latestPublishedVersion: 2, creator: 'Sukey Wu', owners: [101], folderId: 3, wsId: 1, createdAt: '2025-02-15', editedAt: '2025-04-08 09:15', lastRun: 'failed', runningCount: 0, execCount: 18, debugPassed: true, inputs: [
       { name: 'orderId', label: '订单编号', type: 'String', required: true, desc: '需要取消的订单编号' },
       { name: 'reason', label: '取消原因', type: 'String', required: true, desc: '客户取消订单的原因说明' },
       { name: 'refundConfig', label: '退款配置', type: 'Object', required: false, desc: '自定义退款参数，JSON格式，如 {"ratio": 0.8, "method": "original"}' },
@@ -267,7 +267,7 @@ let wsWorkflows = {
     { id: 8, name: '库存预警通知', code: 'HTL_STOCK_ALERT', desc: '酒店库存不足自动预警', type: 'app', allowRef: false, status: 'draft', version: 0, creator: '李四', lastEditor: 'Sukey Wu', owners: [104], folderId: null, wsId: 1, createdAt: '2025-04-10', editedAt: '2025-04-13 09:30', lastRun: null, runningCount: 0, execCount: 0, debugPassed: false, versions: [] },
   ],
   2: [
-    { id: 20, name: '航班信息拉取', code: 'FLT_PULL', desc: '从供应商API拉取航班数据', type: 'app', allowRef: true, status: 'published', version: 4, creator: 'Admin', owners: [102], folderId: 10, wsId: 2, createdAt: '2025-02-05', editedAt: '2025-04-12 09:15', lastRun: 'success', runningCount: 0, execCount: 200, debugPassed: true, versions: [
+    { id: 20, name: '航班信息拉取', code: 'FLT_PULL', desc: '从供应商API拉取航班数据', type: 'app', allowRef: true, status: 'published', version: 4, latestPublishedVersion: 5, creator: 'Admin', owners: [102], folderId: 10, wsId: 2, createdAt: '2025-02-05', editedAt: '2025-04-12 09:15', lastRun: 'success', runningCount: 0, execCount: 200, debugPassed: true, versions: [
       { v: 4, status: 'current', publishedAt: '2025-04-12 09:15', publisher: 'Admin', note: '增加航司代码映射', tags: [] },
       { v: 3, status: 'history', publishedAt: '2025-04-01 10:00', publisher: 'Admin', note: '紧急修复超时问题', tags: ['unverified'] },
       { v: 2, status: 'history', publishedAt: '2025-03-15 14:00', publisher: 'Admin', note: '增加多供应商轮询', tags: [] },
@@ -1812,6 +1812,26 @@ function createWf() {
 }
 function showDeleteWfModal(wfId) {
   const wf = (wsWorkflows[wsCurrentId] || []).find(x => x.id === wfId); if (!wf) return;
+  // Check if this workflow is referenced by other workflows
+  const referencingWfs = [];
+  Object.entries(wsWorkflows).forEach(([wsId, wfs]) => {
+    wfs.forEach(w => {
+      if (w.id === wfId) return;
+      if (w._designerNodes) {
+        const hasRef = w._designerNodes.some(n => n.type === 'workflow' && n.config?.targetWfId == wfId);
+        if (hasRef) referencingWfs.push(w.name);
+      }
+    });
+  });
+  if (referencingWfs.length > 0) {
+    showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">无法删除</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
+      <div class="delete-warning"><span class="delete-warning-icon">${icons.alertTriangle}</span><div class="delete-warning-text">该工作流被以下工作流引用，请先移除所有引用后再删除：</div></div>
+      <div style="margin-top:var(--space-3);padding:var(--space-3);background:var(--md-surface-container);border-radius:var(--radius-md)">
+        ${referencingWfs.map(name => `<div style="font-size:var(--font-size-sm);padding:4px 0;display:flex;align-items:center;gap:var(--space-2)">${icons.workflow} ${name}</div>`).join('')}
+      </div>
+    </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">我知道了</button></div></div>`);
+    return;
+  }
   showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">删除工作流</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
   <div class="delete-warning"><span class="delete-warning-icon">${icons.alertTriangle}</span><div class="delete-warning-text">删除后，该工作流的所有版本将被删除，此操作不可恢复。执行记录将保留。${wf.runningCount > 0 ? `<br><br><strong style="color:var(--md-error)">当前有 ${wf.runningCount} 个运行中实例，删除后将被终止。</strong>` : ''}</div></div>
   <div class="delete-confirm-input" style="margin-top:var(--space-4)"><label class="delete-confirm-label">请输入工作流编号以确认删除：<strong>${wf.code}</strong></label><input type="text" class="form-input" id="deleteWfConfirm" placeholder="请输入工作流编号" oninput="onDeleteWfConfirmInput(${wfId})" style="width:100%" /></div>
@@ -2620,7 +2640,7 @@ function repushAlert(execId, alertIdx) {
   const exec = (wsExecutions[wsCurrentId] || []).find(e => e.id === execId);
   if (!exec || !exec.alerts || !exec.alerts[alertIdx]) return;
   exec.alerts[alertIdx].pushStatus = 'success';
-  showToast('success', '推送成功', '告警已重新推送至 Snake 平台');
+  showToast('success', '推送成功', '告警已重新推送至 Phoenix 系统');
   render();
 }
 
