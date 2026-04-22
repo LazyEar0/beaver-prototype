@@ -6019,11 +6019,143 @@ function addVariable() {
   showToast('success', '添加成功', `全局变量「${name}」已添加`);
 }
 
+/**
+ * 扫描所有节点，找出引用了指定全局变量的位置
+ * 返回 [{ nodeId, nodeName, nodeType, refs: ['赋值目标', '条件左值'] }]
+ */
+function findVariableReferences(varName) {
+  const results = [];
+  if (!varName) return results;
+
+  // 通用文本扫描：检测 ${varName} / {{varName}} / vars.varName 三种引用模式
+  const textPatterns = [
+    new RegExp('\\$\{' + varName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\}'),  // ${varName}
+    new RegExp('\{\{' + varName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\}\}'),   // {{varName}}
+    new RegExp('vars\\.' + varName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b'), // vars.varName
+  ];
+
+  function textContainsVar(text) {
+    if (typeof text !== 'string') return false;
+    return textPatterns.some(p => p.test(text));
+  }
+
+  // 递归扫描对象所有字符串值
+  function objContainsVar(obj, depth) {
+    if (depth > 4) return false;
+    if (typeof obj === 'string') return textContainsVar(obj);
+    if (Array.isArray(obj)) return obj.some(v => objContainsVar(v, depth + 1));
+    if (obj && typeof obj === 'object') return Object.values(obj).some(v => objContainsVar(v, depth + 1));
+    return false;
+  }
+
+  for (const node of designerNodes) {
+    const refs = [];
+    const cfg = node.config || {};
+
+    // ① 赋值节点：target 直接等于变量名（覆盖赋值）
+    if (node.type === 'assign') {
+      const assignments = cfg.assignments || [];
+      for (const a of assignments) {
+        if (a.target === varName) refs.push('赋值目标（覆盖）');
+        if (a.source && textContainsVar(a.source)) refs.push('赋值来源');
+      }
+    }
+
+    // ② 条件节点：条件表达式引用
+    if (node.type === 'if' || node.type === 'switch') {
+      if (cfg.condition && textContainsVar(cfg.condition)) refs.push('条件表达式');
+      const conditions = cfg.conditions || [];
+      for (const c of conditions) {
+        if (c.left && textContainsVar(c.left)) refs.push('条件左值');
+        if (c.right && typeof c.right === 'string' && textContainsVar(c.right)) refs.push('条件右值');
+      }
+    }
+
+    // ③ 循环节点
+    if (node.type === 'loop') {
+      if (cfg.listVar && textContainsVar(cfg.listVar)) refs.push('遍历列表变量');
+    }
+
+    // ④ HTTP 节点
+    if (node.type === 'http') {
+      if (cfg.url && textContainsVar(cfg.url)) refs.push('请求 URL');
+      if (cfg.body && textContainsVar(cfg.body)) refs.push('请求体');
+      // headers
+      const headers = cfg.headers || [];
+      for (const h of headers) {
+        if (h.value && textContainsVar(h.value)) refs.push('请求头');
+      }
+    }
+
+    // ⑤ 输出节点
+    if (node.type === 'output') {
+      if (cfg.template && textContainsVar(cfg.template)) refs.push('输出模板');
+      const outputVars = cfg.outputVars || [];
+      for (const ov of outputVars) {
+        if (ov.mapping && textContainsVar(ov.mapping)) refs.push('输出变量映射');
+      }
+    }
+
+    // ⑥ 代码节点
+    if (node.type === 'code') {
+      if (cfg.code && textContainsVar(cfg.code)) refs.push('代码');
+    }
+
+    // ⑦ 延迟节点
+    if (node.type === 'delay') {
+      if (cfg.delayTarget && textContainsVar(cfg.delayTarget)) refs.push('延迟目标');
+    }
+
+    // ⑧ 通用兜底：扫描整个 config 中所有字符串值
+    if (refs.length === 0 && objContainsVar(cfg, 0)) {
+      refs.push('节点配置');
+    }
+
+    if (refs.length > 0) {
+      results.push({
+        nodeId: node.id,
+        nodeName: node.name || node.code,
+        nodeType: node.type,
+        refs: [...new Set(refs)]
+      });
+    }
+  }
+
+  return results;
+}
+
 function showDeleteVarConfirm(varName) {
-  // Check references
+  const references = findVariableReferences(varName);
+  let bodyHtml;
+
+  if (references.length > 0) {
+    // 被引用 —— 展示受影响节点列表
+    const nodeTypeLabels = { assign: '赋值', if: '条件', switch: 'Switch', loop: '循环', http: 'HTTP 请求', output: '输出', code: '代码', delay: '延迟', trigger: '触发器', end: '结束', mq: 'MQ', workflow: '子流程' };
+    const refListHtml = references.map(r => {
+      const typeLabel = nodeTypeLabels[r.nodeType] || r.nodeType;
+      return `<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--md-surface-container);border-radius:6px;font-size:var(--font-size-sm)">
+        <span style="flex-shrink:0;font-weight:500;color:var(--md-on-surface)">${escHtml(r.nodeName)}</span>
+        <span style="font-size:10px;padding:1px 6px;border-radius:4px;background:var(--md-primary-container);color:var(--md-on-primary-container)">${typeLabel}</span>
+        <span style="flex:1"></span>
+        <span style="font-size:11px;color:var(--md-on-surface-variant)">${r.refs.join('、')}</span>
+      </div>`;
+    }).join('');
+
+    bodyHtml = `<div style="margin-bottom:var(--space-3)">
+      <p style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant);line-height:1.6">变量「<strong style="color:var(--md-on-surface)">${escHtml(varName)}</strong>」已被以下节点引用，删除后相关引用将失效：</p>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:var(--space-2)">${refListHtml}</div>
+    <div style="padding:var(--space-2) var(--space-3);background:var(--md-error-container);border-radius:var(--radius-sm);display:flex;align-items:center;gap:var(--space-2)">
+      <span style="color:var(--md-on-error-container);font-size:var(--font-size-xs)">${icons.alertTriangle || '⚠️'}</span>
+      <span style="color:var(--md-on-error-container);font-size:var(--font-size-xs);line-height:1.5">删除后，上述节点中的变量引用将变为无效引用，可能导致流程运行异常。建议先移除相关引用再删除。</span>
+    </div>`;
+  } else {
+    bodyHtml = `<p style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant)">确定删除变量「${varName}」吗？</p>`;
+  }
+
   showModal(`<div class="modal"><div class="modal-header"><h2 class="modal-title">删除变量</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
-    <p style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant)">确定删除变量「${varName}」吗？</p>
-  </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-danger" onclick="deleteVariable('${varName}')">确认删除</button></div></div>`);
+    ${bodyHtml}
+  </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-danger" onclick="deleteVariable('${varName}')">${references.length > 0 ? '仍然删除' : '确认删除'}</button></div></div>`);
 }
 
 function deleteVariable(varName) {
