@@ -20,7 +20,7 @@ let designerIsPanning = false;
 let designerPanStart = { x: 0, y: 0 };
 let designerNodeIdCounter = 1;
 let designerConnIdCounter = 1;
-let designerRightPanel = 'overview'; // overview | node | settings | version
+let designerRightPanel = 'overview'; // overview | node | settings | version | chatPreview
 let designerBottomPanel = null; // null | problems | debug | variables
 let designerBottomTab = 'problems';
 let designerBottomPanelHeight = 240; // Draggable height
@@ -31,6 +31,10 @@ let designerDebugPaused = false;       // Is debug paused at a breakpoint?
 let designerDebugPausedNodeId = null;  // Which node is paused
 let _debugAnimState = null;           // Animation state for resume/step
 let designerDebugLogFilter = 'all';
+// --- Chatflow debug state ---
+let designerChatDebug = null;       // { conversationId, userId, round, messages: [{role,text,round,ts}], sessionVars:{}, isRunning }
+let designerChatDebugSettings = { userId: 'debug_user', speed: 'normal' };
+let designerChatDebugVarSnapshot = null; // variable snapshot after each round
 let designerDraggingNodeType = null;
 let designerDraggingExistingNode = null;
 let designerDragOffset = { x: 0, y: 0 };
@@ -103,6 +107,8 @@ function openDesigner(wsId, wfId) {
   designerDebugPaused = false;
   designerDebugPausedNodeId = null;
   _debugAnimState = null;
+  designerChatDebug = null;
+  designerChatDebugVarSnapshot = null;
   designerNodePanelExpanded = false;
   designerClipboard = [];
   designerContextMenu = null;
@@ -225,6 +231,12 @@ function generateRealisticNodes(wf) {
     return generateLoopExampleNodes(wf);
   }
 
+  // Chatflow → generate conversation-style nodes
+  const isChat = wf.type === 'chat' || (wf.name && (wf.name.includes('对话') || wf.name.includes('客服') || wf.name.includes('聊天')));
+  if (isChat) {
+    return generateChatflowNodes(wf);
+  }
+
   const nodes = [
     { id: 1, type: 'trigger', name: '触发器', code: 'trigger_1', x: 80, y: 240, config: { triggerType: 'manual' }, warnings: 0 },
     { id: 2, type: 'http', name: '查询数据', code: 'http_1', x: 320, y: 160, config: { method: 'GET', url: 'https://api.example.com/data' }, warnings: 0 },
@@ -244,6 +256,60 @@ function generateRealisticNodes(wf) {
     { id: 7, from: 5, to: 7, fromPort: 'out', toPort: 'in' },
   ];
   const vars = [];  // 节点I/O变量由节点自身配置定义，全局变量由用户主动声明
+  return { nodes, conns, vars };
+}
+
+function generateChatflowNodes(wf) {
+  // ──────────────────────────────────────────────────────
+  //  对话流示例场景：“智能客服对话” — 用户发消息 → 意图识别 → 分支回复 → 会话保持
+  //
+  //  流程逻辑：
+  //  触发器(消息触发)
+  //    └→ IF 意图判断
+  //         ├─ TRUE (预订查询) → 输出(回复用户) → 结束(本轮结束，会话保持)
+  //         └─ FALSE (其他意图) → 赋值(记录未识别意图) → 输出(回复用户) → 结束
+  // ──────────────────────────────────────────────────────
+  const nodes = [
+    {
+      id: 1, type: 'trigger', name: '触发器', code: 'trigger_1',
+      x: 80, y: 220,
+      config: { triggerType: 'message', inputParams: [] }, warnings: 0
+    },
+    {
+      id: 2, type: 'if', name: '意图识别', code: 'if_1',
+      x: 320, y: 220,
+      config: { condition: '${trigger_1.query} 包含 "订单" or "查询"', condMode: 'expression' }, warnings: 0
+    },
+    {
+      id: 3, type: 'output', name: '回复查询结果', code: 'output_1',
+      x: 580, y: 120,
+      config: { outputMode: 'text', template: '您好！您的订单状态为：${order.status}，预计${order.deliveryDate}送达。还有什么可以帮您的吗？', level: 'INFO' }, warnings: 0
+    },
+    {
+      id: 4, type: 'assign', name: '记录未知意图', code: 'assign_1',
+      x: 580, y: 320,
+      config: {}, warnings: 0
+    },
+    {
+      id: 5, type: 'output', name: '回复默认话术', code: 'output_2',
+      x: 820, y: 320,
+      config: { outputMode: 'text', template: '抱歉，我暂时无法理解您的问题。您可以尝试询问：订单查询、酒店预订、退款流程等。', level: 'INFO' }, warnings: 0
+    },
+    {
+      id: 6, type: 'end', name: '结束', code: 'end_1',
+      x: 1060, y: 220,
+      config: {}, warnings: 0
+    },
+  ];
+  const conns = [
+    { id: 1, from: 1, to: 2, fromPort: 'out', toPort: 'in' },
+    { id: 2, from: 2, to: 3, fromPort: 'true', toPort: 'in', label: 'TRUE' },
+    { id: 3, from: 2, to: 4, fromPort: 'false', toPort: 'in', label: 'FALSE' },
+    { id: 4, from: 3, to: 6, fromPort: 'out', toPort: 'in' },
+    { id: 5, from: 4, to: 5, fromPort: 'out', toPort: 'in' },
+    { id: 6, from: 5, to: 6, fromPort: 'out', toPort: 'in' },
+  ];
+  const vars = [];
   return { nodes, conns, vars };
 }
 
@@ -449,7 +515,7 @@ function renderDesigner() {
   const statusClass = { draft: 'status-draft', published: 'status-published', disabled: 'status-disabled' };
 
   shell.innerHTML = `
-    ${designerDebugMode ? `<div class="debug-mode-bar active">${designerDebugPaused ? icons.pause : icons.play} <span>${designerDebugPaused ? '调试已暂停 - 断点命中' : '调试模式 - 画布只读'}</span> ${designerDebugPaused ? `<button class="btn btn-sm debug-btn-resume" onclick="resumeDebug()" title="继续执行到下一个断点或结束">${icons.play}<span>继续执行</span></button><button class="btn btn-sm debug-btn-step" onclick="stepDebug()" title="单步执行下一个节点">${icons.chevronRight}<span>单步执行</span></button>` : ''} <button class="btn btn-sm" style="height:24px;padding:0 12px;background:rgba(239,68,68,0.1);color:var(--md-error);border-radius:var(--radius-full);font-size:11px" onclick="exitDebugMode()">终止调试</button></div>` : ''}
+    ${designerDebugMode ? `<div class="debug-mode-bar active">${designerDebugPaused ? icons.pause : icons.play} <span>${designerDebugPaused ? '调试已暂停 - 断点命中' : ((designerWf?.type || 'app') === 'chat' ? '对话预览模式 - 画布只读' : '调试模式 - 画布只读')}</span> ${designerDebugPaused ? `<button class="btn btn-sm debug-btn-resume" onclick="resumeDebug()" title="继续执行到下一个断点或结束">${icons.play}<span>继续执行</span></button><button class="btn btn-sm debug-btn-step" onclick="stepDebug()" title="单步执行下一个节点">${icons.chevronRight}<span>单步执行</span></button>` : ''} <button class="btn btn-sm" style="height:24px;padding:0 12px;background:rgba(239,68,68,0.1);color:var(--md-error);border-radius:var(--radius-full);font-size:11px" onclick="exitDebugMode()">终止调试</button></div>` : ''}
     ${designerFullscreen ? `<button class="fullscreen-exit-btn" onclick="toggleDesignerFullscreen()" title="退出全屏 (F11)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="4 14 4 20 10 20"/><polyline points="20 10 20 4 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg> 退出全屏</button>` : ''}
     <div class="designer-toolbar">
       <div class="designer-toolbar-left">
@@ -950,6 +1016,13 @@ function getPortPosition(node, port) {
 // --- Right Panel ---
 function renderRightPanel() {
   const isOpen = designerRightPanel !== null;
+
+  // Chatflow debug mode → show chat preview panel instead of normal right panel
+  const wfType = designerWf?.type || 'app';
+  if (designerDebugMode && wfType === 'chat' && designerRightPanel !== null) {
+    const rpWidthStyle = _rpCurrentWidth !== 360 ? ` style="width:${_rpCurrentWidth}px"` : '';
+    return `<div class="right-panel open chat-preview-panel" id="designerRightPanel"${rpWidthStyle}><div class="right-panel-resize-handle" id="rightPanelResizeHandle" onmousedown="startRightPanelResize(event)"></div>${renderChatPreviewPanel()}</div>`;
+  }
 
   let content = '';
   if (designerRightPanel === 'overview') {
@@ -4785,7 +4858,15 @@ function enterDebugMode() {
     return;
   }
 
-  // Check if trigger node has input parameters → show input form first
+  const wfType = designerWf?.type || 'app';
+
+  // Chatflow → enter chat preview debug mode directly
+  if (wfType === 'chat') {
+    enterChatDebugMode();
+    return;
+  }
+
+  // Appflow → check input params, show form if needed
   const triggerNode = designerNodes.find(n => n.type === 'trigger');
   const inputParams = triggerNode?.config?.inputParams || [];
   if (inputParams.length > 0) {
@@ -5355,6 +5436,303 @@ function stepDebug() {
   }, 500);
 }
 
+// ============================================
+//   Chatflow Debug - Conversation Preview Mode
+//   ============================================
+
+function enterChatDebugMode() {
+  designerDebugMode = true;
+  designerDebugPaused = false;
+  designerDebugPausedNodeId = null;
+  _debugAnimState = null;
+  designerDebugLog = [];
+  designerChatDebug = {
+    conversationId: 'conv_' + Math.random().toString(36).substring(2, 10),
+    userId: designerChatDebugSettings.userId,
+    round: 0,
+    messages: [],
+    sessionVars: {},
+    isRunning: false
+  };
+  designerChatDebugVarSnapshot = null;
+  // Reset all node debug states
+  designerNodes.forEach(n => { n._debugStatus = null; });
+  designerConnections.forEach(c => { c._debugActive = false; });
+  designerRightPanel = 'chatPreview';
+  designerBottomPanel = 'debug';
+  designerBottomTab = 'debug';
+  renderDesigner();
+}
+
+function renderChatPreviewPanel() {
+  const cd = designerChatDebug;
+  if (!cd) return '';
+  const isRunning = cd.isRunning;
+  const round = cd.round;
+  const msgs = cd.messages || [];
+  const varSnapshot = designerChatDebugVarSnapshot;
+
+  // Build message bubbles
+  const msgBubbles = msgs.map(m => {
+    if (m.role === 'user') {
+      return `<div class="chat-msg chat-msg-user"><div class="chat-msg-avatar">👤</div><div class="chat-msg-bubble chat-msg-bubble-user">${escHtml(m.text)}</div></div>`;
+    } else {
+      return `<div class="chat-msg chat-msg-bot"><div class="chat-msg-avatar">🤖</div><div class="chat-msg-bubble chat-msg-bubble-bot">${escHtml(m.text)}${m.streaming ? '<span class="chat-cursor">▍</span>' : ''}</div></div>`;
+    }
+  }).join('');
+
+  // Session variable snapshot
+  const varKeys = varSnapshot ? Object.keys(varSnapshot) : [];
+  const varSection = varKeys.length > 0 ? `
+    <div class="chat-vars-section">
+      <div class="chat-vars-header" onclick="this.parentElement.classList.toggle('collapsed')">${icons.hash} 会话变量 (${varKeys.length}) <span class="chat-vars-toggle">▾</span></div>
+      <div class="chat-vars-body">
+        ${varKeys.map(k => `<div class="chat-var-item"><span class="chat-var-name">${escHtml(k)}</span><span class="chat-var-value">${escHtml(JSON.stringify(varSnapshot[k]))}</span></div>`).join('')}
+      </div>
+    </div>` : '';
+
+  // Session status
+  const statusText = isRunning ? '执行中...' : (round > 0 ? `会话保持中 · 第 ${round} 轮` : '等待输入消息');
+  const statusDot = isRunning ? 'running' : (round > 0 ? 'active' : 'idle');
+
+  return `
+    <div class="chat-preview-container">
+      <div class="chat-preview-header">
+        <div class="chat-preview-title">💬 对话预览</div>
+        <div class="chat-preview-status"><span class="chat-status-dot ${statusDot}"></span>${statusText}</div>
+        <button class="chat-preview-settings-btn" onclick="showChatDebugSettings()" title="调试设置">${icons.settings}</button>
+      </div>
+      <div class="chat-preview-messages" id="chatMessagesArea">
+        ${msgs.length === 0 ? `<div class="chat-empty-hint">在下方输入消息开始对话调试，<br>体验用户真实交互流程</div>` : msgBubbles}
+      </div>
+      <div class="chat-preview-input-area">
+        <div class="chat-input-row">
+          <input type="text" class="chat-input" id="chatInputField" placeholder="${isRunning ? '等待执行完成...' : '输入消息进行调试...'}" ${isRunning ? 'disabled' : ''} onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChatDebugMessage()}" />
+          <button class="chat-send-btn" onclick="sendChatDebugMessage()" ${isRunning ? 'disabled' : ''} title="发送消息">${icons.send || '➤'}</button>
+        </div>
+        <div class="chat-input-meta">
+          <span class="chat-meta-item">conversation_id: <code>${cd.conversationId}</code></span>
+          <span class="chat-meta-item">user_id: <code>${cd.userId}</code></span>
+        </div>
+      </div>
+      ${varSection}
+    </div>`;
+}
+
+function sendChatDebugMessage() {
+  const input = document.getElementById('chatInputField');
+  if (!input) return;
+  const text = input.value.trim();
+  if (!text) return;
+  if (!designerChatDebug || designerChatDebug.isRunning) return;
+
+  const cd = designerChatDebug;
+  cd.round++;
+  cd.messages.push({ role: 'user', text, round: cd.round, ts: Date.now() });
+  input.value = '';
+
+  // Start chatflow debug execution for this round
+  startChatDebugRound(text, cd.round);
+}
+
+function startChatDebugRound(query, round) {
+  const cd = designerChatDebug;
+  if (!cd) return;
+  cd.isRunning = true;
+
+  // Reset node debug states for this round
+  designerNodes.forEach(n => { n._debugStatus = null; });
+  designerConnections.forEach(c => { c._debugActive = false; });
+
+  const now = new Date();
+  const ts = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+  let seq = 0;
+  const nextTs = () => { seq++; return `${ts}.${String(seq * 37 % 1000).padStart(3,'0')}`; };
+
+  // Add trigger log
+  designerDebugLog.push({ time: nextTs(), level: 'info', node: '触发器', event: 'workflow.started', message: `第 ${round} 轮对话触发 · query="${query}"`, detail: { query, conversation_id: cd.conversationId, user_id: cd.userId, round } });
+
+  // Build execution order
+  const triggerNode = designerNodes.find(n => n.type === 'trigger');
+  const endNode = designerNodes.find(n => n.type === 'end');
+  const orderedNodes = [];
+  if (triggerNode) orderedNodes.push(triggerNode);
+  const visited = new Set(triggerNode ? [triggerNode.id] : []);
+  const queue = triggerNode ? [triggerNode.id] : [];
+  while (queue.length > 0) {
+    const currentId = queue.shift();
+    const outConns = designerConnections.filter(c => c.from === currentId);
+    for (const conn of outConns) {
+      const targetNode = designerNodes.find(n => n.id === conn.to);
+      if (targetNode && !visited.has(targetNode.id)) {
+        visited.add(targetNode.id);
+        orderedNodes.push(targetNode);
+        queue.push(targetNode.id);
+      }
+    }
+  }
+  designerNodes.forEach(n => { if (!visited.has(n.id)) orderedNodes.push(n); });
+
+  const middleNodes = orderedNodes.filter(n => n.type !== 'trigger' && n.type !== 'end');
+
+  // Collect output nodes' content for chat reply
+  const outputNodes = middleNodes.filter(n => n.type === 'output');
+  const chatReplies = [];
+
+  // Mark trigger as running then success
+  if (triggerNode) {
+    triggerNode._debugStatus = 'running';
+    designerDebugLog.push({ time: nextTs(), level: 'info', node: triggerNode.name, event: 'trigger.input', message: `内置变量注入: query="${query}", conversation_id="${cd.conversationId}", user_id="${cd.userId}"`, detail: { query, conversation_id: cd.conversationId, user_id: cd.userId } });
+  }
+
+  renderDesigner();
+
+  // Animate through nodes progressively
+  let nodeIdx = 0;
+  const totalNodes = (triggerNode ? 1 : 0) + middleNodes.length + (endNode ? 1 : 0);
+
+  function animateChatNode() {
+    if (!designerDebugMode || !designerChatDebug) return;
+
+    // Phase: trigger success → middle nodes → end
+    if (nodeIdx === 0 && triggerNode) {
+      triggerNode._debugStatus = 'success';
+      const inConn = designerConnections.find(c => c.from === triggerNode.id);
+      if (inConn) inConn._debugActive = true;
+      designerDebugLog.push({ time: nextTs(), level: 'info', node: triggerNode.name, event: 'node.completed', message: '触发器执行完成，耗时 2ms' });
+      nodeIdx++;
+      renderDesigner();
+      setTimeout(animateChatNode, 300);
+      return;
+    }
+
+    const midIdx = triggerNode ? nodeIdx - 1 : nodeIdx;
+    if (midIdx < middleNodes.length) {
+      const node = middleNodes[midIdx];
+
+      // Check breakpoint
+      if (node._breakpoint) {
+        node._debugStatus = 'paused';
+        designerDebugPaused = true;
+        designerDebugPausedNodeId = node.id;
+        designerDebugLog.push({ time: nextTs(), level: 'warn', node: node.name, event: 'breakpoint.hit', message: `断点命中: ${node.name} (${node.code})，执行已暂停` });
+        const inConn = designerConnections.find(c => c.to === node.id);
+        if (inConn) inConn._debugActive = true;
+        cd.isRunning = false;
+        renderDesigner();
+        showToast('warning', '断点命中', `${node.name} 处已暂停`);
+        return;
+      }
+
+      node._debugStatus = 'running';
+      const inConn = designerConnections.find(c => c.to === node.id);
+      if (inConn) inConn._debugActive = true;
+      renderDesigner();
+
+      setTimeout(() => {
+        if (!designerDebugMode || !designerChatDebug) return;
+        node._debugStatus = 'success';
+        const outConn = designerConnections.find(c => c.from === node.id);
+        if (outConn) outConn._debugActive = true;
+
+        // Generate log for this node
+        const typeLabel = { http: 'HTTP 请求', code: '代码', assign: '赋值', if: 'IF 条件', switch: 'Switch', loop: '循环', delay: '延迟', output: '输出', mq: 'MQ' };
+        const dur = node.type === 'http' ? Math.floor(Math.random()*300+50) : node.type === 'code' ? Math.floor(Math.random()*100+10) : Math.floor(Math.random()*20+1);
+        const nt = typeLabel[node.type] || node.type;
+        designerDebugLog.push({ time: nextTs(), level: 'info', node: node.name, event: 'node.completed', message: `[${nt}] 执行完成，耗时 ${dur}ms` });
+
+        // If output node, collect reply text for chat preview
+        if (node.type === 'output') {
+          const outputMode = node.config?.outputMode || 'variables';
+          const template = node.config?.template || '';
+          let replyText = '';
+          if (outputMode === 'text' && template) {
+            replyText = template.replace(/\$\{[^}]+\}/g, '模拟值');
+          } else {
+            replyText = node.config?.level === 'ERROR' ? '⚠️ 处理出错，请稍后重试' : `操作成功 (模拟输出 · ${dur}ms)`;
+          }
+          chatReplies.push(replyText);
+
+          // Simulate streaming: add partial message then complete it
+          const partialReply = replyText.substring(0, Math.ceil(replyText.length * 0.4));
+          cd.messages.push({ role: 'bot', text: partialReply, round, ts: Date.now(), streaming: true });
+          renderDesigner();
+          // Scroll chat to bottom
+          setTimeout(() => {
+            const area = document.getElementById('chatMessagesArea');
+            if (area) area.scrollTop = area.scrollHeight;
+          }, 50);
+        }
+
+        nodeIdx++;
+        renderDesigner();
+        setTimeout(animateChatNode, 300);
+      }, 500);
+      return;
+    }
+
+    // End node
+    if (endNode) {
+      endNode._debugStatus = 'running';
+      renderDesigner();
+      setTimeout(() => {
+        if (!designerDebugMode || !designerChatDebug) return;
+        endNode._debugStatus = 'success';
+        designerDebugLog.push({ time: nextTs(), level: 'info', node: endNode.name, event: 'workflow.finished', message: `第 ${round} 轮执行完成，会话保持` });
+
+        // Complete streaming messages
+        cd.messages.forEach(m => { if (m.streaming) m.streaming = false; });
+
+        // If no output nodes produced reply, add a default system message
+        if (chatReplies.length === 0) {
+          cd.messages.push({ role: 'bot', text: '✓ 本轮执行完成，会话保持中。', round, ts: Date.now() });
+        }
+
+        // Update session variable snapshot
+        designerChatDebugVarSnapshot = {};
+        designerVariables.forEach(v => {
+          designerChatDebugVarSnapshot[v.name] = v.defaultValue || null;
+        });
+
+        cd.isRunning = false;
+        if (designerWf) designerWf.debugPassed = true;
+        designerBottomPanel = 'debug';
+        designerBottomTab = 'debug';
+        renderDesigner();
+        showToast('success', `第 ${round} 轮完成`, '会话保持中，可继续输入下一条消息');
+
+        // Focus input field
+        setTimeout(() => {
+          const inp = document.getElementById('chatInputField');
+          if (inp) inp.focus();
+        }, 100);
+      }, 400);
+    }
+  }
+
+  setTimeout(animateChatNode, 400);
+}
+
+function showChatDebugSettings() {
+  const s = designerChatDebugSettings;
+  const cd = designerChatDebug;
+  showModal(`<div class="modal" style="max-width:440px"><div class="modal-header"><h2 class="modal-title">${icons.settings} 对话调试设置</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
+    <div class="form-group"><label class="form-label">模拟用户 ID</label><input type="text" class="form-input" id="chatDebugUserId" value="${escHtml(s.userId)}" placeholder="debug_user" /></div>
+    <div class="form-group"><label class="form-label">会话 ID（只读）</label><input type="text" class="form-input" value="${cd?.conversationId || ''}" readonly style="background:var(--md-surface-variant)" /></div>
+    <div class="form-group"><label class="form-label">执行速度</label><select class="form-select" id="chatDebugSpeed"><option value="normal"${s.speed==='normal'?' selected':''}>正常速度</option><option value="slow"${s.speed==='slow'?' selected':''}>慢速（便于观察）</option></select></div>
+  </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="applyChatDebugSettings()">确认</button></div></div>`);
+}
+
+function applyChatDebugSettings() {
+  const userIdEl = document.getElementById('chatDebugUserId');
+  const speedEl = document.getElementById('chatDebugSpeed');
+  if (userIdEl) designerChatDebugSettings.userId = userIdEl.value.trim() || 'debug_user';
+  if (speedEl) designerChatDebugSettings.speed = speedEl.value;
+  if (designerChatDebug) designerChatDebug.userId = designerChatDebugSettings.userId;
+  closeModal();
+  showToast('success', '设置已更新', '');
+}
+
 function exitDebugMode() {
   // Clear pending debug animation timers
   if (_debugTimer1) { clearTimeout(_debugTimer1); _debugTimer1 = null; }
@@ -5364,6 +5742,9 @@ function exitDebugMode() {
   designerDebugPausedNodeId = null;
   _debugAnimState = null;
   designerDebugLogFilter = 'all';
+  // Clear chat debug state
+  designerChatDebug = null;
+  designerChatDebugVarSnapshot = null;
   designerNodes.forEach(n => { n._debugStatus = null; });
   designerConnections.forEach(c => { c._debugActive = false; });
   designerBottomPanel = null;
@@ -7336,7 +7717,7 @@ function renderExprEditor(options) {
   const editorId = `expr_${id}_${Date.now()}`;
   const tag = singleLine ? 'input' : 'textarea';
   const inputAttrs = singleLine 
-    ? `type="text" style="height:32px;padding-right:${expandable ? 60 : 36}px"` 
+    ? `type="text" style="height:32px;padding-right:${expandable ? 60 : 36}px" value="${escHtml(value)}"` 
     : `style="min-height:${minHeight}px;padding-right:${expandable ? 60 : 36}px"`;
   
   const expandBtn = expandable ? `
