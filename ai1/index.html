@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Beaver - 文件节点原型 (Sprint-AI1)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <!-- 复用现有原型的完整设计系统 -->
+  <link rel="stylesheet" href="../src/style.css" />
+  <link rel="stylesheet" href="../src/designer.css" />
+  <!-- 仅补充本版本新增样式 -->
+  <link rel="stylesheet" href="./src/ai1-patch.css" />
+</head>
+<body>
+
+<!-- Toast container -->
+<div id="toastContainer" style="position:fixed;top:16px;right:16px;z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none"></div>
+
+<!-- DESIGNER SHELL -->
+<div class="designer-shell" id="designerShell"></div>
+
+<!-- HOME PAGE -->
+<div id="homePage" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:24px;padding:32px;background:var(--color-bg-page)">
+  <div style="display:flex;flex-direction:column;align-items:center;gap:8px">
+    <div style="display:flex;align-items:center;gap:8px;font-size:24px;font-weight:700;color:var(--md-primary)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:28px;height:28px"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+      Beaver
+    </div>
+    <span style="font-size:12px;color:var(--md-on-surface-variant);background:var(--md-primary-container);padding:2px 10px;border-radius:999px">
+      Sprint-AI1 · 文件节点原型演示
+    </span>
+  </div>
+
+  <div style="width:100%;max-width:560px">
+    <div onclick="openAI1Designer()" style="display:flex;align-items:center;gap:16px;padding:20px 24px;background:#fff;border:1px solid var(--md-outline-variant);border-radius:var(--radius-xl);cursor:pointer;transition:box-shadow 0.2s,border-color 0.2s"
+         onmouseenter="this.style.boxShadow='var(--shadow-lg)';this.style.borderColor='var(--md-primary)'"
+         onmouseleave="this.style.boxShadow='';this.style.borderColor='var(--md-outline-variant)'">
+      <div style="width:48px;height:48px;border-radius:var(--radius-lg);background:var(--md-primary-container);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">💬</div>
+      <div style="flex:1">
+        <div style="font-size:var(--font-size-lg);font-weight:600;margin-bottom:4px">PRD生成对话流</div>
+        <div style="font-size:var(--font-size-sm);color:var(--md-on-surface-variant);margin-bottom:8px;line-height:1.6">演示：用户对话 → LLM生成内容 → 文件节点上传OSS → 返回文件卡片</div>
+        <div style="display:flex;gap:8px">
+          <span style="font-size:11px;font-weight:500;padding:2px 8px;border-radius:999px;background:linear-gradient(135deg,#eff6ff,#dbeafe);color:#1d4ed8;border:1px solid #93c5fd">💬 对话流</span>
+          <span style="font-size:11px;padding:2px 8px;border-radius:999px;background:var(--md-surface-container);color:var(--md-on-surface-variant)">Sprint-AI1 演示场景</span>
+        </div>
+      </div>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--md-primary)"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+    </div>
+  </div>
+
+  <div style="max-width:560px;width:100%;font-size:12px;color:var(--md-on-surface-variant);background:var(--md-info-container);border-radius:var(--radius-md);padding:12px 16px;line-height:1.7">
+    <strong>原型范围说明：</strong>本原型聚焦 AI1.1 文件节点配置、AI1.2 输出节点文件模式、AI1.3 节点库更新三项需求，画布为静态预设，不支持拖拽编辑。设计语言和组件风格与现有原型完全一致。
+  </div>
+</div>
+
+<script src="./src/ai1-designer.js"></script>
+</body>
+</html>

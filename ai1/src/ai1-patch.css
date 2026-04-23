@@ -1,0 +1,350 @@
+/* ============================================================
+   Beaver Sprint-AI1 补丁样式
+   仅包含现有 designer.css / style.css 中不存在的新增类
+   其余所有样式直接使用现有原型的 CSS 文件
+============================================================ */
+
+/* ============================================================
+   AI1 原型 - 工具栏布局修正
+   覆盖现有 min-width 限制，确保工具栏始终单行
+============================================================ */
+.designer-toolbar {
+  overflow: hidden;
+  flex-wrap: nowrap;
+}
+
+.designer-toolbar-left {
+  min-width: auto;
+  flex-shrink: 1;
+  overflow: hidden;
+}
+
+.designer-toolbar-right {
+  min-width: auto;
+  flex-shrink: 0;
+}
+
+/* ============================================================
+   AI1.2 新增：文件卡片（对话区消息）
+============================================================ */
+.chat-file-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--md-surface-container);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 12px;
+  border-bottom-left-radius: 4px;
+  max-width: 85%;
+  transition: box-shadow 0.15s ease;
+  animation: chatMsgIn 0.2s ease;
+}
+.chat-file-card:hover {
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+.chat-file-card-icon {
+  font-size: 26px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+.chat-file-card-info {
+  flex: 1;
+  min-width: 0;
+}
+.chat-file-card-name {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--md-on-surface);
+}
+.chat-file-card-meta {
+  font-size: 11px;
+  color: var(--md-outline);
+  margin-top: 2px;
+}
+.chat-file-card-btn {
+  flex-shrink: 0;
+  padding: 5px 12px;
+  background: var(--md-primary);
+  color: #fff;
+  border-radius: var(--radius-md);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: background 0.15s;
+}
+.chat-file-card-btn:hover {
+  background: #5B44A0;
+}
+.chat-file-card-btn svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* 文件卡片上方附加文字（气泡形式，同 bot bubble 风格） */
+.chat-file-additional-text {
+  font-size: 13px;
+  line-height: 1.5;
+  max-width: 85%;
+  padding: 8px 12px;
+  background: var(--md-surface-container);
+  border-radius: 12px;
+  border-bottom-left-radius: 4px;
+  color: var(--md-on-surface);
+  margin-bottom: 6px;
+}
+
+/* ============================================================
+   文件节点 - 操作类型列表（config panel 内）
+============================================================ */
+.operation-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.operation-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.operation-item:hover:not(.disabled) {
+  background: rgba(103, 80, 164, 0.06);
+}
+.operation-item.active {
+  background: var(--md-primary-container);
+  color: var(--md-on-primary-container);
+  font-weight: 500;
+}
+.operation-item.disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.operation-item-badge {
+  margin-left: auto;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--md-surface-container-high);
+  color: var(--md-outline);
+}
+
+/* ============================================================
+   变量选择器触发按钮（config panel 内）
+============================================================ */
+.var-trigger-btn {
+  width: 100%;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 6px;
+  font-size: var(--font-size-sm);
+  color: var(--md-outline);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: border-color 0.15s;
+}
+.var-trigger-btn:hover {
+  border-color: var(--md-primary);
+  color: var(--md-on-surface);
+}
+.var-trigger-btn.has-value {
+  color: var(--md-on-surface);
+  border-color: var(--md-outline-variant);
+}
+.var-trigger-btn svg {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+}
+.var-trigger-btn .var-ref-tag {
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  background: var(--md-primary-container);
+  color: var(--md-primary);
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+.var-trigger-btn .arrow-icon {
+  margin-left: auto;
+  color: var(--md-outline);
+}
+
+/* ============================================================
+   变量选择浮层（复用现有 var-picker-* 样式，仅补充定位）
+============================================================ */
+.ai1-var-picker {
+  position: fixed;
+  z-index: 9999;
+  width: 280px;
+  max-height: 300px;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-xl);
+  overflow: hidden;
+}
+.ai1-var-picker-header {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--md-outline-variant);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--md-on-surface-variant);
+  flex-shrink: 0;
+}
+.ai1-var-picker-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--md-outline-variant);
+  flex-shrink: 0;
+}
+.ai1-var-picker-search svg {
+  width: 12px;
+  height: 12px;
+  color: var(--md-outline);
+  flex-shrink: 0;
+}
+.ai1-var-picker-search input {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: 12px;
+  background: transparent;
+}
+.ai1-var-picker-body {
+  flex: 1;
+  overflow-y: auto;
+}
+.ai1-var-group-title {
+  padding: 4px 10px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--md-outline);
+}
+.ai1-var-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  padding: 6px 10px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.ai1-var-item:hover {
+  background: rgba(103, 80, 164, 0.06);
+}
+
+/* ============================================================
+   输出变量只读展示框
+============================================================ */
+.output-vars-readonly {
+  background: var(--md-surface-container);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+}
+.output-var-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  padding: 3px 0;
+}
+.output-var-name {
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  font-weight: 600;
+}
+.output-var-type {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: #FEF7E0;
+  color: var(--md-warning);
+}
+.output-var-desc {
+  font-size: 11px;
+  color: var(--md-outline);
+}
+
+/* ============================================================
+   文件卡片预览（config panel 内，只读）
+============================================================ */
+.file-card-preview {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--md-surface-container);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--radius-md);
+  border-bottom-left-radius: 4px;
+}
+.file-card-preview.placeholder {
+  opacity: 0.5;
+}
+.file-card-preview-icon { font-size: 22px; flex-shrink: 0; }
+.file-card-preview-info { flex: 1; min-width: 0; }
+.file-card-preview-name {
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.file-card-preview-meta {
+  font-size: 11px;
+  color: var(--md-outline);
+  margin-top: 2px;
+}
+
+/* ============================================================
+   Canvas 节点：节点颜色补充（现有原型 node-color-integration）
+   文件节点使用集成色（紫色系）
+============================================================ */
+.node-color-file {
+  background: #F3E5F5;
+  color: #6A1B9A;
+}
+
+/* Canvas 节点提示条 */
+.canvas-static-hint {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  padding: 5px 14px;
+  border-radius: 999px;
+  font-size: 11px;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.canvas-static-hint svg { width: 12px; height: 12px; }
