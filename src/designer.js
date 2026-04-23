@@ -67,6 +67,9 @@ let designerActiveConfigTab = 'basic'; // 'basic' | 'advanced' — persists acro
 let designerVarPickerOpen = null; // Active variable picker: { editorId, position }
 let designerVarPickerHighlighted = -1; // Keyboard navigation highlight index
 
+// --- Helper: convert variable type to CSS-safe class name ---
+function typeClass(t) { return t && t.startsWith('Array') ? 'Array' : (t || 'String'); }
+
 // --- Group State (Task 1: Node Grouping) ---
 let designerGroups = []; // { id, name, nodeIds[], collapsed, color, x, y, w, h }
 let designerGroupIdCounter = 1;
@@ -167,10 +170,30 @@ function openDesigner(wsId, wfId) {
   // Initialize default nodes if empty
   initDesignerNodes(wf);
 
+  // Reset group and search state
+  designerGroups = [];
+  designerGroupIdCounter = 1;
+  designerGroupRenaming = null;
+  designerSearchOpen = false;
+  designerSearchQuery = '';
+  designerFocusFlashNodeId = null;
+
   const shell = document.getElementById('designerShell');
   shell.classList.add('active');
-  renderDesigner();
-  startAutoSave();
+
+  // Task 4: large-flow loading indicator
+  const nodeCount = designerNodes.length;
+  if (nodeCount > 80) {
+    showLargeFlowLoader(nodeCount);
+    requestAnimationFrame(() => {
+      renderDesigner();
+      hideLargeFlowLoader();
+      startAutoSave();
+    });
+  } else {
+    renderDesigner();
+    startAutoSave();
+  }
 
   // Multi-person awareness: check if someone else has unsaved draft
   const otherDraft = _getOtherUserDraft(wfId);
@@ -555,6 +578,11 @@ function renderDesigner() {
       </div>
       <div class="designer-toolbar-center">
         <button class="toolbar-btn" onclick="designerUndo()" title="撤销上一步操作 (Ctrl+Z)">${icons.arrowLeft}</button>
+        <span class="toolbar-divider"></span>
+        <button class="toolbar-btn" onclick="openDesignerSearch()" title="搜索节点 (Ctrl+F)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <span>搜索</span>
+        </button>
         <span class="toolbar-divider"></span>
         <button class="toolbar-btn" onclick="autoLayout()" title="自动优化节点排列">${icons.workflow}</button>
         <button class="toolbar-btn ${designerMinimapVisible ? 'active' : ''}" onclick="toggleMinimap()" title="${designerMinimapVisible ? '隐藏小地图' : '显示小地图'}">
@@ -1745,8 +1773,10 @@ function renderTriggerConfig(node) {
         { value: 'datetime',   label: '日期时间' },
         { value: 'file',       label: '文件' },
         { value: 'json',       label: 'JSON 对象' },
+        { value: 'arrayString', label: '数组（字符串）' },
+        { value: 'arrayObject', label: '数组（对象）' },
       ];
-      const fieldTypeTypeMap = { shortText: 'String', longText: 'String', number: 'Integer', toggle: 'Boolean', datetime: 'DateTime', file: 'File', json: 'Object' };
+      const fieldTypeTypeMap = { shortText: 'String', longText: 'String', number: 'Integer', toggle: 'Boolean', datetime: 'DateTime', file: 'File', json: 'Object', arrayString: 'Array[String]', arrayObject: 'Array[Object]' };
       const inferredType = fieldTypeTypeMap[fieldType] || 'String';
       return `
       <div class="trigger-param-card">
@@ -2333,7 +2363,7 @@ function renderCodeConfig(node) {
     node.config.codeOutputVars = [{ name: 'result', type: 'Object', desc: '代码 return 返回的结果' }];
   }
   const codeOutputVars = node.config.codeOutputVars;
-  const typeOptions = ['String', 'Integer', 'Double', 'Boolean', 'DateTime', 'Object', 'File'];
+  const typeOptions = ['String', 'Integer', 'Double', 'Boolean', 'DateTime', 'Object', 'File', 'Array[String]', 'Array[Integer]', 'Array[Object]'];
   
   const outputDeclHtml = `
     <div class="config-section" style="margin-top:var(--space-2)">
@@ -2346,7 +2376,7 @@ function renderCodeConfig(node) {
         const curType = v.type || 'Object';
         return `
       <div class="code-output-var-row">
-        <span class="var-icon type-${curType}" title="${curType}">${curType.charAt(0)}</span>
+        <span class="var-icon type-${typeClass(curType)}" title="${curType}">${curType.startsWith('Array') ? '[]' : curType.charAt(0)}</span>
         <input class="config-input" style="flex:1;height:28px;font-size:11px;font-family:var(--font-family-mono)" placeholder="变量名" value="${escHtml(v.name)}" onchange="updateCodeOutputVar(${node.id}, ${i}, 'name', this.value); renderDesigner()" />
         <select class="assign-type-select" title="变量类型" style="height:28px;font-size:11px" onchange="updateCodeOutputVar(${node.id}, ${i}, 'type', this.value); renderDesigner()">
           ${typeOptions.map(t => `<option value="${t}"${curType === t ? ' selected' : ''}>${t}</option>`).join('')}
@@ -2525,7 +2555,7 @@ function renderAssignConfig(node) {
   const upstreamPreview = renderUpstreamOutputPreview(node.id);
   const outputVarsSection = renderOutputVariablesSection(node);
   const assignments = node.config?.assignments || [{ target: 'processedData', source: '', type: 'String' }];
-  const typeOptions = ['String', 'Integer', 'Double', 'Boolean', 'DateTime', 'Object', 'File'];
+  const typeOptions = ['String', 'Integer', 'Double', 'Boolean', 'DateTime', 'Object', 'File', 'Array[String]', 'Array[Integer]', 'Array[Object]'];
   
   return `<div class="config-section">
     <div class="config-section-title">赋值规则</div>
@@ -2698,7 +2728,7 @@ function renderOutputConfig(node) {
   const wfType = designerWf?.type || 'app';
   const isChat = wfType === 'chat';
   const mode = node.config?.outputMode || 'variables';
-  const typeOptions = ['String', 'Integer', 'Double', 'Boolean', 'DateTime', 'Object', 'File'];
+  const typeOptions = ['String', 'Integer', 'Double', 'Boolean', 'DateTime', 'Object', 'File', 'Array[String]', 'Array[Integer]', 'Array[Object]'];
 
   // Variable mode content
   const outputVars = node.config?.outputVars || [{ name: 'result', type: 'String', source: '' }];
@@ -3160,7 +3190,7 @@ function renderSubWfConfig(node) {
     node.config.wfOutputVars = [{ name: node.config.outputVar || 'wfResult', type: 'Object', desc: '被调用工作流的返回结果' }];
   }
   const wfOutputVars = node.config.wfOutputVars;
-  const wfTypeOptions = ['String', 'Integer', 'Double', 'Boolean', 'DateTime', 'Object', 'File'];
+  const wfTypeOptions = ['String', 'Integer', 'Double', 'Boolean', 'DateTime', 'Object', 'File', 'Array[String]', 'Array[Integer]', 'Array[Object]'];
   
   const wfOutputDeclHtml = `
     <div class="config-section" style="margin-top:var(--space-2)">
@@ -3173,7 +3203,7 @@ function renderSubWfConfig(node) {
         const curType = v.type || 'Object';
         return `
       <div class="code-output-var-row">
-        <span class="var-icon type-${curType}" title="${curType}">${curType.charAt(0)}</span>
+        <span class="var-icon type-${typeClass(curType)}" title="${curType}">${curType.startsWith('Array') ? '[]' : curType.charAt(0)}</span>
         <input class="config-input" style="flex:1;height:28px;font-size:11px;font-family:var(--font-family-mono)" placeholder="变量名" value="${escHtml(v.name)}" onchange="updateWfOutputVar(${node.id}, ${i}, 'name', this.value); renderDesigner()" />
         <select class="assign-type-select" title="变量类型" style="height:28px;font-size:11px" onchange="updateWfOutputVar(${node.id}, ${i}, 'type', this.value); renderDesigner()">
           ${wfTypeOptions.map(t => `<option value="${t}"${curType === t ? ' selected' : ''}>${t}</option>`).join('')}
@@ -3187,12 +3217,12 @@ function renderSubWfConfig(node) {
   const inputMappingHtml = targetWf
     ? (inputMapping.length > 0
       ? inputMapping.map((m, i) => {
-          const typeBadgeMap = { String: 'S', Integer: 'I', Double: 'D', Boolean: 'B', DateTime: 'T', Object: 'O', File: 'F', 'Array[String]': 'A', 'Array[Object]': 'A' };
+          const typeBadgeMap = { String: 'S', Integer: 'I', Double: 'D', Boolean: 'B', DateTime: 'T', Object: 'O', File: 'F', 'Array[String]': 'A[]', 'Array[Integer]': 'A[]', 'Array[Object]': 'A[]' };
           const badge = typeBadgeMap[m.type] || 'S';
           return `
         <div class="subwf-param-row">
           <div class="subwf-param-left">
-            <span class="var-icon type-${m.type}" title="${m.type}">${badge}</span>
+            <span class="var-icon type-${typeClass(m.type)}" title="${m.type}">${badge}</span>
             <div class="subwf-param-info">
               <div class="subwf-param-name">${escHtml(m.label || m.name)}${m.required ? ' <span style="color:var(--md-error)">*</span>' : ''}</div>
               <div class="subwf-param-desc">${escHtml(m.name)}${m.desc ? ' · ' + escHtml(m.desc) : ''}</div>
@@ -3884,10 +3914,11 @@ function renderBottomPanel() {
 function renderProblemsPanel(problems) {
   if (problems.length === 0) return '<div style="text-align:center;color:var(--md-success);padding:var(--space-6);font-size:var(--font-size-sm);display:flex;align-items:center;justify-content:center;gap:8px">' + icons.checkCircle + ' 无问题，可以发布</div>';
   return problems.map(p => `
-    <div class="problem-item" onclick="${p.nodeId ? `selectNode(${p.nodeId})` : ''}">
+    <div class="problem-item" onclick="${p.nodeId ? `selectNode(${p.nodeId})` : ''}" style="cursor:${p.nodeId ? 'pointer' : 'default'}">
       <span class="problem-icon ${p.level}">${p.level === 'error' ? icons.xCircle : icons.alertTriangle}</span>
       <span class="problem-text">${p.message}</span>
       <span class="problem-location">${p.location}</span>
+      ${p.nodeId ? `<button class="problem-locate-btn" onclick="event.stopPropagation();focusNode('node',${p.nodeId})" title="定位到节点">→</button>` : ''}
     </div>
   `).join('');
 }
@@ -5333,8 +5364,7 @@ function enterDebugMode() {
 // --- Debug Input Parameter Modal ---
 function showDebugInputModal(inputParams) {
   const wf = designerWf;
-  const fieldTypeToType = { shortText: 'String', longText: 'String', number: 'Integer', toggle: 'Boolean', datetime: 'DateTime', file: 'File', json: 'Object' };
-  // Convert trigger inputParams to the format expected by buildWfInputFormHtml
+  const fieldTypeToType = { shortText: 'String', longText: 'String', number: 'Integer', toggle: 'Boolean', datetime: 'DateTime', file: 'File', json: 'Object', arrayString: 'Array[String]', arrayObject: 'Array[Object]' };
   const inputs = inputParams.map(p => ({
     name: p.name,
     label: p.label || p.name,
@@ -6637,11 +6667,31 @@ function renderMinimap() {
   _minimapMinX = minX;
   _minimapMinY = minY;
 
+  // Node type color map for layered minimap (Task 5)
+  const typeColorMap = {
+    trigger: '#8b5cf6', end: '#8b5cf6', 'if': '#8b5cf6', switch: '#8b5cf6', loop: '#8b5cf6', delay: '#8b5cf6',
+    assign: '#3b82f6', output: '#3b82f6', code: '#3b82f6',
+    http: '#f59e0b', mq: '#f59e0b',
+    workflow: '#10b981',
+    placeholder: '#94a3b8',
+  };
+  const useColor = designerNodes.length > 50;
+
   return `<div class="canvas-minimap" onmousedown="onMinimapMouseDown(event)">
     ${designerNodes.map(n => {
       const nx = (n.x - minX) * scale + 10;
       const ny = (n.y - minY) * scale + 10;
-      return `<div class="minimap-node" style="left:${nx}px;top:${ny}px;width:${20 * scale}px;height:${8 * scale}px"></div>`;
+      const isSelected = designerSelectedNodeId === n.id || designerSelectedNodeIds.includes(n.id);
+      const dotColor = useColor ? (typeColorMap[n.type] || '#64748b') : '#64748b';
+      return `<div class="minimap-node" style="left:${nx}px;top:${ny}px;width:${Math.max(4, 20 * scale)}px;height:${Math.max(3, 8 * scale)}px;background:${dotColor};${isSelected ? 'box-shadow:0 0 0 1.5px #fff,0 0 0 2.5px ' + dotColor + ';' : ''}"></div>`;
+    }).join('')}
+    ${designerGroups.map(g => {
+      const gx = (g.x - minX) * scale + 10;
+      const gy = (g.y - minY) * scale + 10;
+      const gw = g.w * scale;
+      const gh = g.h * scale;
+      const colorIdx = g.id % GROUP_BORDER_COLORS.length;
+      return `<div style="position:absolute;left:${gx}px;top:${gy}px;width:${Math.max(6,gw)}px;height:${Math.max(4,gh)}px;border:1px solid ${GROUP_BORDER_COLORS[colorIdx]};border-radius:2px;pointer-events:none;opacity:0.5"></div>`;
     }).join('')}
     <div class="minimap-viewport" id="minimapViewport" style="left:${10 - designerPanX * scale / designerZoom / 10}px;top:${10 - designerPanY * scale / designerZoom / 10}px;width:60px;height:40px;cursor:grab"></div>
   </div>`;
@@ -6736,6 +6786,7 @@ function designerKeyHandler(e) {
     else deleteSelectedNode();
   }
   if (e.key === 'Escape') {
+    if (designerSearchOpen) { closeDesignerSearch(); return; }
     if (designerConnecting) { cancelConnection(); }
     else if (designerMoreMenuOpen) { designerMoreMenuOpen = false; renderDesigner(); }
     else if (designerPublishMenuOpen) { designerPublishMenuOpen = false; renderDesigner(); }
@@ -6750,6 +6801,16 @@ function designerKeyHandler(e) {
   if (e.ctrlKey && e.key === 'c') { e.preventDefault(); designerCopyNodes(); }
   if (e.ctrlKey && e.key === 'v') { e.preventDefault(); designerPasteNodes(); }
   if (e.ctrlKey && e.key === 'a') { e.preventDefault(); designerSelectAll(); }
+  // Ctrl+G = create group from selection
+  if (e.ctrlKey && e.key === 'g') { e.preventDefault(); createGroup(); }
+  // Ctrl+Shift+G = dissolve group containing selected node
+  if (e.ctrlKey && e.shiftKey && e.key === 'G') {
+    e.preventDefault();
+    const nodeGrp = designerGroups.find(g => g.nodeIds.includes(designerSelectedNodeId));
+    if (nodeGrp) dissolveGroup(nodeGrp.id);
+  }
+  // Ctrl+F = open global search
+  if (e.ctrlKey && e.key === 'f') { e.preventDefault(); openDesignerSearch(); }
 }
 
 function designerKeyUpHandler(e) {
@@ -6783,11 +6844,25 @@ function renderContextMenu() {
     </div>`;
   }
 
-  // Node context menu
+  // Group context menu
+  if (m.group) {
+    const grp = designerGroups.find(g => g.id === m.groupId);
+    if (!grp) return '';
+    return `<div class="designer-context-menu" style="left:${m.x}px;top:${m.y}px" onclick="event.stopPropagation()">
+      <div class="context-menu-item" onclick="startGroupRename(${grp.id});closeContextMenu()">✏️ 重命名</div>
+      <div class="context-menu-item" onclick="${grp.collapsed ? `expandGroup(${grp.id})` : `collapseGroup(${grp.id})`};closeContextMenu()">${grp.collapsed ? '📂 展开分组' : '📁 折叠分组'}</div>
+      <div class="context-menu-item" onclick="dissolveGroup(${grp.id});closeContextMenu()">🔓 解散分组 <span style="color:var(--md-outline);font-size:10px">(保留节点)</span></div>
+      <div class="context-menu-divider"></div>
+      <div class="context-menu-item danger" onclick="confirmDeleteGroup(${grp.id})">🗑 删除分组及节点</div>
+    </div>`;
+  }
+
   const node = designerNodes.find(n => n.id === m.nodeId);
   if (!node) return '';
   const isPlaceholder = node.type === 'placeholder';
   const canConvert = node.type !== 'trigger' && node.type !== 'end';
+  // Check if node is in any group
+  const nodeGroup = designerGroups.find(g => g.nodeIds.includes(node.id));
   return `<div class="designer-context-menu" style="left:${m.x}px;top:${m.y}px" onclick="event.stopPropagation()">
     <div class="context-menu-item" onclick="designerCopyNodes();closeContextMenu()">${icons.copy || icons.clipboard} 复制节点 <span class="context-menu-shortcut">Ctrl+C</span></div>
     <div class="context-menu-item" onclick="duplicateNode(${m.nodeId});closeContextMenu()">${icons.copy || icons.clipboard} 复制为副本</div>
@@ -6796,6 +6871,9 @@ function renderContextMenu() {
     <div class="context-menu-item" onclick="toggleBreakpoint(${m.nodeId});closeContextMenu()">${node._breakpoint ? icons.xCircle : '🔴'} ${node._breakpoint ? '移除断点' : '设置断点'} </div>
     ${designerConnections.filter(c => c.to === m.nodeId).length > 1 && node.type !== 'end' ? `<div class="context-menu-item" onclick="showMergeStrategyConfig(${m.nodeId});closeContextMenu()">🔀 汇合策略</div>` : ''}
     <div class="context-menu-divider"></div>
+    ${designerSelectedNodeIds.length >= 2 ? `<div class="context-menu-item" onclick="createGroup();closeContextMenu()">📦 将选中节点创建分组 <span class="context-menu-shortcut">Ctrl+G</span></div>` : ''}
+    ${nodeGroup ? `<div class="context-menu-item" onclick="dissolveGroup(${nodeGroup.id});closeContextMenu()">🔓 解散所在分组「${escHtml(nodeGroup.name)}」</div>` : ''}
+    ${designerSelectedNodeIds.length >= 2 || nodeGroup ? `<div class="context-menu-divider"></div>` : ''}
     <div class="context-menu-item danger" onclick="deleteNodeById(${m.nodeId});closeContextMenu()">${icons.trash} 删除节点 <span class="context-menu-shortcut">Delete</span></div>
   </div>`;
 }
@@ -8081,7 +8159,7 @@ function renderOutputVariablesSection(node) {
             const varType = (node.config?.assignments?.find(a => a.target === o.name)?.type) || o.type;
             return isAssignNode ? `
             <div class="output-var-item" onclick="copyOutputVarPath('${nodeCode}', '${o.name}')" title="点击复制引用路径">
-              <span class="var-icon type-${varType}" title="${varType}">${varType.charAt(0)}</span>
+              <span class="var-icon type-${typeClass(varType)}" title="${varType}">${varType.startsWith('Array') ? '[]' : varType.charAt(0)}</span>
               <div class="output-var-info">
                 <div class="output-var-name">${o.name}</div>
                 <div class="output-var-desc-inline">${o.desc}</div>
@@ -8090,7 +8168,7 @@ function renderOutputVariablesSection(node) {
             </div>` : `
             <div class="output-var-edit-row">
               <div class="output-var-edit-main">
-                <span class="var-icon type-${o.type}" title="${o.type}">${o.type.charAt(0)}</span>
+                <span class="var-icon type-${typeClass(o.type)}" title="${o.type}">${o.type.startsWith('Array') ? '[]' : o.type.charAt(0)}</span>
                 <input 
                   class="output-var-input" 
                   value="${o.name}" 
@@ -8114,7 +8192,7 @@ function renderOutputVariablesSection(node) {
         <div class="output-vars-fixed">
           ${fixedOutputs.map(o => `
             <div class="output-var-item" onclick="copyOutputVarPath('${nodeCode}', '${o.name}')" title="点击复制引用路径">
-              <span class="var-icon type-${o.type}" title="${o.type}">${o.type.charAt(0)}</span>
+              <span class="var-icon type-${typeClass(o.type)}" title="${o.type}">${o.type.startsWith('Array') ? '[]' : o.type.charAt(0)}</span>
               <div class="output-var-info">
                 <div class="output-var-name">${o.name}</div>
                 <div class="output-var-desc-inline">${o.desc}</div>
@@ -8248,7 +8326,7 @@ function renderHttpOutputVariablesSection(node) {
             onmouseover="this.style.background='var(--md-surface-container)'"
             onmouseout="this.style.background=''"
           >
-            <span class="var-icon type-${f.type}" style="flex-shrink:0;width:16px;height:16px;font-size:9px" title="${f.type}">${f.type.charAt(0)}</span>
+            <span class="var-icon type-${typeClass(f.type)}" style="flex-shrink:0;width:16px;height:16px;font-size:9px" title="${f.type}">${f.type.startsWith('Array') ? '[]' : f.type.charAt(0)}</span>
             <code style="font-family:var(--font-family-mono);flex:1;color:var(--md-on-surface)">${f.path}</code>
             <span style="color:var(--md-outline);font-size:10px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${f.desc}</span>
             <code style="font-family:var(--font-family-mono);font-size:10px;color:#64748b;background:var(--md-surface-container);padding:0 3px;border-radius:2px;flex-shrink:0">${f.example}</code>
@@ -9365,7 +9443,8 @@ function renderVarPickerGroups(groups, editorId, keyword = '') {
   // 类型全称 map
   const typeLabel = {
     String: 'Str', Number: 'Num', Integer: 'Int', Double: 'Dbl',
-    Boolean: 'Bool', Object: 'Obj', Array: 'Arr', File: 'File', DateTime: 'Date'
+    Boolean: 'Bool', Object: 'Obj', Array: 'Arr', File: 'File', DateTime: 'Date',
+    'Array[String]': 'A[]', 'Array[Integer]': 'A[]', 'Array[Object]': 'A[]'
   };
 
   function highlight(text) {
@@ -9387,7 +9466,7 @@ function renderVarPickerGroups(groups, editorId, keyword = '') {
              data-ref="${v.ref}" 
              data-path="${v.path}"
              onclick="selectVariable('${editorId}', '${v.ref.replace(/'/g, "\\'")}')">
-          <span class="var-type-tag type-${v.type}" title="${v.type}">${tLabel}</span>
+          <span class="var-type-tag type-${typeClass(v.type)}" title="${v.type}">${tLabel}</span>
           <div class="var-info">
             <div class="var-name">${highlight(v.name)}</div>
             <div class="var-path">${highlight(v.path)}</div>
@@ -9630,7 +9709,8 @@ function renderCondPickerGroups(groups, pickerId) {
   };
   const typeLabel = {
     String: 'Str', Number: 'Num', Integer: 'Int', Double: 'Dbl',
-    Boolean: 'Bool', Object: 'Obj', Array: 'Arr', File: 'File', DateTime: 'Date'
+    Boolean: 'Bool', Object: 'Obj', Array: 'Arr', File: 'File', DateTime: 'Date',
+    'Array[String]': 'A[]', 'Array[Integer]': 'A[]', 'Array[Object]': 'A[]'
   };
   return groups.map(group => {
     const badge = sourceBadgeMap[group.source];
@@ -9644,7 +9724,7 @@ function renderCondPickerGroups(groups, pickerId) {
              data-ref="${v.ref}"
              data-path="${v.path}"
              onclick="${v._selectOnclick}">
-          <span class="var-type-tag type-${v.type}" title="${v.type}">${tLabel}</span>
+          <span class="var-type-tag type-${typeClass(v.type)}" title="${v.type}">${tLabel}</span>
           <div class="var-info">
             <div class="var-name">${escHtml(v.name)}</div>
             <div class="var-path">${escHtml(v.path)}</div>
@@ -9725,7 +9805,7 @@ function showAssignTargetPicker(inputId, nodeId, ruleIndex) {
     </div>
     ${globalVars.map(v => `
       <div class="var-picker-item" onclick="selectAssignTarget('${inputId}', ${nodeId}, ${ruleIndex}, '${escHtml(v.name)}')">
-        <span class="var-icon type-${v.type || 'String'}" style="flex-shrink:0">${(v.type || 'S').charAt(0)}</span>
+        <span class="var-icon type-${typeClass(v.type || 'String')}" style="flex-shrink:0">${(v.type || '').startsWith('Array') ? '[]' : (v.type || 'S').charAt(0)}</span>
         <div style="flex:1;min-width:0">
           <div style="font-size:12px;font-family:var(--font-family-mono);font-weight:500">${escHtml(v.name)}</div>
           ${v.desc ? `<div style="font-size:10px;color:var(--md-on-surface-variant)">${escHtml(v.desc)}</div>` : ''}
@@ -10210,4 +10290,202 @@ function handleExpandKeydown(event) {
     event.preventDefault();
     closeExprExpandModal(true);
   }
+}
+
+// =============================================================
+// Task 1 — Group helpers
+// =============================================================
+function confirmDeleteGroup(grpId) {
+  closeContextMenu();
+  const grp = designerGroups.find(g => g.id === grpId);
+  if (!grp) return;
+  showModal(`<div class="modal" style="max-width:380px">
+    <div class="modal-header"><h2 class="modal-title">删除分组</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div>
+    <div class="modal-body">
+      <p>确认删除分组「${escHtml(grp.name)}」及其内部 <strong>${grp.nodeIds.length}</strong> 个节点？此操作不可撤销。</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal()">取消</button>
+      <button class="btn btn-primary" style="background:var(--md-error)" onclick="closeModal();deleteGroup(${grpId})">确认删除</button>
+    </div>
+  </div>`);
+}
+
+// =============================================================
+// Task 2 — Global Search
+// =============================================================
+function renderSearchOverlay() {
+  if (!designerSearchOpen) return '';
+  const q = designerSearchQuery.toLowerCase().trim();
+  // Build results: nodes + groups
+  let results = [];
+  designerNodes.forEach(n => {
+    const nt = nodeTypes.find(t => t.type === n.type) || {};
+    const score = (!q ||
+      n.name.toLowerCase().includes(q) ||
+      n.code.toLowerCase().includes(q) ||
+      (nt.name || '').toLowerCase().includes(q)) ? 1 : 0;
+    if (score) results.push({ type: 'node', id: n.id, label: n.name, sub: n.code, icon: nt.icon || '?', color: nt.color || '' });
+  });
+  designerGroups.forEach(g => {
+    const score = (!q || g.name.toLowerCase().includes(q)) ? 1 : 0;
+    if (score) results.push({ type: 'group', id: g.id, label: g.name, sub: `分组 · ${g.nodeIds.length}个节点`, icon: '📦', color: '' });
+  });
+  results = results.slice(0, 20);
+
+  return `<div class="designer-search-overlay" id="designerSearchOverlay" onclick="closeDesignerSearch()">
+    <div class="designer-search-box" onclick="event.stopPropagation()">
+      <div class="designer-search-input-wrap">
+        <svg class="designer-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input class="designer-search-input" id="designerSearchInput"
+          type="text" placeholder="搜索节点名称、编号、分组…"
+          value="${escHtml(designerSearchQuery)}"
+          oninput="onDesignerSearchInput(this.value)"
+          onkeydown="onDesignerSearchKey(event)" />
+        <span class="designer-search-count">${results.length} 项</span>
+      </div>
+      <div class="designer-search-results" id="designerSearchResults">
+        ${results.length === 0 ? `<div class="designer-search-empty">未找到匹配结果</div>` : ''}
+        ${results.map((r, i) => `<div class="designer-search-item ${i === designerSearchHighlight ? 'highlighted' : ''}"
+          data-idx="${i}" onclick="onDesignerSearchSelect(${JSON.stringify(r).replace(/"/g, '&quot;')})">
+          <div class="designer-search-item-icon ${r.color}">${r.icon}</div>
+          <div class="designer-search-item-text">
+            <div class="designer-search-item-name">${escHtml(r.label)}</div>
+            <div class="designer-search-item-sub">${escHtml(r.sub)}</div>
+          </div>
+        </div>`).join('')}
+      </div>
+      <div class="designer-search-hint">↑↓ 导航 &nbsp; Enter 确认 &nbsp; Esc 关闭</div>
+    </div>
+  </div>`;
+}
+
+function openDesignerSearch() {
+  designerSearchOpen = true;
+  designerSearchQuery = '';
+  designerSearchHighlight = 0;
+  renderDesigner();
+  setTimeout(() => {
+    const el = document.getElementById('designerSearchInput');
+    if (el) el.focus();
+  }, 30);
+}
+
+function closeDesignerSearch() {
+  designerSearchOpen = false;
+  renderDesigner();
+}
+
+function onDesignerSearchInput(val) {
+  designerSearchQuery = val;
+  designerSearchHighlight = 0;
+  // Re-render only the results area for performance
+  const overlay = document.getElementById('designerSearchOverlay');
+  if (overlay) {
+    overlay.outerHTML = renderSearchOverlay();
+  } else {
+    renderDesigner();
+  }
+}
+
+function onDesignerSearchKey(e) {
+  const q = designerSearchQuery.toLowerCase().trim();
+  let results = [];
+  designerNodes.forEach(n => {
+    const nt = nodeTypes.find(t => t.type === n.type) || {};
+    if (!q || n.name.toLowerCase().includes(q) || n.code.toLowerCase().includes(q) || (nt.name || '').toLowerCase().includes(q))
+      results.push({ type: 'node', id: n.id });
+  });
+  designerGroups.forEach(g => {
+    if (!q || g.name.toLowerCase().includes(q)) results.push({ type: 'group', id: g.id });
+  });
+  results = results.slice(0, 20);
+
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    designerSearchHighlight = Math.min(designerSearchHighlight + 1, results.length - 1);
+    _refreshSearchHighlight();
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    designerSearchHighlight = Math.max(designerSearchHighlight - 1, 0);
+    _refreshSearchHighlight();
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    const r = results[designerSearchHighlight];
+    if (r) { closeDesignerSearch(); focusNode(r.type, r.id); }
+  } else if (e.key === 'Escape') {
+    closeDesignerSearch();
+  }
+}
+
+function _refreshSearchHighlight() {
+  document.querySelectorAll('.designer-search-item').forEach((el, i) => {
+    el.classList.toggle('highlighted', i === designerSearchHighlight);
+  });
+  const el = document.querySelector('.designer-search-item.highlighted');
+  if (el) el.scrollIntoView({ block: 'nearest' });
+}
+
+function onDesignerSearchSelect(r) {
+  closeDesignerSearch();
+  focusNode(r.type, r.id);
+}
+
+// =============================================================
+// Task 2 — focusNode: fly canvas to a node/group and flash it
+// =============================================================
+function focusNode(type, id) {
+  let targetX, targetY;
+  if (type === 'node') {
+    const node = designerNodes.find(n => n.id === id);
+    if (!node) return;
+    targetX = node.x + 90; // center of node (w=180)
+    targetY = node.y + 36; // center of node (h=72)
+    // Select the node
+    designerSelectedNodeId = id;
+    designerRightPanel = 'node';
+  } else if (type === 'group') {
+    const grp = designerGroups.find(g => g.id === id);
+    if (!grp) return;
+    targetX = grp.x + grp.w / 2;
+    targetY = grp.y + grp.h / 2;
+  }
+  if (targetX === undefined) return;
+  // Animate pan to center the target
+  const container = document.getElementById('canvasContainer');
+  if (!container) { renderDesigner(); return; }
+  const cr = container.getBoundingClientRect();
+  designerPanX = cr.width / 2 - targetX * designerZoom;
+  designerPanY = cr.height / 2 - targetY * designerZoom;
+  // Flash highlight
+  designerFocusFlashNodeId = type === 'node' ? id : null;
+  renderDesigner();
+  // Remove flash after 1.5s
+  if (type === 'node') {
+    setTimeout(() => {
+      designerFocusFlashNodeId = null;
+      const el = document.getElementById(`node-${id}`);
+      if (el) el.classList.remove('node-focus-flash');
+    }, 1500);
+  }
+}
+
+// =============================================================
+// Task 4 — Large-flow loading indicator
+// =============================================================
+function showLargeFlowLoader(nodeCount) {
+  const shell = document.getElementById('designerShell');
+  if (!shell) return;
+  const el = document.createElement('div');
+  el.id = 'largeFlowLoader';
+  el.className = 'large-flow-loader';
+  el.innerHTML = `<div class="large-flow-loader-inner">
+    <div class="large-flow-loader-spinner"></div>
+    <span>正在渲染工作流（共 ${nodeCount} 个节点）…</span>
+  </div>`;
+  shell.appendChild(el);
+}
+function hideLargeFlowLoader() {
+  const el = document.getElementById('largeFlowLoader');
+  if (el) el.remove();
 }

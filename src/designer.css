@@ -5842,3 +5842,418 @@
   height: 10px;
 }
 
+/* ============================================================
+   Task 1 — Node Groups
+   ============================================================ */
+.canvas-groups {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  transform-origin: 0 0;
+}
+
+.group-container {
+  position: absolute;
+  border: 1.5px dashed;
+  border-radius: 12px;
+  pointer-events: all;
+  box-sizing: border-box;
+}
+
+.group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 10px 4px 12px;
+  border-bottom: 1px solid;
+  min-height: 32px;
+}
+
+.group-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--md-on-surface);
+  cursor: text;
+  user-select: none;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.group-name-input {
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid var(--md-primary);
+  border-radius: 4px;
+  padding: 1px 6px;
+  outline: none;
+  background: var(--md-surface);
+  color: var(--md-on-surface);
+  max-width: 200px;
+}
+
+.group-header-actions {
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.group-container:hover .group-header-actions {
+  opacity: 1;
+}
+
+.group-action-btn {
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: transparent;
+  color: var(--md-on-surface-variant);
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.group-action-btn:hover {
+  background: var(--md-surface-container-high);
+  color: var(--md-on-surface);
+}
+
+/* Collapsed group card */
+.group-card {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 220px;
+  padding: 8px 12px;
+  background: var(--md-surface);
+  border: 2px solid;
+  border-radius: 10px;
+  cursor: pointer;
+  pointer-events: all;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  transition: box-shadow 0.15s;
+  box-sizing: border-box;
+}
+
+.group-card:hover {
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+}
+
+.group-card.selected {
+  box-shadow: 0 0 0 2px var(--md-primary);
+}
+
+.group-card-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.group-card-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.group-card-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--md-on-surface);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.group-card-count {
+  font-size: 10px;
+  color: var(--md-outline);
+  margin-top: 1px;
+}
+
+.group-expand-btn {
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 50%;
+  background: var(--md-surface-container);
+  color: var(--md-on-surface-variant);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.group-expand-btn:hover {
+  background: var(--md-primary-container);
+  color: var(--md-primary);
+  border-color: var(--md-primary);
+}
+
+/* ============================================================
+   Task 2 — Problems Panel Locate Button
+   ============================================================ */
+.problem-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  font-size: 12px;
+  border-bottom: 1px solid var(--md-outline-variant);
+  cursor: pointer;
+}
+
+.problem-item:hover {
+  background: var(--md-surface-container);
+}
+
+.problem-locate-btn {
+  margin-left: auto;
+  flex-shrink: 0;
+  padding: 2px 7px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--radius-full);
+  background: var(--md-surface-container);
+  color: var(--md-primary);
+  cursor: pointer;
+  line-height: 1.4;
+}
+
+.problem-locate-btn:hover {
+  background: var(--md-primary-container);
+  border-color: var(--md-primary);
+}
+
+/* ============================================================
+   Task 2 — Global Search Overlay
+   ============================================================ */
+.designer-search-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.25);
+  z-index: 9000;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 80px;
+  backdrop-filter: blur(2px);
+}
+
+.designer-search-box {
+  width: 480px;
+  background: var(--md-surface);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18), 0 0 0 1px var(--md-outline-variant);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  max-height: 420px;
+}
+
+.designer-search-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--md-outline-variant);
+}
+
+.designer-search-icon {
+  color: var(--md-outline);
+  flex-shrink: 0;
+}
+
+.designer-search-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: 14px;
+  background: transparent;
+  color: var(--md-on-surface);
+}
+
+.designer-search-count {
+  font-size: 11px;
+  color: var(--md-outline);
+  flex-shrink: 0;
+}
+
+.designer-search-results {
+  overflow-y: auto;
+  flex: 1;
+  padding: 4px 0;
+}
+
+.designer-search-empty {
+  padding: 24px;
+  text-align: center;
+  color: var(--md-outline);
+  font-size: 13px;
+}
+
+.designer-search-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.designer-search-item:hover,
+.designer-search-item.highlighted {
+  background: var(--md-surface-container);
+}
+
+.designer-search-item-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.designer-search-item-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.designer-search-item-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--md-on-surface);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.designer-search-item-sub {
+  font-size: 11px;
+  color: var(--md-outline);
+  margin-top: 1px;
+}
+
+.designer-search-hint {
+  padding: 6px 16px;
+  font-size: 10px;
+  color: var(--md-outline);
+  border-top: 1px solid var(--md-outline-variant);
+  background: var(--md-surface-container-low);
+}
+
+/* ============================================================
+   Task 2 — Node Focus Flash Animation
+   ============================================================ */
+@keyframes nodeFocusFlash {
+  0%   { box-shadow: 0 0 0 0 rgba(24,144,255,0.6), var(--node-shadow); }
+  30%  { box-shadow: 0 0 0 8px rgba(24,144,255,0.3), var(--node-shadow); }
+  70%  { box-shadow: 0 0 0 4px rgba(24,144,255,0.15), var(--node-shadow); }
+  100% { box-shadow: 0 0 0 0 rgba(24,144,255,0), var(--node-shadow); }
+}
+
+.canvas-node.node-focus-flash {
+  animation: nodeFocusFlash 1.5s ease-out;
+  border-color: #1890FF !important;
+}
+
+/* ============================================================
+   Task 3 — LOD (Zoom Level of Detail)
+   ============================================================ */
+.canvas-node.lod-compact .canvas-node-body > *:not(.canvas-node-code) {
+  display: none;
+}
+
+.canvas-node.lod-compact .canvas-node-port-label {
+  display: none;
+}
+
+.canvas-node.lod-compact {
+  min-height: 52px;
+}
+
+.canvas-node.lod-micro {
+  min-height: 36px;
+  overflow: hidden;
+}
+
+.canvas-node.lod-micro .canvas-node-title {
+  display: none;
+}
+
+.canvas-node.lod-micro .canvas-node-body {
+  display: none;
+}
+
+.canvas-node.lod-micro .canvas-node-port-label {
+  display: none;
+}
+
+.canvas-node.lod-micro .canvas-node-header {
+  justify-content: center;
+  padding: 4px;
+}
+
+.canvas-node.lod-micro .loop-body-badge,
+.canvas-node.lod-micro .canvas-node-warning,
+.canvas-node.lod-micro .merge-strategy-badge {
+  display: none;
+}
+
+/* ============================================================
+   Task 4 — Large Flow Loading Indicator
+   ============================================================ */
+.large-flow-loader {
+  position: absolute;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(var(--md-surface-rgb, 255,255,255), 0.7);
+  backdrop-filter: blur(4px);
+}
+
+.large-flow-loader-inner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 20px;
+  background: var(--md-surface);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  font-size: 13px;
+  color: var(--md-on-surface);
+}
+
+@keyframes loaderSpin {
+  to { transform: rotate(360deg); }
+}
+
+.large-flow-loader-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--md-outline-variant);
+  border-top-color: var(--md-primary);
+  border-radius: 50%;
+  animation: loaderSpin 0.7s linear infinite;
+}
+
