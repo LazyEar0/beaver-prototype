@@ -2434,6 +2434,92 @@
   background: var(--md-outline-variant);
 }
 
+/* OR tag between condition groups */
+.condition-or-tag {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--md-primary);
+  letter-spacing: 0.06em;
+}
+
+.condition-or-tag::before,
+.condition-or-tag::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--md-primary);
+  opacity: 0.35;
+}
+
+/* Condition group container */
+.condition-group {
+  background: var(--md-surface);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin-bottom: 0;
+}
+
+.condition-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.condition-group-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--md-outline);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.condition-group-delete {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--md-outline);
+  font-size: 11px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  line-height: 1;
+  transition: var(--transition-fast);
+}
+
+.condition-group-delete:hover {
+  color: var(--md-error);
+  background: var(--md-error-container);
+}
+
+/* Add condition group button */
+.cond-add-group-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  padding: 5px 0;
+  margin-top: 8px;
+  border: 1px dashed var(--md-primary);
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--md-primary);
+  background: transparent;
+  cursor: pointer;
+  transition: var(--transition-fast);
+  opacity: 0.8;
+}
+
+.cond-add-group-btn:hover {
+  opacity: 1;
+  background: var(--md-primary-container);
+}
+
 /* Add condition button */
 .cond-add-btn {
   display: flex;
@@ -5593,5 +5679,166 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 160px;
+}
+
+/* ========== Dual Mode Editor (双模式编辑器) ========== */
+
+/* 外层容器 */
+.dual-mode-editor {
+  width: 100%;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--md-surface-container-lowest);
+}
+
+/* 顶部模式切换栏 */
+.dual-mode-editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px;
+  height: 30px;
+  background: var(--md-surface-container);
+  border-bottom: 1px solid var(--md-outline-variant);
+  gap: 6px;
+}
+
+/* 模式切换 Tab 组 */
+.dual-mode-tabs {
+  display: flex;
+  gap: 2px;
+}
+
+.dual-mode-tab {
+  height: 20px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--md-on-surface-variant);
+  cursor: pointer;
+  transition: var(--transition-fast);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.dual-mode-tab:hover {
+  background: var(--md-surface-container-high);
+  color: var(--md-on-surface);
+}
+
+.dual-mode-tab.active {
+  background: var(--md-primary-container);
+  color: var(--md-primary);
+  border-color: var(--md-primary-container);
+}
+
+.dual-mode-tab svg {
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+}
+
+/* 模式描述提示 */
+.dual-mode-hint {
+  font-size: 10px;
+  color: var(--md-outline);
+  flex: 1;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 内容区域 */
+.dual-mode-editor-body {
+  position: relative;
+}
+
+/* 简单模式：去掉内部边框，与外层容器合并 */
+.dual-mode-editor-body .expr-editor-wrapper {
+  border-radius: 0;
+}
+
+.dual-mode-editor-body .expr-editor-wrapper .expr-editor {
+  border: none;
+  border-radius: 0;
+  background: var(--md-surface-container-lowest);
+}
+
+.dual-mode-editor-body .expr-editor-wrapper .expr-editor:focus {
+  border: none;
+  box-shadow: none;
+  outline: none;
+}
+
+/* 外层获取焦点状态 */
+.dual-mode-editor:focus-within {
+  border-color: var(--md-primary);
+  box-shadow: 0 0 0 2px var(--md-primary-container);
+}
+
+/* 高阶代码模式：内嵌小型代码编辑器 */
+.dual-mode-editor-body .dual-code-editor {
+  width: 100%;
+  padding: 8px;
+  font-size: 12px;
+  font-family: var(--font-family-mono);
+  background: #1e1e1e;
+  color: #d4d4d4;
+  border: none;
+  outline: none;
+  resize: vertical;
+  min-height: 80px;
+  box-sizing: border-box;
+  line-height: 1.5;
+  tab-size: 2;
+  spellcheck: false;
+}
+
+.dual-mode-editor-body .dual-code-editor::placeholder {
+  color: #666;
+}
+
+/* 代码模式工具栏 */
+.dual-code-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 3px 6px;
+  background: #1e1e1e;
+  border-top: 1px solid #333;
+  gap: 4px;
+}
+
+.dual-code-expand-btn {
+  height: 20px;
+  padding: 0 8px;
+  border: 1px solid #555;
+  border-radius: 3px;
+  background: transparent;
+  color: #aaa;
+  font-size: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  transition: var(--transition-fast);
+}
+
+.dual-code-expand-btn:hover {
+  background: #333;
+  color: #fff;
+  border-color: #888;
+}
+
+.dual-code-expand-btn svg {
+  width: 10px;
+  height: 10px;
 }
 

@@ -1816,13 +1816,50 @@ function renderConditionRows(conditions, addFnStr, removeFnPfx, updateFnPfx, nod
   return html;
 }
 
-function renderIfConfig(node) {
+// 将旧的 conditions[] 迁移为 conditionGroups[][]
+function _migrateIfConditions(node) {
   if (!node.config) node.config = {};
-  const condMode = node.config.condMode || 'visual';
-  if (!node.config.conditions || node.config.conditions.length === 0) {
-    node.config.conditions = [{ left: 'response.status', op: 'eq', right: '200' }];
+  // 已是新格式
+  if (node.config.conditionGroups && node.config.conditionGroups.length > 0) return;
+  // 旧格式迁移
+  if (node.config.conditions && node.config.conditions.length > 0) {
+    node.config.conditionGroups = [node.config.conditions];
+    delete node.config.conditions;
+    return;
   }
-  const conditions = node.config.conditions;
+  // 默认初始化
+  node.config.conditionGroups = [[{ left: 'response.status', op: 'eq', right: '200' }]];
+}
+
+function renderConditionGroups(conditionGroups, nodeId, addRowFnPfx, removeRowFnPfx, updateRowFnPfx, addGroupFn, removeGroupFnPfx) {
+  let html = '';
+  conditionGroups.forEach((group, gi) => {
+    if (gi > 0) {
+      html += `<div class="condition-or-tag">OR</div>`;
+    }
+    const canRemoveGroup = conditionGroups.length > 1;
+    html += `<div class="condition-group">
+      <div class="condition-group-header">
+        <span class="condition-group-label">条件组 ${gi + 1}</span>
+        ${canRemoveGroup ? `<button class="condition-group-delete" onclick="${removeGroupFnPfx}${gi})" title="删除此条件组">✕</button>` : ''}
+      </div>
+      ${renderConditionRows(
+        group,
+        `${addRowFnPfx}${gi})`,
+        `${removeRowFnPfx}${gi},`,
+        `${updateRowFnPfx}${gi},`,
+        nodeId
+      )}
+    </div>`;
+  });
+  html += `<button class="cond-add-group-btn" onclick="${addGroupFn}">+ 添加条件组（OR）</button>`;
+  return html;
+}
+
+function renderIfConfig(node) {
+  _migrateIfConditions(node);
+  const condMode = node.config.condMode || 'visual';
+  const conditionGroups = node.config.conditionGroups;
   const nid = node.id;
 
   return `<div class="config-section">
@@ -1835,13 +1872,15 @@ function renderIfConfig(node) {
     </div>
     ${condMode === 'visual' ? `
     <div class="if-block">
-      <div class="if-block-label">如果（满足以下全部条件）</div>
-      ${renderConditionRows(
-        conditions,
-        `addIfCondition(${nid})`,
-        `removeIfCondition(${nid},`,
-        `updateIfCondition(${nid},`,
-        nid
+      <div class="if-block-label">如果（满足以下条件）</div>
+      ${renderConditionGroups(
+        conditionGroups,
+        nid,
+        `addIfCondInGroup(${nid},`,
+        `removeIfCondInGroup(${nid},`,
+        `updateIfCondInGroup(${nid},`,
+        `addIfCondGroup(${nid})`,
+        `removeIfCondGroup(${nid},`
       )}
     </div>` : `
     <div class="config-field">
@@ -1859,13 +1898,21 @@ function renderIfConfig(node) {
 function renderSwitchConfig(node) {
   if (!node.config) node.config = {};
   if (!node.config.branches) node.config.branches = [
-    { name: '分支1', condition: '', condMode: 'visual', conditions: [{ left: 'vars.status', op: 'eq', right: '' }] },
-    { name: '分支2', condition: '', condMode: 'visual', conditions: [{ left: 'vars.status', op: 'eq', right: '' }] },
+    { name: '分攱1', condition: '', condMode: 'visual', conditionGroups: [[{ left: 'vars.status', op: 'eq', right: '' }]] },
+    { name: '分攱2', condition: '', condMode: 'visual', conditionGroups: [[{ left: 'vars.status', op: 'eq', right: '' }]] },
   ];
-  // Migrate old branches that don't have conditions yet
+  // Migrate old branches
   node.config.branches.forEach(b => {
-    if (!b.conditions) b.conditions = [{ left: b.condition ? '__custom__' : 'vars.status', op: 'eq', right: '' }];
     if (!b.condMode) b.condMode = 'visual';
+    // 升级旧的 conditions[] -> conditionGroups[][]
+    if (!b.conditionGroups || b.conditionGroups.length === 0) {
+      if (b.conditions && b.conditions.length > 0) {
+        b.conditionGroups = [b.conditions];
+        delete b.conditions;
+      } else {
+        b.conditionGroups = [[{ left: b.condition ? '__custom__' : 'vars.status', op: 'eq', right: '' }]];
+      }
+    }
   });
   const branches = node.config.branches;
   const nid = node.id;
@@ -1882,7 +1929,7 @@ function renderSwitchConfig(node) {
     </div>
     ${branches.map((b, i) => {
       const condMode = b.condMode || 'visual';
-      const conditions = b.conditions || [{ left: 'vars.status', op: 'eq', right: '' }];
+      const conditionGroups = b.conditionGroups || [[{ left: 'vars.status', op: 'eq', right: '' }]];
       const branchColor = `hsl(${i * 60}, 55%, 48%)`;
       return `
       <div class="branch-card" style="border-left-color:${branchColor}">
@@ -1895,12 +1942,14 @@ function renderSwitchConfig(node) {
           <button class="table-action-btn" style="width:24px;height:24px;flex-shrink:0" onclick="removeSwitchBranch(${nid}, ${i})" title="删除分支">${icons.close}</button>
         </div>
         ${condMode === 'visual'
-          ? renderConditionRows(
-              conditions,
-              `addSwitchCondition(${nid},${i})`,
-              `removeSwitchCondition(${nid},${i},`,
-              `updateSwitchCondition(${nid},${i},`,
-              nid
+          ? renderConditionGroups(
+              conditionGroups,
+              nid,
+              `addSwitchCondInGroup(${nid},${i},`,
+              `removeSwitchCondInGroup(${nid},${i},`,
+              `updateSwitchCondInGroup(${nid},${i},`,
+              `addSwitchCondGroup(${nid},${i})`,
+              `removeSwitchCondGroup(${nid},${i},`
             )
           : `<textarea class="expr-editor" style="min-height:36px;font-size:11px" placeholder="输入分支条件表达式..." onchange="updateSwitchBranchCondition(${nid}, ${i}, this.value)">${escHtml(b.condition || '')}</textarea>`
         }
@@ -1909,7 +1958,7 @@ function renderSwitchConfig(node) {
     <button class="btn btn-ghost btn-sm" onclick="addSwitchBranch(${nid})" style="width:100%;justify-content:center;margin-top:var(--space-2)">${icons.plus} 添加分支</button>
     <div style="margin-top:var(--space-3);padding:8px 10px;background:var(--md-surface-container);border-radius:6px;border-left:3px solid #94a3b8">
       <div style="font-size:11px;font-weight:700;color:var(--md-outline);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:2px">Default</div>
-      <div style="font-size:11px;color:var(--md-on-surface-variant)">以上所有分支均不匹配时执行（兜底）</div>
+      <div style="font-size:11px;color:var(--md-on-surface-variant)">以上所有分支均不匹配时执行（兄底）</div>
     </div>
   </div>`;
 }
@@ -3900,9 +3949,44 @@ function onCanvasMouseMove(e) {
       }
       node.x = nx;
       node.y = ny;
-      updateCanvasTransform();
+      // Direct DOM update — no full re-render during drag for performance
+      _updateDraggingNodeDOM(node);
     }
   }
+}
+
+// Lightweight DOM-only position update during node drag.
+// Updates node position and connected SVG paths without rebuilding anything.
+function _updateDraggingNodeDOM(node) {
+  const el = document.getElementById(`node-${node.id}`);
+  if (el) {
+    el.style.left = node.x + 'px';
+    el.style.top = node.y + 'px';
+  }
+  // Update only the SVG paths connected to the dragging node
+  const svg = document.getElementById('canvasSvg');
+  if (!svg) return;
+  const g = svg.querySelector('g');
+  if (!g) return;
+  const affectedConnIds = designerConnections
+    .filter(c => c.from === node.id || c.to === node.id)
+    .map(c => c.id);
+  affectedConnIds.forEach(connId => {
+    const conn = designerConnections.find(c => c.id === connId);
+    if (!conn) return;
+    const fromNode = designerNodes.find(n => n.id === conn.from);
+    const toNode = designerNodes.find(n => n.id === conn.to);
+    if (!fromNode || !toNode) return;
+    const fromPos = getPortPosition(fromNode, conn.fromPort || 'out');
+    const toPos = getPortPosition(toNode, conn.toPort || 'in');
+    const dx = Math.abs(toPos.x - fromPos.x);
+    const cp = Math.max(dx * 0.4, 50);
+    const pathD = `M${fromPos.x},${fromPos.y} C${fromPos.x + cp},${fromPos.y} ${toPos.x - cp},${toPos.y} ${toPos.x},${toPos.y}`;
+    const grp = g.querySelector(`[data-conn="${connId}"]`);
+    if (grp) {
+      grp.querySelectorAll('path').forEach(p => p.setAttribute('d', pathD));
+    }
+  });
 }
 
 function onCanvasMouseUp(e) {
@@ -3941,8 +4025,15 @@ function onCanvasMouseUp(e) {
   }
 
   designerIsPanning = false;
-  if (designerDraggingExistingNode) designerDirty = true; // Node was moved
-  designerDraggingExistingNode = null;
+  if (designerDraggingExistingNode) {
+    designerDirty = true; // Node was moved
+    designerDraggingExistingNode = null;
+    // Full re-render after drag ends to sync connection labels/overlays
+    invalidateProblemsCache();
+    renderDesigner();
+  } else {
+    designerDraggingExistingNode = null;
+  }
   document.getElementById('canvasContainer').style.cursor = '';
 }
 
@@ -3976,14 +4067,8 @@ function updateCanvasTransform() {
     if (g) g.setAttribute('transform', `translate(${designerPanX}, ${designerPanY}) scale(${designerZoom})`);
   }
   if (grid) grid.style.transform = `translate(${designerPanX % 20}px, ${designerPanY % 20}px)`;
-
-  // Re-render nodes for position updates (lightweight)
-  const nc = document.getElementById('canvasNodes');
-  if (nc) nc.innerHTML = renderCanvasNodes();
-  if (svg) {
-    const g = svg.querySelector('g');
-    if (g) g.innerHTML = `${renderConnections()}`;
-  }
+  // NOTE: DO NOT re-render innerHTML here — only CSS transforms are needed for pan/zoom.
+  // Node position updates during drag are handled by _updateDraggingNodeDOM().
 }
 
 // --- Node Interaction ---
@@ -4330,8 +4415,36 @@ function onConnectionHover(e, connId) {
   // Cancel any pending leave to prevent flicker when moving to overlay button
   if (_connLeaveTimer) { clearTimeout(_connLeaveTimer); _connLeaveTimer = null; }
   if (designerHoveredConnId === connId) return;
+  // Remove previous hover state via direct DOM — no full re-render
+  if (designerHoveredConnId) {
+    const prev = document.querySelector(`[data-conn="${designerHoveredConnId}"]`);
+    if (prev) {
+      prev.querySelectorAll('path[class]').forEach(p => {
+        p.classList.remove('connection-hovered', 'connection-alt-delete');
+      });
+      prev.querySelectorAll('path').forEach((p, i) => {
+        if (i === 1) { // glow path
+          p.remove();
+        }
+      });
+    }
+    const prevOverlay = document.getElementById(`conn-overlay-${designerHoveredConnId}`);
+    if (prevOverlay) prevOverlay.style.display = 'none';
+  }
   designerHoveredConnId = connId;
-  renderDesigner();
+  // Apply hover state directly
+  const grp = document.querySelector(`[data-conn="${connId}"]`);
+  if (grp) {
+    const visPath = grp.querySelectorAll('path')[grp.querySelectorAll('path').length - 1];
+    if (visPath) {
+      visPath.classList.add(designerAltDown ? 'connection-alt-delete' : 'connection-hovered');
+      visPath.setAttribute('stroke', designerAltDown ? '#dc2626' : '#1890FF');
+      visPath.setAttribute('stroke-width', '3.5');
+      visPath.setAttribute('marker-end', designerAltDown ? 'url(#arrowhead-danger)' : 'url(#arrowhead-active)');
+    }
+  }
+  const overlay = document.getElementById(`conn-overlay-${connId}`);
+  if (overlay) overlay.style.display = 'flex';
 }
 
 function onConnectionLeave(e, connId) {
@@ -4341,8 +4454,21 @@ function onConnectionLeave(e, connId) {
   _connLeaveTimer = setTimeout(() => {
     _connLeaveTimer = null;
     if (designerHoveredConnId !== connId) return;
+    // Restore default style directly — no full re-render
+    const grp = document.querySelector(`[data-conn="${connId}"]`);
+    if (grp) {
+      const paths = grp.querySelectorAll('path');
+      const visPath = paths[paths.length - 1];
+      if (visPath) {
+        visPath.classList.remove('connection-hovered', 'connection-alt-delete');
+        visPath.setAttribute('stroke', '#222');
+        visPath.setAttribute('stroke-width', '2.5');
+        visPath.setAttribute('marker-end', 'url(#arrowhead)');
+      }
+    }
+    const overlay = document.getElementById(`conn-overlay-${connId}`);
+    if (overlay) overlay.style.display = 'none';
     designerHoveredConnId = null;
-    renderDesigner();
   }, 80);
 }
 
@@ -4516,7 +4642,7 @@ function updateSwitchBranchCondition(nodeId, branchIdx, newCondition) {
   designerDirty = true;
 }
 
-// --- IF node condition operations ---
+// --- IF node condition group operations ---
 function toggleIfCondMode(nodeId, mode) {
   const node = designerNodes.find(n => n.id === nodeId);
   if (!node) return;
@@ -4526,36 +4652,60 @@ function toggleIfCondMode(nodeId, mode) {
   renderDesigner();
 }
 
-function addIfCondition(nodeId) {
+function addIfCondGroup(nodeId) {
   const node = designerNodes.find(n => n.id === nodeId);
   if (!node) return;
-  if (!node.config) node.config = {};
-  if (!node.config.conditions) node.config.conditions = [];
-  node.config.conditions.push({ left: 'vars.status', op: 'eq', right: '' });
+  _migrateIfConditions(node);
+  node.config.conditionGroups.push([{ left: 'vars.status', op: 'eq', right: '' }]);
   designerDirty = true;
   renderDesigner();
 }
 
-function removeIfCondition(nodeId, condIdx) {
+function removeIfCondGroup(nodeId, groupIdx) {
   const node = designerNodes.find(n => n.id === nodeId);
-  if (!node || !node.config || !node.config.conditions) return;
-  if (node.config.conditions.length <= 1) return;
-  node.config.conditions.splice(condIdx, 1);
+  if (!node || !node.config?.conditionGroups) return;
+  if (node.config.conditionGroups.length <= 1) return;
+  node.config.conditionGroups.splice(groupIdx, 1);
   designerDirty = true;
   renderDesigner();
 }
 
-function updateIfCondition(nodeId, condIdx, field, value) {
+function addIfCondInGroup(nodeId, groupIdx) {
   const node = designerNodes.find(n => n.id === nodeId);
-  if (!node || !node.config || !node.config.conditions) return;
-  if (!node.config.conditions[condIdx]) return;
-  node.config.conditions[condIdx][field] = value;
+  if (!node || !node.config?.conditionGroups) return;
+  const group = node.config.conditionGroups[groupIdx];
+  if (!group) return;
+  group.push({ left: 'vars.status', op: 'eq', right: '' });
   designerDirty = true;
-  // Re-render when op changes (hides/shows right input) or left changes (preset vs custom switch)
+  renderDesigner();
+}
+
+function removeIfCondInGroup(nodeId, groupIdx, condIdx) {
+  const node = designerNodes.find(n => n.id === nodeId);
+  if (!node || !node.config?.conditionGroups) return;
+  const group = node.config.conditionGroups[groupIdx];
+  if (!group || group.length <= 1) return;
+  group.splice(condIdx, 1);
+  designerDirty = true;
+  renderDesigner();
+}
+
+function updateIfCondInGroup(nodeId, groupIdx, condIdx, field, value) {
+  const node = designerNodes.find(n => n.id === nodeId);
+  if (!node || !node.config?.conditionGroups) return;
+  const group = node.config.conditionGroups[groupIdx];
+  if (!group || !group[condIdx]) return;
+  group[condIdx][field] = value;
+  designerDirty = true;
   if (field === 'op' || field === 'left') renderDesigner();
 }
 
-// --- Switch node per-branch condition operations ---
+// Keep old addIfCondition / removeIfCondition / updateIfCondition as no-ops for safety
+function addIfCondition(nodeId) { addIfCondInGroup(nodeId, 0); }
+function removeIfCondition(nodeId, condIdx) { removeIfCondInGroup(nodeId, 0, condIdx); }
+function updateIfCondition(nodeId, condIdx, field, value) { updateIfCondInGroup(nodeId, 0, condIdx, field, value); }
+
+// --- Switch node condition group operations ---
 function toggleSwitchCondMode(nodeId, branchIdx, mode) {
   const node = designerNodes.find(n => n.id === nodeId);
   if (!node || !node.config || !node.config.branches) return;
@@ -4564,37 +4714,67 @@ function toggleSwitchCondMode(nodeId, branchIdx, mode) {
   renderDesigner();
 }
 
-function addSwitchCondition(nodeId, branchIdx) {
+function addSwitchCondGroup(nodeId, branchIdx) {
   const node = designerNodes.find(n => n.id === nodeId);
-  if (!node || !node.config || !node.config.branches) return;
+  if (!node || !node.config?.branches) return;
   const branch = node.config.branches[branchIdx];
   if (!branch) return;
-  if (!branch.conditions) branch.conditions = [];
-  branch.conditions.push({ left: 'vars.status', op: 'eq', right: '' });
+  if (!branch.conditionGroups) branch.conditionGroups = [[{ left: 'vars.status', op: 'eq', right: '' }]];
+  branch.conditionGroups.push([{ left: 'vars.status', op: 'eq', right: '' }]);
   designerDirty = true;
   renderDesigner();
 }
 
-function removeSwitchCondition(nodeId, branchIdx, condIdx) {
+function removeSwitchCondGroup(nodeId, branchIdx, groupIdx) {
   const node = designerNodes.find(n => n.id === nodeId);
-  if (!node || !node.config || !node.config.branches) return;
+  if (!node || !node.config?.branches) return;
   const branch = node.config.branches[branchIdx];
-  if (!branch || !branch.conditions) return;
-  if (branch.conditions.length <= 1) return;
-  branch.conditions.splice(condIdx, 1);
+  if (!branch?.conditionGroups || branch.conditionGroups.length <= 1) return;
+  branch.conditionGroups.splice(groupIdx, 1);
   designerDirty = true;
   renderDesigner();
 }
 
-function updateSwitchCondition(nodeId, branchIdx, condIdx, field, value) {
+function addSwitchCondInGroup(nodeId, branchIdx, groupIdx) {
   const node = designerNodes.find(n => n.id === nodeId);
-  if (!node || !node.config || !node.config.branches) return;
+  if (!node || !node.config?.branches) return;
   const branch = node.config.branches[branchIdx];
-  if (!branch || !branch.conditions || !branch.conditions[condIdx]) return;
-  branch.conditions[condIdx][field] = value;
+  if (!branch?.conditionGroups) return;
+  const group = branch.conditionGroups[groupIdx];
+  if (!group) return;
+  group.push({ left: 'vars.status', op: 'eq', right: '' });
+  designerDirty = true;
+  renderDesigner();
+}
+
+function removeSwitchCondInGroup(nodeId, branchIdx, groupIdx, condIdx) {
+  const node = designerNodes.find(n => n.id === nodeId);
+  if (!node || !node.config?.branches) return;
+  const branch = node.config.branches[branchIdx];
+  if (!branch?.conditionGroups) return;
+  const group = branch.conditionGroups[groupIdx];
+  if (!group || group.length <= 1) return;
+  group.splice(condIdx, 1);
+  designerDirty = true;
+  renderDesigner();
+}
+
+function updateSwitchCondInGroup(nodeId, branchIdx, groupIdx, condIdx, field, value) {
+  const node = designerNodes.find(n => n.id === nodeId);
+  if (!node || !node.config?.branches) return;
+  const branch = node.config.branches[branchIdx];
+  if (!branch?.conditionGroups) return;
+  const group = branch.conditionGroups[groupIdx];
+  if (!group || !group[condIdx]) return;
+  group[condIdx][field] = value;
   designerDirty = true;
   if (field === 'op' || field === 'left') renderDesigner();
 }
+
+// Keep old Switch condition functions as no-ops for safety
+function addSwitchCondition(nodeId, branchIdx) { addSwitchCondInGroup(nodeId, branchIdx, 0); }
+function removeSwitchCondition(nodeId, branchIdx, condIdx) { removeSwitchCondInGroup(nodeId, branchIdx, 0, condIdx); }
+function updateSwitchCondition(nodeId, branchIdx, condIdx, field, value) { updateSwitchCondInGroup(nodeId, branchIdx, 0, condIdx, field, value); }
 
 // --- Right Panel Resize ---
 let _rpResizing = false;
