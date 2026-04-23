@@ -67,6 +67,30 @@ let designerActiveConfigTab = 'basic'; // 'basic' | 'advanced' — persists acro
 let designerVarPickerOpen = null; // Active variable picker: { editorId, position }
 let designerVarPickerHighlighted = -1; // Keyboard navigation highlight index
 
+// --- Group State (Task 1: Node Grouping) ---
+let designerGroups = []; // { id, name, nodeIds[], collapsed, color, x, y, w, h }
+let designerGroupIdCounter = 1;
+let designerGroupRenaming = null; // groupId being renamed inline
+const GROUP_COLORS = [
+  'rgba(139,92,246,0.08)',  // purple
+  'rgba(59,130,246,0.08)',  // blue
+  'rgba(16,185,129,0.08)', // green
+  'rgba(245,158,11,0.08)', // amber
+  'rgba(239,68,68,0.08)',  // red
+  'rgba(236,72,153,0.08)', // pink
+  'rgba(20,184,166,0.08)', // teal
+  'rgba(99,102,241,0.08)', // indigo
+];
+const GROUP_BORDER_COLORS = [
+  '#8b5cf6','#3b82f6','#10b981','#f59e0b','#ef4444','#ec4899','#14b8a6','#6366f1'
+];
+
+// --- Search State (Task 2: Global Search) ---
+let designerSearchOpen = false;
+let designerSearchQuery = '';
+let designerSearchHighlight = 0; // keyboard-nav index
+let designerFocusFlashNodeId = null; // node being flash-highlighted after jump
+
 // --- Node Type Definitions ---
 const nodeTypes = [
   { type: 'trigger', name: '触发器', icon: '⚡', color: 'node-color-trigger', category: '流程控制', desc: '流程的起始入口，定义触发条件（手动/定时/事件/Webhook）', code: 'trigger', hidden: true },
@@ -606,6 +630,10 @@ function renderDesigner() {
               ${renderConnections()}
             </g>
           </svg>
+          <!-- Group containers layer (below nodes) -->
+          <div class="canvas-groups" id="canvasGroups" style="transform: translate(${designerPanX}px, ${designerPanY}px) scale(${designerZoom})">
+            ${renderCanvasGroups()}
+          </div>
           <div class="canvas-nodes" id="canvasNodes" style="transform: translate(${designerPanX}px, ${designerPanY}px) scale(${designerZoom})">
             ${renderCanvasNodes()}
           </div>
@@ -627,6 +655,7 @@ function renderDesigner() {
 
     ${renderBottomPanel()}
     ${renderContextMenu()}
+    ${renderSearchOverlay()}
   `;
 
   // Set up keyboard shortcuts
@@ -695,6 +724,166 @@ function filterNodes(query) {
   });
 }
 
+// --- Canvas Groups (Task 1) ---
+function renderCanvasGroups() {
+  return designerGroups.map(grp => {
+    const colorIdx = grp.id % GROUP_COLORS.length;
+    const bgColor = GROUP_COLORS[colorIdx];
+    const borderColor = GROUP_BORDER_COLORS[colorIdx];
+    if (grp.collapsed) {
+      // Folded state: render as a wide node-like card
+      const isSelected = designerSelectedNodeIds.includes('g' + grp.id);
+      return `<div class="group-card ${isSelected ? 'selected' : ''}" id="grp-${grp.id}"
+        style="left:${grp.x}px;top:${grp.y}px;border-color:${borderColor}"
+        onclick="expandGroup(${grp.id})"
+        oncontextmenu="onGroupContextMenu(event,${grp.id})"
+        title="双击展开分组">
+        <div class="group-card-icon" style="background:${borderColor}20;color:${borderColor}">▣</div>
+        <div class="group-card-info">
+          <div class="group-card-name">${escHtml(grp.name)}</div>
+          <div class="group-card-count">${grp.nodeIds.length} 个节点</div>
+        </div>
+        <button class="group-expand-btn" onclick="event.stopPropagation();expandGroup(${grp.id})" title="展开分组">+</button>
+      </div>`;
+    }
+    // Expanded state: render as a container box around the nodes
+    return `<div class="group-container" id="grp-${grp.id}"
+      style="left:${grp.x}px;top:${grp.y}px;width:${grp.w}px;height:${grp.h}px;background:${bgColor};border-color:${borderColor}"
+      oncontextmenu="onGroupContextMenu(event,${grp.id})">
+      <div class="group-header" style="border-bottom-color:${borderColor}20">
+        ${designerGroupRenaming === grp.id
+          ? `<input class="group-name-input" value="${escHtml(grp.name)}" id="grp-rename-${grp.id}" onblur="commitGroupRename(${grp.id},this.value)" onkeydown="if(event.key==='Enter')commitGroupRename(${grp.id},this.value);if(event.key==='Escape')cancelGroupRename()" onclick="event.stopPropagation()" />`
+          : `<span class="group-name" ondblclick="startGroupRename(${grp.id})" title="双击重命名">${escHtml(grp.name)}</span>`
+        }
+        <div class="group-header-actions">
+          <button class="group-action-btn" onclick="event.stopPropagation();collapseGroup(${grp.id})" title="折叠分组">−</button>
+          <button class="group-action-btn" onclick="event.stopPropagation();onGroupContextMenu(event,${grp.id})" title="更多操作">⋯</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function computeGroupBounds(nodeIds) {
+  const pad = 24;
+  const nodes = nodeIds.map(id => designerNodes.find(n => n.id === id)).filter(Boolean);
+  if (nodes.length === 0) return { x: 100, y: 100, w: 240, h: 120 };
+  const minX = Math.min(...nodes.map(n => n.x)) - pad;
+  const minY = Math.min(...nodes.map(n => n.y)) - 44; // extra top for header
+  const maxX = Math.max(...nodes.map(n => n.x + 180)) + pad;
+  const maxY = Math.max(...nodes.map(n => n.y + 72)) + pad;
+  return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+}
+
+function createGroup() {
+  if (designerReadonly || designerDebugMode) return;
+  const ids = designerSelectedNodeIds.length > 0 ? [...designerSelectedNodeIds] : (designerSelectedNodeId ? [designerSelectedNodeId] : []);
+  if (ids.length < 2) { showToast('warning', '提示', '请先框选至少 2 个节点再创建分组'); return; }
+  pushUndoState();
+  const bounds = computeGroupBounds(ids);
+  const colorIdx = designerGroupIdCounter % GROUP_COLORS.length;
+  const grp = { id: designerGroupIdCounter++, name: '新分组', nodeIds: ids, collapsed: false, color: colorIdx, ...bounds };
+  designerGroups.push(grp);
+  designerDirty = true;
+  renderDesigner();
+  // Auto-focus rename
+  setTimeout(() => {
+    const el = document.getElementById(`grp-rename-${grp.id - 1}`);
+    if (el) { designerGroupRenaming = grp.id; el.focus(); el.select(); }
+  }, 50);
+  showToast('success', '已创建分组', `包含 ${ids.length} 个节点`);
+}
+
+function collapseGroup(grpId) {
+  const grp = designerGroups.find(g => g.id === grpId);
+  if (!grp) return;
+  // Store original bounds before collapsing
+  grp._expandedBounds = { x: grp.x, y: grp.y, w: grp.w, h: grp.h };
+  grp.collapsed = true;
+  // Position the collapsed card at the group's top-left
+  renderDesigner();
+}
+
+function expandGroup(grpId) {
+  const grp = designerGroups.find(g => g.id === grpId);
+  if (!grp) return;
+  grp.collapsed = false;
+  if (grp._expandedBounds) {
+    grp.x = grp._expandedBounds.x;
+    grp.y = grp._expandedBounds.y;
+    grp.w = grp._expandedBounds.w;
+    grp.h = grp._expandedBounds.h;
+  } else {
+    const bounds = computeGroupBounds(grp.nodeIds);
+    Object.assign(grp, bounds);
+  }
+  renderDesigner();
+}
+
+function dissolveGroup(grpId) {
+  const grp = designerGroups.find(g => g.id === grpId);
+  if (!grp) return;
+  pushUndoState();
+  designerGroups = designerGroups.filter(g => g.id !== grpId);
+  designerDirty = true;
+  renderDesigner();
+  showToast('info', '分组已解散', grp.name);
+}
+
+function deleteGroup(grpId) {
+  const grp = designerGroups.find(g => g.id === grpId);
+  if (!grp) return;
+  pushUndoState();
+  // Remove all nodes inside the group
+  designerNodes = designerNodes.filter(n => !grp.nodeIds.includes(n.id) || n.type === 'trigger' || n.type === 'end');
+  designerConnections = designerConnections.filter(c =>
+    !grp.nodeIds.some(id => c.from === id || c.to === id)
+  );
+  designerGroups = designerGroups.filter(g => g.id !== grpId);
+  designerDirty = true;
+  syncDesignerState();
+  renderDesigner();
+  showToast('success', '分组及内部节点已删除', grp.name);
+}
+
+function startGroupRename(grpId) {
+  designerGroupRenaming = grpId;
+  renderDesigner();
+  setTimeout(() => {
+    const el = document.getElementById(`grp-rename-${grpId}`);
+    if (el) { el.focus(); el.select(); }
+  }, 30);
+}
+
+function commitGroupRename(grpId, val) {
+  const grp = designerGroups.find(g => g.id === grpId);
+  if (grp && val.trim()) grp.name = val.trim();
+  designerGroupRenaming = null;
+  renderDesigner();
+}
+
+function cancelGroupRename() {
+  designerGroupRenaming = null;
+  renderDesigner();
+}
+
+function onGroupContextMenu(e, grpId) {
+  e.preventDefault();
+  e.stopPropagation();
+  if (designerReadonly) return;
+  const grp = designerGroups.find(g => g.id === grpId);
+  if (!grp) return;
+  const shell = document.getElementById('designerShell');
+  const rect = shell.getBoundingClientRect();
+  designerContextMenu = {
+    x: e.clientX - rect.left,
+    y: e.clientY - rect.top,
+    groupId: grpId,
+    group: true,
+  };
+  renderDesigner();
+}
+
 // --- Canvas Nodes ---
 function renderCanvasNodes() {
   // Pre-compute all loop body sets so we don't call getLoopBodyDescendants per-node repeatedly
@@ -712,6 +901,10 @@ function renderCanvasNodes() {
     const ownerLoop = loopBodyMap.get(node.id) || null;
     const isLoopBodyNode = !!ownerLoop;
     const inputConns = designerConnections.filter(c => c.to === node.id);
+    // LOD: zoom-level-of-detail classes (Task 3)
+    const lodClass = designerZoom < 0.35 ? 'lod-micro' : designerZoom < 0.6 ? 'lod-compact' : '';
+    // Flash highlight for search jump (Task 2)
+    const flashClass = designerFocusFlashNodeId === node.id ? 'node-focus-flash' : '';
     // Don't show merge strategy badge when all inputs come from loop ports of the same loop node
     // (loop body and done never fire simultaneously, so merging makes no sense)
     const loopPortInputs = inputConns.filter(c => {
@@ -750,7 +943,7 @@ function renderCanvasNodes() {
       portsHtml += `<div class="canvas-node-port port-out" data-port="out" data-node="${node.id}"></div>`;
     }
 
-    return `<div class="canvas-node ${isSelected ? 'selected' : ''} ${debugClass} ${isPlaceholder ? 'node-placeholder' : ''} ${node.type === 'loop' ? 'loop-node-style' : ''} ${isLoopBodyNode ? 'loop-body-node' : ''}" id="node-${node.id}"
+    return `<div class="canvas-node ${isSelected ? 'selected' : ''} ${debugClass} ${isPlaceholder ? 'node-placeholder' : ''} ${node.type === 'loop' ? 'loop-node-style' : ''} ${isLoopBodyNode ? 'loop-body-node' : ''} ${lodClass} ${flashClass}" id="node-${node.id}"
       style="left:${node.x}px;top:${node.y}px"
       onmousedown="onNodeMouseDown(event, ${node.id})"
       onclick="onNodeClick(event, ${node.id})"
@@ -1885,7 +2078,18 @@ function renderIfConfig(node) {
     </div>` : `
     <div class="config-field">
       <div class="config-field-label">条件表达式</div>
-      <textarea class="expr-editor" placeholder="response.status == 200" onchange="updateNodeConfig(${nid},'condition',this.value)">${node.config?.condition || 'response.status == 200'}</textarea>
+      ${renderDualModeEditor({
+        id: `if_cond_${nid}`,
+        value: node.config?.condition || 'response.status == 200',
+        placeholder: 'response.status == 200',
+        nodeId: nid,
+        minHeight: 40,
+        codeMinHeight: 80,
+        label: 'IF 条件表达式',
+        hint: '表达式模式：支持 {{vars.xxx}} 引用；高阶模式：支持完整 JS 语法',
+        modeKey: `if_cond_${nid}`,
+        onChange: `updateNodeConfig(${nid},'condition',this.value)`
+      })}
       <div style="font-size:11px;color:var(--md-outline);margin-top:4px">支持 JS 表达式，变量通过 <code style="background:var(--md-surface-container);padding:1px 4px;border-radius:3px">vars.xxx</code> 引用</div>
     </div>`}
     <div class="if-else-block">
@@ -1951,7 +2155,19 @@ function renderSwitchConfig(node) {
               `addSwitchCondGroup(${nid},${i})`,
               `removeSwitchCondGroup(${nid},${i},`
             )
-          : `<textarea class="expr-editor" style="min-height:36px;font-size:11px" placeholder="输入分支条件表达式..." onchange="updateSwitchBranchCondition(${nid}, ${i}, this.value)">${escHtml(b.condition || '')}</textarea>`
+          : renderDualModeEditor({
+                    id: `switch_branch_${nid}_${i}`,
+                    value: b.condition || '',
+                    placeholder: '\u8f93\u5165\u5206\u652f\u6761\u4ef6\u8868\u8fbe\u5f0f...',
+                    nodeId: nid,
+                    minHeight: 36,
+                    codeMinHeight: 60,
+                    label: `Switch \u5206\u652f ${i + 1} \u6761\u4ef6`,
+                    hint: '\u8868\u8fbe\u5f0f\u6a21\u5f0f\u652f\u6301 {{vars.xxx}} \u5f15\u7528\uff1b\u9ad8\u9636\u6a21\u5f0f\u652f\u6301\u5b8c\u6574 JS \u8bed\u6cd5',
+                    modeKey: `switch_branch_${nid}_${i}`,
+                    singleLine: true,
+                    onChange: `updateSwitchBranchCondition(${nid}, ${i}, this.value)`
+                  })
         }
       </div>`;
     }).join('')}
@@ -2016,16 +2232,18 @@ function renderHttpConfig(node) {
           <button class="cond-mode-tab ${bodyType === 'none' ? 'active' : ''}" onclick="updateNodeConfig(${node.id},'bodyType','none');renderDesigner()">无</button>
         </div>
       </div>
-      ${bodyType !== 'none' ? renderExprEditor({
+      ${bodyType !== 'none' ? renderDualModeEditor({
         id: `http_body_${node.id}`,
         value: node.config?.body || '',
         placeholder: bodyPlaceholders[bodyType] || '',
         nodeId: node.id,
         minHeight: 60,
-        label: '请求体',
+        codeMinHeight: 80,
+        label: '\u8bf7\u6c42\u4f53',
         hint: bodyHints[bodyType] || '',
+        modeKey: `http_body_${node.id}`,
         onChange: `updateNodeConfig(${node.id}, 'body', this.value)`
-      }) : '<div class="config-field-help" style="padding:4px 0">此请求无请求体</div>'}
+      }) : '<div class="config-field-help" style="padding:4px 0">\u6b64\u8bf7\u6c42\u65e0\u8bf7\u6c42\u4f53</div>'}
     </div>` : '';
 
   // Success conditions
@@ -2069,27 +2287,32 @@ function renderHttpConfig(node) {
     </div>
     <div class="config-field">
       <div class="config-field-label">请求 URL <span class="required">*</span></div>
-      ${renderExprEditor({
+      ${renderDualModeEditor({
         id: `http_url_${node.id}`,
         value: node.config?.url || '',
-        placeholder: 'https://api.example.com/endpoint 或 {{input.apiUrl}}',
+        placeholder: 'https://api.example.com/endpoint \u6216 {{input.apiUrl}}',
         nodeId: node.id,
         singleLine: true,
-        label: '请求 URL',
+        minHeight: 36,
+        codeMinHeight: 60,
+        label: '\u8bf7\u6c42 URL',
+        modeKey: `http_url_${node.id}`,
         onChange: `updateNodeConfig(${node.id}, 'url', this.value)`
       })}
     </div>
     ${queryParamsHtml}
     <div class="config-field">
       <div class="config-field-label">请求头</div>
-      ${renderExprEditor({
+      ${renderDualModeEditor({
         id: `http_headers_${node.id}`,
         value: node.config?.headers || '',
         placeholder: '{"Content-Type": "application/json", "Authorization": "{{input.token}}"}',
         nodeId: node.id,
         minHeight: 50,
-        label: '请求头',
-        hint: 'JSON 格式，支持 {{变量}} 引用',
+        codeMinHeight: 80,
+        label: '\u8bf7\u6c42\u5934',
+        hint: 'JSON \u683c\u5f0f\uff0c\u652f\u6301 {{\u53d8\u91cf}} \u5f15\u7528',
+        modeKey: `http_headers_${node.id}`,
         onChange: `updateNodeConfig(${node.id}, 'headers', this.value)`
       })}
     </div>
@@ -2327,12 +2550,17 @@ function renderAssignConfig(node) {
           ${typeOptions.map(t => `<option value="${t}"${curType === t ? ' selected' : ''}>${t}</option>`).join('')}
         </select>
         <span class="condition-op">=</span>
-        ${renderExprEditor({
+        ${renderDualModeEditor({
           id: `assign_src_${node.id}_${i}`,
           value: a.source,
           placeholder: srcPlaceholder,
           nodeId: node.id,
           singleLine: true,
+          minHeight: 36,
+          codeMinHeight: 60,
+          label: '赋値表达式',
+          hint: '表达式模式支持 {{\u53d8\u91cf}} 插入；高阶模式支持完整 JS 语法',
+          modeKey: `assign_src_${node.id}_${i}`,
           onChange: `updateAssignment(${node.id}, ${i}, 'source', this.value)`
         })}
         ${assignments.length > 1 ? `<button class="assign-remove-btn" title="删除此规则" onclick="removeAssignment(${node.id}, ${i})">
@@ -2487,12 +2715,17 @@ function renderOutputConfig(node) {
         </select>
         <input class="config-input assign-target-input" placeholder="变量名" value="${escHtml(v.name)}" style="font-family:var(--font-family-mono)" onchange="updateOutputVar(${node.id}, ${i}, 'name', this.value); renderDesigner()" />
         <span class="condition-op">=</span>
-        ${renderExprEditor({
+        ${renderDualModeEditor({
           id: `output_src_${node.id}_${i}`,
           value: v.source,
-          placeholder: '{{节点.输出变量}}',
+          placeholder: '{{\u8282\u70b9.\u8f93\u51fa\u53d8\u91cf}}',
           nodeId: node.id,
           singleLine: true,
+          minHeight: 36,
+          codeMinHeight: 60,
+          label: '\u8f93\u51fa\u53d8\u91cf\u6765\u6e90',
+          hint: '\u8868\u8fbe\u5f0f\u6a21\u5f0f\u652f\u6301 {{\u53d8\u91cf}} \u63d2\u5165\uff1b\u9ad8\u9636\u6a21\u5f0f\u652f\u6301\u5b8c\u6574 JS \u8bed\u6cd5',
+          modeKey: `output_src_${node.id}_${i}`,
           onChange: `updateOutputVar(${node.id}, ${i}, 'source', this.value)`
         })}
         ${outputVars.length > 1 ? `<button class="assign-remove-btn" title="删除此变量" onclick="removeOutputVar(${node.id}, ${i})">
@@ -2509,14 +2742,16 @@ function renderOutputConfig(node) {
   const textModeHtml = `
     <div class="config-field">
       <div class="config-field-label">输出文本</div>
-      ${renderExprEditor({
+      ${renderDualModeEditor({
         id: `output_text_${node.id}`,
         value: node.config?.textTemplate || '',
-        placeholder: '输出文本，支持 {{节点.变量路径}} 插入变量',
+        placeholder: '\u8f93\u51fa\u6587\u672c\uff0c\u652f\u6301 {{\u8282\u70b9.\u53d8\u91cf\u8def\u5f84}} \u63d2\u5165\u53d8\u91cf',
         nodeId: node.id,
         minHeight: 80,
-        label: '文本模板',
-        hint: '使用 {{节点.变量路径}} 插入上游变量，输出固定为 text 变量',
+        codeMinHeight: 100,
+        label: '\u6587\u672c\u6a21\u677f',
+        hint: '\u8868\u8fbe\u5f0f\u6a21\u5f0f\uff1a{{\u53d8\u91cf}} \u63d2\u5165\uff1b\u9ad8\u9636\u6a21\u5f0f\uff1a\u652f\u6301 JS \u8fd0\u7b97\u751f\u6210\u6587\u672c',
+        modeKey: `output_text_${node.id}`,
         onChange: `updateNodeConfig(${node.id}, 'textTemplate', this.value)`
       })}
     </div>
@@ -2544,13 +2779,16 @@ function renderOutputConfig(node) {
     </div>
     <div class="config-field">
       <div class="config-field-label">回复内容</div>
-      ${renderExprEditor({
+      ${renderDualModeEditor({
         id: `output_reply_${node.id}`,
         value: node.config?.replyContent || '',
-        placeholder: '输入回复内容，支持 {{节点.变量路径}} 引用上游变量',
+        placeholder: '\u8f93\u5165\u56de\u590d\u5185\u5bb9\uff0c\u652f\u6301 {{\u8282\u70b9.\u53d8\u91cf\u8def\u5f84}} \u5f15\u7528\u4e0a\u6e38\u53d8\u91cf',
         nodeId: node.id,
         minHeight: 80,
-        hint: '此内容将直接发送给对话用户，支持变量插值',
+        codeMinHeight: 100,
+        label: '\u56de\u590d\u5185\u5bb9',
+        hint: '\u8868\u8fbe\u5f0f\u6a21\u5f0f\uff1a{{\u53d8\u91cf}} \u63d2\u5165\uff1b\u9ad8\u9636\u6a21\u5f0f\uff1a\u652f\u6301\u5b8c\u6574 JS \u751f\u6210\u5185\u5bb9',
+        modeKey: `output_reply_${node.id}`,
         onChange: `updateNodeConfig(${node.id}, 'replyContent', this.value)`
       })}
     </div>`;
@@ -2691,7 +2929,18 @@ function renderLoopConfig(node) {
     ` : `
       <div class="config-field">
         <div class="config-field-label">循环条件 <span class="required">*</span></div>
-        <textarea class="expr-editor" style="min-height:40px" placeholder="retryCount < 3 && !success" onchange="updateNodeConfig(${node.id}, 'whileCondition', this.value)">${node.config?.whileCondition || ''}</textarea>
+        ${renderDualModeEditor({
+          id: `loop_while_${node.id}`,
+          value: node.config?.whileCondition || '',
+          placeholder: 'retryCount < 3 && !success',
+          nodeId: node.id,
+          minHeight: 40,
+          codeMinHeight: 60,
+          label: '循环条件',
+          hint: '条件为 true 时继续循环；高阶模式支持完整 JS 语法',
+          modeKey: `loop_while_${node.id}`,
+          onChange: `updateNodeConfig(${node.id}, 'whileCondition', this.value)`
+        })}
         <div class="config-field-help">条件为 true 时继续执行循环体；每次循环体执行完毕后重新判断</div>
       </div>
     `}
@@ -2709,7 +2958,18 @@ function renderLoopConfig(node) {
     ${node.config?.allowBreak !== false ? `
       <div class="config-field">
         <div class="config-field-label">Break 条件 <span class="required">*</span></div>
-        <textarea class="expr-editor" style="min-height:36px;font-size:11px" placeholder="roomItem.stock === 0" onchange="updateNodeConfig(${node.id}, 'breakCondition', this.value)">${node.config?.breakCondition || ''}</textarea>
+        ${renderDualModeEditor({
+          id: `loop_break_${node.id}`,
+          value: node.config?.breakCondition || '',
+          placeholder: 'roomItem.stock === 0',
+          nodeId: node.id,
+          minHeight: 36,
+          codeMinHeight: 60,
+          label: 'Break 条件',
+          hint: '表达式为 true 时跳出循环；高阶模式支持完整 JS 语法',
+          modeKey: `loop_break_${node.id}`,
+          onChange: `updateNodeConfig(${node.id}, 'breakCondition', this.value)`
+        })}
         <div class="config-field-help">表达式为 true 时跳出循环，进入"Break"端口连接的后续节点。支持引用循环变量，如 <code style="font-size:10px;font-family:var(--font-family-mono);background:var(--md-surface-container);padding:0 3px;border-radius:2px">\${roomItem.stock} === 0</code>、<code style="font-size:10px;font-family:var(--font-family-mono);background:var(--md-surface-container);padding:0 3px;border-radius:2px">errorCount > 5</code></div>
       </div>
     ` : ''}
@@ -2739,40 +2999,48 @@ function renderMqConfig(node) {
     <div class="config-section-title">MQ 发送配置</div>
     <div class="config-field">
       <div class="config-field-label">Topic <span class="required">*</span></div>
-      ${renderExprEditor({
+      ${renderDualModeEditor({
         id: `mq_topic_${node.id}`,
         value: node.config?.topic || '',
-        placeholder: 'order_events 或 {{input.topicName}}',
+        placeholder: 'order_events \u6216 {{input.topicName}}',
         nodeId: node.id,
         singleLine: true,
+        minHeight: 36,
+        codeMinHeight: 60,
         label: 'Topic',
+        modeKey: `mq_topic_${node.id}`,
         onChange: `updateNodeConfig(${node.id}, 'topic', this.value)`
       })}
       <div class="config-field-help">消息发送的目标队列或 Topic 名称</div>
     </div>
     <div class="config-field">
       <div class="config-field-label">消息 Key</div>
-      ${renderExprEditor({
+      ${renderDualModeEditor({
         id: `mq_key_${node.id}`,
         value: node.config?.messageKey || '',
-        placeholder: '可选，如 {{input.orderId}}（Kafka 分区键 / RabbitMQ routing key）',
+        placeholder: '\u53ef\u9009\uff0c\u5982 {{input.orderId}}\uff08Kafka \u5206\u533a\u952e / RabbitMQ routing key\uff09',
         nodeId: node.id,
         singleLine: true,
-        label: '消息 Key',
+        minHeight: 36,
+        codeMinHeight: 60,
+        label: '\u6d88\u606f Key',
+        modeKey: `mq_key_${node.id}`,
         onChange: `updateNodeConfig(${node.id}, 'messageKey', this.value)`
       })}
       <div class="config-field-help">选填。Kafka 场景控制分区路由，RabbitMQ 场景作为 routing key</div>
     </div>
     <div class="config-field">
       <div class="config-field-label">消息内容 <span class="required">*</span></div>
-      ${renderExprEditor({
+      ${renderDualModeEditor({
         id: `mq_body_${node.id}`,
         value: node.config?.body || '',
         placeholder: '{"event": "order_created", "orderId": "{{input.orderId}}"}',
         nodeId: node.id,
         minHeight: 80,
-        label: '消息内容',
-        hint: 'JSON 格式，支持 {{变量}} 引用',
+        codeMinHeight: 100,
+        label: '\u6d88\u606f\u5185\u5bb9',
+        hint: 'JSON \u683c\u5f0f\uff0c\u652f\u6301 {{\u53d8\u91cf}} \u5f15\u7528',
+        modeKey: `mq_body_${node.id}`,
         onChange: `updateNodeConfig(${node.id}, 'body', this.value)`
       })}
       <div class="config-field-help">JSON 格式，支持 {{变量}} 引用上游节点输出</div>
@@ -2786,12 +3054,16 @@ function renderMqConfig(node) {
       <div class="assign-rule-main" style="gap:6px">
         <input class="config-input" placeholder="属性名" value="${escHtml(p.key || '')}" style="flex:1;font-family:var(--font-family-mono)" onchange="updateMqProperty(${node.id}, ${i}, 'key', this.value)" />
         <span class="condition-op">=</span>
-        ${renderExprEditor({
+        ${renderDualModeEditor({
           id: `mq_prop_val_${node.id}_${i}`,
           value: p.value || '',
-          placeholder: '属性值，支持 {{变量}}',
+          placeholder: '\u5c5e\u6027\u5024\uff0c\u652f\u6301 {{\u53d8\u91cf}}',
           nodeId: node.id,
           singleLine: true,
+          minHeight: 36,
+          codeMinHeight: 60,
+          label: '\u6d88\u606f\u5c5e\u6027\u5024',
+          modeKey: `mq_prop_val_${node.id}_${i}`,
           onChange: `updateMqProperty(${node.id}, ${i}, 'value', this.value)`
         })}
         ${properties.length > 1 ? `<button class="assign-remove-btn" title="删除此属性" onclick="removeMqProperty(${node.id}, ${i})">
@@ -8012,6 +8284,141 @@ function copyOutputVarPath(nodeCode, varName) {
  * 渲染带变量选择器的表达式编辑器
  * @param {object} options - 配置选项
  */
+/**
+ * 双模式编辑器 — 简单模式(表达式编辑器) + 高阶模式(代码编辑器)
+ *
+ * @param {object} options
+ *   id         - 唯一标识符，用于生成 DOM id
+ *   nodeId     - 所属节点 id
+ *   value      - 当前字段的表达式内容
+ *   codeValue  - 当前字段的代码内容（不传则和 value 共用一个存储）
+ *   placeholder - 表达式模式占位符
+ *   codePlaceholder - 代码模式占位符
+ *   nodeId     - 节点 id
+ *   onChange   - 表达式内容变化回调
+ *   onCodeChange - 代码内容变化回调（不传则与 onChange 相同）
+ *   singleLine  - 是否单行输入（仅表达式模式）
+ *   minHeight   - 表达式区最小高度
+ *   codeMinHeight - 代码区最小高度
+ *   label       - 展开弹窗标题
+ *   hint        - 展开弹窗提示文字
+ *   modeKey     - 模式存储键名（存储到 node.config._dualMode_xxx）
+ *   language    - 高阶代码编辑器的语言，默认 'JavaScript'
+ */
+function renderDualModeEditor(options) {
+  const {
+    id,
+    nodeId,
+    value = '',
+    codeValue,
+    placeholder = '',
+    codePlaceholder = '// 输入 JS 表达式',
+    onChange = '',
+    onCodeChange,
+    singleLine = false,
+    minHeight = 60,
+    codeMinHeight = 80,
+    label = '',
+    hint = '',
+    modeKey = id,
+    language = 'JavaScript',
+    expandable = true
+  } = options;
+
+  const node = designerNodes.find(n => n.id === nodeId);
+  const modeConfigKey = `_dualMode_${modeKey}`;
+  const currentMode = node?.config?.[modeConfigKey] || 'simple';
+  const isSimple = currentMode === 'simple';
+  const actualCodeValue = codeValue !== undefined ? codeValue : value;
+  const actualCodeChange = onCodeChange || onChange;
+
+  const dualEditorId = `dual_${id}_${nodeId}`;
+
+  const headerHtml = `
+    <div class="dual-mode-editor-header">
+      <div class="dual-mode-tabs">
+        <button class="dual-mode-tab${isSimple ? ' active' : ''}" 
+          onclick="toggleDualEditorMode(${nodeId}, '${modeConfigKey}', 'simple')"
+          title="简单模式：支持变量插入和模板字符串">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 6h16M4 12h10M4 18h12"/>
+          </svg>
+          表达式
+        </button>
+        <button class="dual-mode-tab${!isSimple ? ' active' : ''}" 
+          onclick="toggleDualEditorMode(${nodeId}, '${modeConfigKey}', 'code')"
+          title="高阶模式：支持完整 JS 代码语法">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>
+          </svg>
+          高阶
+        </button>
+      </div>
+      <span class="dual-mode-hint">${isSimple ? '支持 {{\u53d8\u91cf}} 插入' : '支持完整 JS 语法'}</span>
+    </div>`;
+
+  // 简单模式内容
+  const simpleBody = renderExprEditor({
+    id: `${id}_simple`,
+    value,
+    placeholder,
+    nodeId,
+    minHeight,
+    onChange,
+    singleLine,
+    label,
+    hint,
+    expandable
+  });
+
+  // 高阶模式内容
+  const codeEditorId = `dual_code_${id}_${nodeId}`;
+  const langLabel = language === 'JavaScript' ? 'JS' : language === 'Python' ? 'PY' : language.substring(0, 3).toUpperCase();
+  const codeBody = `
+    <div class="dual-mode-editor-body">
+      <textarea
+        id="${codeEditorId}"
+        class="dual-code-editor"
+        style="min-height:${codeMinHeight}px"
+        placeholder="${escHtml(codePlaceholder)}"
+        onchange="${actualCodeChange}"
+        spellcheck="false"
+      >${escHtml(actualCodeValue)}</textarea>
+      <div class="dual-code-toolbar">
+        <span style="color:#666;font-size:10px;flex:1">${langLabel}</span>
+        <button class="dual-code-expand-btn"
+          onclick="openExprExpandModal('${codeEditorId}', ${nodeId}, ${JSON.stringify(label || id).replace(/"/g, '&quot;')}, ${JSON.stringify(hint || codePlaceholder).replace(/"/g, '&quot;')})"
+          title="展开编辑">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+          </svg>
+          展开编辑
+        </button>
+      </div>
+    </div>`;
+
+  return `
+    <div class="dual-mode-editor" id="${dualEditorId}">
+      ${headerHtml}
+      ${isSimple 
+        ? `<div class="dual-mode-editor-body">${simpleBody}</div>`
+        : codeBody
+      }
+    </div>`;
+}
+
+/**
+ * 切换双模式编辑器的模式
+ */
+function toggleDualEditorMode(nodeId, modeConfigKey, mode) {
+  const node = designerNodes.find(n => n.id === nodeId);
+  if (!node) return;
+  if (!node.config) node.config = {};
+  node.config[modeConfigKey] = mode;
+  designerDirty = true;
+  renderDesigner();
+}
+
 function renderExprEditor(options) {
   const {
     id,
