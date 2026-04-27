@@ -6475,6 +6475,137 @@ function renderVarDefaultWidget(type) {
   }
 }
 
+// ── Schema 树形编辑器 ──────────────────────────────────────────
+// _schemaTree: 树形节点数组，每个节点 { id, name, type, children:[] }
+// 支持 5 层嵌套，Object/Array[Object] 类型的字段可展开子字段
+const _schemaTree = [];
+let _schemaNodeIdCounter = 0;
+
+function _newSchemaNode(name='', type='String') {
+  return { id: ++_schemaNodeIdCounter, name, type, children: [], expanded: true };
+}
+
+// 从树中按 id 查找节点（含任意层级）
+function _findSchemaNode(nodes, id) {
+  for (const n of nodes) {
+    if (n.id === id) return n;
+    const found = _findSchemaNode(n.children, id);
+    if (found) return found;
+  }
+  return null;
+}
+
+// 从父列表中删除指定 id 节点
+function _removeSchemaNode(nodes, id) {
+  const idx = nodes.findIndex(n => n.id === id);
+  if (idx !== -1) { nodes.splice(idx, 1); return true; }
+  for (const n of nodes) { if (_removeSchemaNode(n.children, id)) return true; }
+  return false;
+}
+
+// 渲染整棵树到 DOM
+function renderSchemaTree() {
+  const container = document.getElementById('schemaFieldRows');
+  if (!container) return;
+  container.innerHTML = '';
+  _renderSchemaNodes(_schemaTree, container, 0);
+}
+
+const SCHEMA_TYPE_OPTIONS = ['String','Integer','Double','Boolean','DateTime','Object','File','Array[String]','Array[Integer]','Array[Object]'];
+
+function _renderSchemaNodes(nodes, container, depth) {
+  if (depth >= 5) return; // 最大5层
+  nodes.forEach(node => {
+    const canHaveChildren = node.type === 'Object' || node.type === 'Array[Object]';
+    const indent = depth * 16;
+    const row = document.createElement('div');
+    row.setAttribute('data-schema-id', node.id);
+    row.style.cssText = `margin-left:${indent}px;margin-bottom:2px`;
+
+    // 行本体
+    const rowMain = document.createElement('div');
+    rowMain.style.cssText = 'display:flex;gap:4px;align-items:center';
+
+    // 展开/折叠按钮（仅 Object/Array[Object] 显示）
+    const toggleBtn = document.createElement('button');
+    toggleBtn.type = 'button';
+    toggleBtn.style.cssText = `width:16px;height:16px;padding:0;border:none;background:none;cursor:pointer;font-size:10px;color:var(--md-outline);flex-shrink:0;visibility:${canHaveChildren ? 'visible' : 'hidden'}`;
+    toggleBtn.textContent = node.expanded ? '▾' : '▸';
+    toggleBtn.onclick = () => {
+      node.expanded = !node.expanded;
+      renderSchemaTree();
+    };
+    rowMain.appendChild(toggleBtn);
+
+    // 字段名输入
+    const nameInput = document.createElement('input');
+    nameInput.className = 'config-input';
+    nameInput.placeholder = '字段名';
+    nameInput.value = node.name;
+    nameInput.style.cssText = 'flex:1;height:28px;font-size:11px;font-family:var(--font-family-mono)';
+    nameInput.oninput = () => { node.name = nameInput.value; };
+    rowMain.appendChild(nameInput);
+
+    // 类型下拉
+    const typeSelect = document.createElement('select');
+    typeSelect.className = 'assign-type-select';
+    typeSelect.style.cssText = 'height:28px;font-size:11px';
+    SCHEMA_TYPE_OPTIONS.forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t; opt.textContent = t;
+      if (t === node.type) opt.selected = true;
+      typeSelect.appendChild(opt);
+    });
+    typeSelect.onchange = () => {
+      const prev = node.type;
+      node.type = typeSelect.value;
+      // 切换到非结构类型时清空子字段
+      if (node.type !== 'Object' && node.type !== 'Array[Object]') node.children = [];
+      // 切换到结构类型时自动展开
+      if (node.type === 'Object' || node.type === 'Array[Object]') node.expanded = true;
+      renderSchemaTree();
+    };
+    rowMain.appendChild(typeSelect);
+
+    // 删除按钮
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'table-action-btn danger';
+    delBtn.style.cssText = 'width:24px;height:24px;flex-shrink:0';
+    delBtn.innerHTML = icons.trash;
+    delBtn.onclick = () => { _removeSchemaNode(_schemaTree, node.id); renderSchemaTree(); };
+    rowMain.appendChild(delBtn);
+
+    row.appendChild(rowMain);
+
+    // 子字段区域（仅 Object/Array[Object] 且已展开）
+    if (canHaveChildren && node.expanded) {
+      const childArea = document.createElement('div');
+      childArea.style.cssText = `margin-top:2px`;
+      // 递归渲染子节点
+      _renderSchemaNodes(node.children, childArea, depth + 1);
+      // 添加子字段按钮
+      if (depth < 4) {
+        const addChildBtn = document.createElement('button');
+        addChildBtn.type = 'button';
+        addChildBtn.className = 'btn btn-ghost btn-sm';
+        const childLabel = node.type === 'Array[Object]' ? '添加元素字段' : '添加子字段';
+        addChildBtn.style.cssText = `margin-left:${16}px;height:24px;font-size:11px;margin-top:2px`;
+        addChildBtn.innerHTML = `${icons.plus} ${childLabel}`;
+        addChildBtn.onclick = () => {
+          node.children.push(_newSchemaNode());
+          node.expanded = true;
+          renderSchemaTree();
+        };
+        childArea.appendChild(addChildBtn);
+      }
+      row.appendChild(childArea);
+    }
+
+    container.appendChild(row);
+  });
+}
+
 // 渲染 Object / Array[Object] 的结构定义区域
 function renderSchemaDefSection(type) {
   if (type !== 'Object' && type !== 'Array[Object]') return '';
@@ -6487,31 +6618,34 @@ function renderSchemaDefSection(type) {
       <span>${title} <span style="color:var(--md-outline);font-weight:400">（可选）</span></span>
       <span style="font-size:var(--font-size-xs);color:var(--md-outline)">${hint}</span>
     </div>
-    <div id="schemaFieldRows" style="display:flex;flex-direction:column;gap:4px;margin-bottom:6px"></div>
+    <div id="schemaFieldRows" style="display:flex;flex-direction:column;padding:4px 0 6px"></div>
     <div style="display:flex;gap:6px;align-items:center">
-      <button type="button" class="btn btn-ghost btn-sm" style="flex:1;justify-content:center" onclick="addSchemaFieldRow()">${icons.plus} 添加字段</button>
-      <button type="button" class="btn btn-ghost btn-sm" style="flex:1;justify-content:center" onclick="showSchemaPasteDialog()">${icons.code || '{ }'}  粘贴 JSON / Schema</button>
+      <button type="button" class="btn btn-ghost btn-sm" style="flex:1;justify-content:center" onclick="_schemaTree.push(_newSchemaNode());renderSchemaTree()">${icons.plus} 添加字段</button>
+      <button type="button" class="btn btn-ghost btn-sm" style="flex:1;justify-content:center" onclick="showSchemaPasteDialog()">{ }  粘贴 JSON / Schema</button>
     </div>
   </div>`;
 }
 
-// 添加一行字段定义
-const _schemaFields = [];
-function addSchemaFieldRow(name='', fieldType='String') {
-  const idx = _schemaFields.length;
-  _schemaFields.push({ name, type: fieldType });
-  const container = document.getElementById('schemaFieldRows');
-  if (!container) return;
-  const row = document.createElement('div');
-  row.className = 'assign-rule-row';
-  row.style.cssText = 'display:flex;gap:4px;align-items:center;padding:2px 0';
-  row.innerHTML = `
-    <input class="config-input" placeholder="字段名" value="${escHtml(name)}" style="flex:1;height:28px;font-size:11px;font-family:var(--font-family-mono)" oninput="_schemaFields[${idx}].name=this.value" />
-    <select class="assign-type-select" style="height:28px;font-size:11px" onchange="_schemaFields[${idx}].type=this.value">
-      ${['String','Integer','Double','Boolean','DateTime','Object','File','Array[String]','Array[Integer]','Array[Object]'].map(t => `<option value="${t}"${t===fieldType?' selected':''}>${t}</option>`).join('')}
-    </select>
-    <button type="button" class="table-action-btn danger" style="width:24px;height:24px;flex-shrink:0" onclick="this.parentElement.remove();_schemaFields.splice(${idx},1)">${icons.trash}</button>`;
-  container.appendChild(row);
+// 将树转为扁平 schema 数组（存储用）
+function _schemaTreeToFlat(nodes) {
+  return nodes.map(n => {
+    const item = { name: n.name.trim(), type: n.type };
+    if ((n.type === 'Object' || n.type === 'Array[Object]') && n.children.length > 0) {
+      item.children = _schemaTreeToFlat(n.children);
+    }
+    return item;
+  }).filter(n => n.name);
+}
+
+// 将扁平 schema 数组恢复成树节点（粘贴生成后用）
+function _flatToSchemaTree(fields) {
+  return fields.map(f => {
+    const node = _newSchemaNode(f.name, f.type);
+    if (f.children && f.children.length > 0) {
+      node.children = _flatToSchemaTree(f.children);
+    }
+    return node;
+  });
 }
 
 // 粘贴 JSON / Schema 快速生成结构
@@ -6544,26 +6678,50 @@ function applySchemaFromPaste() {
   const isSchema = parsed && parsed.type === 'object' && parsed.properties;
   const isArraySchema = parsed && parsed.type === 'array' && parsed.items?.properties;
 
+  // 递归解析 Json Schema properties
+  function parseSchemaProps(props, depth) {
+    if (depth > 5) return [];
+    return Object.entries(props).map(([k, v]) => {
+      const item = { name: k, type: jsSchemaTypeToVarType(v.type) };
+      if (v.properties) item.children = parseSchemaProps(v.properties, depth + 1);
+      else if (v.items?.properties) item.children = parseSchemaProps(v.items.properties, depth + 1);
+      return item;
+    });
+  }
+  // 递归从样本数据推断
+  function parseSampleObj(obj, depth) {
+    if (depth > 5) return [];
+    return Object.entries(obj).map(([k, v]) => {
+      const t = inferTypeFromValue(v);
+      const item = { name: k, type: t };
+      if (t === 'Object' && v && typeof v === 'object' && !Array.isArray(v)) {
+        item.children = parseSampleObj(v, depth + 1);
+      } else if (t === 'Array[Object]' && Array.isArray(v) && v.length > 0 && typeof v[0] === 'object') {
+        item.children = parseSampleObj(v[0], depth + 1);
+      }
+      return item;
+    });
+  }
+
   let fields = [];
   if (isSchema) {
-    fields = Object.entries(parsed.properties).map(([k, v]) => ({ name: k, type: jsSchemaTypeToVarType(v.type) }));
+    fields = parseSchemaProps(parsed.properties, 1);
   } else if (isArraySchema) {
-    fields = Object.entries(parsed.items.properties).map(([k, v]) => ({ name: k, type: jsSchemaTypeToVarType(v.type) }));
+    fields = parseSchemaProps(parsed.items.properties, 1);
   } else if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
     // 样本数据推断
-    fields = Object.entries(parsed).map(([k, v]) => ({ name: k, type: inferTypeFromValue(v) }));
+    fields = parseSampleObj(parsed, 1);
   } else if (Array.isArray(parsed) && parsed.length > 0 && typeof parsed[0] === 'object') {
-    fields = Object.entries(parsed[0]).map(([k, v]) => ({ name: k, type: inferTypeFromValue(v) }));
+    fields = parseSampleObj(parsed[0], 1);
   } else {
     showToast('warning','无法识别','请粘贴对象类型的 JSON 数据或 Json Schema'); return;
   }
 
   closeModal();
-  // 清空已有行，重新生成
-  _schemaFields.length = 0;
-  const container = document.getElementById('schemaFieldRows');
-  if (container) container.innerHTML = '';
-  fields.forEach(f => addSchemaFieldRow(f.name, f.type));
+  // 清空已有树，重新生成
+  _schemaTree.length = 0;
+  _flatToSchemaTree(fields).forEach(n => _schemaTree.push(n));
+  renderSchemaTree();
   showToast('success','生成成功',`已识别 ${fields.length} 个字段，可手动微调`);
 }
 
@@ -6593,7 +6751,8 @@ function updateVarDefaultWidget() {
   const schemaArea = document.getElementById('varSchemaArea');
   if (schemaArea) {
     schemaArea.innerHTML = renderSchemaDefSection(type);
-    _schemaFields.length = 0; // reset
+    _schemaTree.length = 0; // reset
+    _schemaNodeIdCounter = 0;
   }
 }
 
@@ -6626,9 +6785,8 @@ function addVariable() {
   if (designerVariables.some(v => v.name === name)) { showToast('warning', '提示', '变量名已存在'); return; }
 
   // 收集结构定义（仅 Object / Array[Object] 有效）
-  const schema = (type === 'Object' || type === 'Array[Object]') && _schemaFields.length > 0
-    ? _schemaFields.filter(f => f.name.trim()).map(f => ({ name: f.name.trim(), type: f.type }))
-    : undefined;
+  const schemaFlat = _schemaTreeToFlat(_schemaTree);
+  const schema = (type === 'Object' || type === 'Array[Object]') && schemaFlat.length > 0 ? schemaFlat : undefined;
 
   designerVariables.push({ name, type, defaultValue, desc, schema });
   syncDesignerState();
