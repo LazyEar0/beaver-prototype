@@ -3989,6 +3989,7 @@ function renderVariablesPanel(vars) {
     <div class="var-item">
       <span class="var-type-badge">${v.type}</span>
       <span class="var-name">${v.name}</span>
+      ${v.schema && v.schema.length > 0 ? `<span style="font-size:var(--font-size-xs);color:var(--md-primary);margin-left:4px;flex-shrink:0">• ${v.schema.length}个字段</span>` : ''}
       ${v.defaultValue ? `<span style="font-size:var(--font-size-xs);color:var(--md-outline);font-family:var(--font-family-mono);margin-left:4px">= ${v.defaultValue}</span>` : ''}
       ${v.desc ? `<span style="font-size:var(--font-size-xs);color:var(--md-outline);margin-left:8px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${v.desc}</span>` : '<span style="flex:1"></span>'}
       <button class="table-action-btn" style="width:24px;height:24px;margin-left:auto;flex-shrink:0" onclick="showToast('info','编辑变量','${v.name}')">${icons.edit}</button>
@@ -6463,22 +6464,152 @@ function renderVarDefaultWidget(type) {
       return `${label}<textarea class="config-input" id="newVarDefault" rows="3" placeholder='JSON 对象，如 {"key":"value"}' style="font-family:var(--font-family-mono);resize:vertical"></textarea>`;
     case 'File':
       return `${label}<div style="font-size:var(--font-size-xs);color:var(--md-outline);padding:6px 0">File 类型无初始值</div><input type="hidden" id="newVarDefault" value="" />`;
+    case 'Array[String]':
+      return `${label}<input class="config-input" id="newVarDefault" type="text" placeholder='字符串数组，如 ["a","b"]' style="font-family:var(--font-family-mono)" />`;
+    case 'Array[Integer]':
+      return `${label}<input class="config-input" id="newVarDefault" type="text" placeholder='整数数组，如 [1,2,3]' style="font-family:var(--font-family-mono)" />`;
+    case 'Array[Object]':
+      return `${label}<textarea class="config-input" id="newVarDefault" rows="3" placeholder='对象数组，如 [{"id":1},{"id":2}]' style="font-family:var(--font-family-mono);resize:vertical"></textarea>`;
     default: // String
       return `${label}<input class="config-input" id="newVarDefault" type="text" placeholder="字符串，如 hello" />`;
   }
+}
+
+// 渲染 Object / Array[Object] 的结构定义区域
+function renderSchemaDefSection(type) {
+  if (type !== 'Object' && type !== 'Array[Object]') return '';
+  const isArray = type === 'Array[Object]';
+  const title = isArray ? '元素结构定义' : '对象结构定义';
+  const hint = isArray ? '描述数组中每个元素的字段组成' : '描述对象的字段组成';
+  return `
+  <div class="config-field" id="varSchemaDefContainer" style="margin-top:4px">
+    <div class="config-field-label" style="display:flex;align-items:center;justify-content:space-between">
+      <span>${title} <span style="color:var(--md-outline);font-weight:400">（可选）</span></span>
+      <span style="font-size:var(--font-size-xs);color:var(--md-outline)">${hint}</span>
+    </div>
+    <div id="schemaFieldRows" style="display:flex;flex-direction:column;gap:4px;margin-bottom:6px"></div>
+    <div style="display:flex;gap:6px;align-items:center">
+      <button type="button" class="btn btn-ghost btn-sm" style="flex:1;justify-content:center" onclick="addSchemaFieldRow()">${icons.plus} 添加字段</button>
+      <button type="button" class="btn btn-ghost btn-sm" style="flex:1;justify-content:center" onclick="showSchemaPasteDialog()">${icons.code || '{ }'}  粘贴 JSON / Schema</button>
+    </div>
+  </div>`;
+}
+
+// 添加一行字段定义
+const _schemaFields = [];
+function addSchemaFieldRow(name='', fieldType='String') {
+  const idx = _schemaFields.length;
+  _schemaFields.push({ name, type: fieldType });
+  const container = document.getElementById('schemaFieldRows');
+  if (!container) return;
+  const row = document.createElement('div');
+  row.className = 'assign-rule-row';
+  row.style.cssText = 'display:flex;gap:4px;align-items:center;padding:2px 0';
+  row.innerHTML = `
+    <input class="config-input" placeholder="字段名" value="${escHtml(name)}" style="flex:1;height:28px;font-size:11px;font-family:var(--font-family-mono)" oninput="_schemaFields[${idx}].name=this.value" />
+    <select class="assign-type-select" style="height:28px;font-size:11px" onchange="_schemaFields[${idx}].type=this.value">
+      ${['String','Integer','Double','Boolean','DateTime','Object','File','Array[String]','Array[Integer]','Array[Object]'].map(t => `<option value="${t}"${t===fieldType?' selected':''}>${t}</option>`).join('')}
+    </select>
+    <button type="button" class="table-action-btn danger" style="width:24px;height:24px;flex-shrink:0" onclick="this.parentElement.remove();_schemaFields.splice(${idx},1)">${icons.trash}</button>`;
+  container.appendChild(row);
+}
+
+// 粘贴 JSON / Schema 快速生成结构
+function showSchemaPasteDialog() {
+  showModal(`<div class="modal" style="max-width:460px">
+    <div class="modal-header"><h2 class="modal-title">粘贴 JSON / Schema 快速生成结构</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div>
+    <div class="modal-body">
+      <div style="font-size:var(--font-size-xs);color:var(--md-outline);margin-bottom:var(--space-3);line-height:1.6">
+        支持两种格式，系统自动识别：<br>
+        · <strong>JSON 样本数据</strong>：粘贴一条真实数据，如 <code>{"id":1,"name":"张三"}</code><br>
+        · <strong>Json Schema</strong>：粘贴 Schema 文本，如 <code>{"type":"object","properties":{...}}</code>
+      </div>
+      <textarea class="config-input" id="schemaPasteInput" rows="7" placeholder='粘贴 JSON 数据或 Json Schema...' style="font-family:var(--font-family-mono);resize:vertical;width:100%"></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal()">取消</button>
+      <button class="btn btn-primary" onclick="applySchemaFromPaste()">识别并生成结构</button>
+    </div>
+  </div>`);
+}
+
+// 解析粘贴内容，生成字段行
+function applySchemaFromPaste() {
+  const raw = (document.getElementById('schemaPasteInput')?.value || '').trim();
+  if (!raw) { showToast('warning','提示','请粘贴 JSON 数据或 Schema 文本'); return; }
+  let parsed;
+  try { parsed = JSON.parse(raw); } catch(e) { showToast('error','格式错误','内容不是合法的 JSON，请检查后重试'); return; }
+
+  // 判断是 Json Schema 还是样本数据
+  const isSchema = parsed && parsed.type === 'object' && parsed.properties;
+  const isArraySchema = parsed && parsed.type === 'array' && parsed.items?.properties;
+
+  let fields = [];
+  if (isSchema) {
+    fields = Object.entries(parsed.properties).map(([k, v]) => ({ name: k, type: jsSchemaTypeToVarType(v.type) }));
+  } else if (isArraySchema) {
+    fields = Object.entries(parsed.items.properties).map(([k, v]) => ({ name: k, type: jsSchemaTypeToVarType(v.type) }));
+  } else if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+    // 样本数据推断
+    fields = Object.entries(parsed).map(([k, v]) => ({ name: k, type: inferTypeFromValue(v) }));
+  } else if (Array.isArray(parsed) && parsed.length > 0 && typeof parsed[0] === 'object') {
+    fields = Object.entries(parsed[0]).map(([k, v]) => ({ name: k, type: inferTypeFromValue(v) }));
+  } else {
+    showToast('warning','无法识别','请粘贴对象类型的 JSON 数据或 Json Schema'); return;
+  }
+
+  closeModal();
+  // 清空已有行，重新生成
+  _schemaFields.length = 0;
+  const container = document.getElementById('schemaFieldRows');
+  if (container) container.innerHTML = '';
+  fields.forEach(f => addSchemaFieldRow(f.name, f.type));
+  showToast('success','生成成功',`已识别 ${fields.length} 个字段，可手动微调`);
+}
+
+function jsSchemaTypeToVarType(t) {
+  const map = { string:'String', integer:'Integer', number:'Double', boolean:'Boolean', object:'Object', array:'Array[Object]' };
+  return map[t] || 'String';
+}
+function inferTypeFromValue(v) {
+  if (v === null || v === undefined) return 'String';
+  if (typeof v === 'boolean') return 'Boolean';
+  if (typeof v === 'number') return Number.isInteger(v) ? 'Integer' : 'Double';
+  if (typeof v === 'object' && !Array.isArray(v)) return 'Object';
+  if (Array.isArray(v)) {
+    if (v.length === 0) return 'Array[String]';
+    if (typeof v[0] === 'object') return 'Array[Object]';
+    if (typeof v[0] === 'number') return Number.isInteger(v[0]) ? 'Array[Integer]' : 'Array[String]';
+    return 'Array[String]';
+  }
+  return 'String';
 }
 
 function updateVarDefaultWidget() {
   const type = document.getElementById('newVarType').value;
   const container = document.getElementById('varDefaultContainer');
   if (container) container.innerHTML = renderVarDefaultWidget(type);
+  // 结构定义区域
+  const schemaArea = document.getElementById('varSchemaArea');
+  if (schemaArea) {
+    schemaArea.innerHTML = renderSchemaDefSection(type);
+    _schemaFields.length = 0; // reset
+  }
 }
 
 function showAddVariableDialog() {
-  showModal(`<div class="modal" style="max-width:420px"><div class="modal-header"><h2 class="modal-title">新增全局变量</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
+  showModal(`<div class="modal" style="max-width:460px"><div class="modal-header"><h2 class="modal-title">新增全局变量</h2><button class="modal-close" onclick="closeModal()">${icons.close}</button></div><div class="modal-body">
     <div style="font-size:var(--font-size-xs);color:var(--md-outline);margin-bottom:var(--space-3);line-height:1.5">全局变量独立于节点存在，可在任意节点中读写，适用于跨节点共享状态、计数器、开关等场景。</div>
     <div class="config-field"><div class="config-field-label">变量名 <span class="required">*</span></div><input class="config-input" id="newVarName" placeholder="英文标识符，如 retryCount" style="font-family:var(--font-family-mono)" /></div>
-    <div class="config-field"><div class="config-field-label">数据类型</div><select class="config-select" id="newVarType" onchange="updateVarDefaultWidget()"><option>String</option><option>Integer</option><option>Double</option><option>Boolean</option><option>DateTime</option><option>Object</option><option>File</option></select></div>
+    <div class="config-field">
+      <div class="config-field-label">数据类型</div>
+      <select class="config-select" id="newVarType" onchange="updateVarDefaultWidget()">
+        <optgroup label="原子类型"><option>String</option><option>Integer</option><option>Double</option><option>Boolean</option><option>DateTime</option><option>File</option></optgroup>
+        <optgroup label="结构类型（可定义字段结构）"><option>Object</option><option>Array[Object]</option></optgroup>
+        <optgroup label="数组类型"><option>Array[String]</option><option>Array[Integer]</option></optgroup>
+      </select>
+    </div>
+    <div id="varSchemaArea"></div>
     <div class="config-field" id="varDefaultContainer">${renderVarDefaultWidget('String')}</div>
     <div class="config-field"><div class="config-field-label">描述</div><input class="config-input" id="newVarDesc" placeholder="变量用途描述" /></div>
   </div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="addVariable()">添加</button></div></div>`);
@@ -6494,7 +6625,12 @@ function addVariable() {
   if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)) { showToast('warning', '提示', '变量名只能包含英文字母、数字和下划线，且不能以数字开头'); return; }
   if (designerVariables.some(v => v.name === name)) { showToast('warning', '提示', '变量名已存在'); return; }
 
-  designerVariables.push({ name, type, defaultValue, desc });
+  // 收集结构定义（仅 Object / Array[Object] 有效）
+  const schema = (type === 'Object' || type === 'Array[Object]') && _schemaFields.length > 0
+    ? _schemaFields.filter(f => f.name.trim()).map(f => ({ name: f.name.trim(), type: f.type }))
+    : undefined;
+
+  designerVariables.push({ name, type, defaultValue, desc, schema });
   syncDesignerState();
   closeModal();
   renderDesigner();
