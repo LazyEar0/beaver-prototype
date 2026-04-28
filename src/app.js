@@ -214,7 +214,7 @@ let folderNextId = 200;
 let wsFolders = {
   1: [
     { id: 1, name: '预订核心流程', desc: '酒店预订核心业务流程', parentId: null, wsId: 1, creator: 'Sukey Wu', createdAt: '2025-01-15', editedAt: '2025-04-12 10:30' },
-    { id: 2, name: '搜索相关', desc: '酒店搜索与筛选', parentId: null, wsId: 1, creator: 'Admin', createdAt: '2025-01-20', editedAt: '2025-04-10 14:00' },
+    { id: 2, name: '搜索相关【关注运行时需要填写输入参数/调试时，需要填写输入参数的场景，自行在流程中配置。】', desc: '酒店搜索与筛选', parentId: null, wsId: 1, creator: 'Admin', createdAt: '2025-01-20', editedAt: '2025-04-10 14:00' },
     { id: 3, name: '取消与退款', desc: '取消和退款处理', parentId: 1, wsId: 1, creator: 'Sukey Wu', createdAt: '2025-02-10', editedAt: '2025-04-08 09:15' },
     { id: 4, name: '供应商对接', desc: '供应商API对接', parentId: null, wsId: 1, creator: '张三', createdAt: '2025-03-01', editedAt: '2025-04-06 16:00' },
     { id: 5, name: '退款审批', desc: '退款审批子流程', parentId: 3, wsId: 1, creator: 'Sukey Wu', createdAt: '2025-03-10', editedAt: '2025-04-05 11:00' },
@@ -256,7 +256,7 @@ let wsWorkflows = {
       { name: 'attachments', label: '附件材料', type: 'File', required: false, desc: '客户提供的相关证明材料' },
     ], versions: [{ v: 1, status: 'current', publishedAt: '2025-03-01 11:00', publisher: 'Sukey Wu', note: '初始发布', tags: [] }] },
     { id: 4, name: '退款流程', code: 'HTL_REFUND', desc: '客户退款申请审批与执行', type: 'app', allowRef: false, status: 'draft', version: 0, creator: '张三', owners: [103], folderId: 3, wsId: 1, createdAt: '2025-03-20', editedAt: '2025-04-07 15:45', lastRun: null, runningCount: 0, execCount: 0, debugPassed: false, versions: [] },
-    { id: 5, name: '智能客服对话', code: 'HTL_CHAT', desc: '基于AI的酒店预订智能客服', type: 'chat', allowRef: false, status: 'published', version: 3, creator: 'Sukey Wu', owners: [101, 107], folderId: null, wsId: 1, createdAt: '2025-02-28', editedAt: '2025-04-11 11:20', lastRun: 'success', runningCount: 1, execCount: 120, debugPassed: true, versions: [
+    { id: 5, name: '智能客服对话', code: 'HTL_CHAT', desc: '【对话流，关注对话流的区别，开始、输出、结束、调试等，版本历史】基于AI的酒店预订智能客服', type: 'chat', allowRef: false, status: 'published', version: 3, creator: 'Sukey Wu', owners: [101, 107], folderId: null, wsId: 1, createdAt: '2025-02-28', editedAt: '2025-04-11 11:20', lastRun: 'success', runningCount: 1, execCount: 120, debugPassed: true, versions: [
       { v: 3, status: 'current', publishedAt: '2025-04-11 09:30', publisher: 'Sukey Wu', note: '回滚至v1', tags: ['rollback'], rollbackFrom: 1 },
       { v: 2, status: 'history', publishedAt: '2025-04-05 09:30', publisher: 'Sukey Wu', note: '优化对话逻辑', tags: [] },
       { v: 1, status: 'history', publishedAt: '2025-03-10 14:00', publisher: 'Sukey Wu', note: '', tags: [] },
@@ -265,8 +265,8 @@ let wsWorkflows = {
       { v: 2, status: 'current', publishedAt: '2025-03-25 10:00', publisher: 'Admin', note: '增加Agoda接入', tags: [] },
       { v: 1, status: 'history', publishedAt: '2025-03-10 09:00', publisher: 'Admin', note: '', tags: [] },
     ] },
-    { id: 7, name: '预订数据报表', code: 'HTL_REPORT', desc: '每日酒店预订统计报表', type: 'app', allowRef: false, status: 'published', version: 1, creator: '钱七', owners: [107], folderId: null, wsId: 1, createdAt: '2025-03-25', editedAt: '2025-04-09 08:00', lastRun: 'success', runningCount: 0, execCount: 15, debugPassed: true, versions: [{ v: 1, status: 'current', publishedAt: '2025-04-01 10:00', publisher: '钱七', note: '初始版本', tags: [] }] },
-    { id: 8, name: '库存预警通知', code: 'HTL_STOCK_ALERT', desc: '酒店库存不足自动预警', type: 'app', allowRef: false, status: 'draft', version: 0, creator: '李四', lastEditor: 'Sukey Wu', owners: [104], folderId: null, wsId: 1, createdAt: '2025-04-10', editedAt: '2025-04-13 09:30', lastRun: null, runningCount: 0, execCount: 0, debugPassed: false, versions: [] },
+    { id: 7, name: '预订数据报表', code: 'HTL_REPORT', desc: '【多人协同的示例】每日酒店预订统计报表', type: 'app', allowRef: false, status: 'published', version: 1, creator: '钱七', owners: [107], folderId: null, wsId: 1, createdAt: '2025-03-25', editedAt: '2025-04-09 08:00', lastRun: 'success', runningCount: 0, execCount: 15, debugPassed: true, versions: [{ v: 1, status: 'current', publishedAt: '2025-04-01 10:00', publisher: '钱七', note: '初始版本', tags: [] }] },
+    { id: 8, name: '库存预警通知', code: 'HTL_STOCK_ALERT', desc: '【循环节点的示例；直接调试的时候有错误；问题清单有警告类型】酒店库存不足自动预警', type: 'app', allowRef: false, status: 'draft', version: 0, creator: '李四', lastEditor: 'Sukey Wu', owners: [104], folderId: null, wsId: 1, createdAt: '2025-04-10', editedAt: '2025-04-13 09:30', lastRun: null, runningCount: 0, execCount: 0, debugPassed: false, versions: [] },
   ],
   2: [
     { id: 20, name: '航班信息拉取', code: 'FLT_PULL', desc: '从供应商API拉取航班数据', type: 'app', allowRef: true, status: 'published', version: 4, latestPublishedVersion: 5, creator: 'Admin', owners: [102], folderId: 10, wsId: 2, createdAt: '2025-02-05', editedAt: '2025-04-12 09:15', lastRun: 'success', runningCount: 0, execCount: 200, debugPassed: true, versions: [
