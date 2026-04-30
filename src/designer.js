@@ -652,7 +652,7 @@ function renderDesigner() {
     </div>
 
     <div class="designer-main">
-      ${renderNodePanel()}
+      ${!designerReadonly ? renderNodePanel() : ''}
       <div class="canvas-area" id="canvasArea">
         <div class="canvas-container" id="canvasContainer" onmousedown="onCanvasMouseDown(event)" onmousemove="onCanvasMouseMove(event)" onmouseup="onCanvasMouseUp(event)" onwheel="onCanvasWheel(event)" ondblclick="onCanvasDblClick(event)" oncontextmenu="onCanvasContextMenu(event)">
           <div class="canvas-grid" style="transform: translate(${designerPanX % 20}px, ${designerPanY % 20}px)"></div>
@@ -1357,14 +1357,18 @@ function renderNodeConfigPanel() {
   return `
     <div class="right-panel-header">
       <span class="right-panel-title"><span class="canvas-node-icon ${nt.color || ''}" style="width:22px;height:22px;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;font-size:11px">${nt.icon || ''}</span> ${node.name}</span>
-      ${canConvert ? `<button class="node-type-convert-btn" onclick="showConvertNodeMenu(${node.id})" title="切换节点类型">🔄</button>` : ''}
+      ${canConvert && !designerReadonly ? `<button class="node-type-convert-btn" onclick="showConvertNodeMenu(${node.id})" title="切换节点类型">🔄</button>` : ''}
       <button class="right-panel-close" onclick="deselectNode()">${icons.close}</button>
     </div>
     <div class="right-panel-tabs">
       <div class="right-panel-tab ${!isAdvanced ? 'active' : ''}" id="rpTabBasic" onclick="switchNodeConfigTab('basic')">基础配置</div>
       <div class="right-panel-tab ${isAdvanced ? 'active' : ''}" id="rpTabAdvanced" onclick="switchNodeConfigTab('advanced')">高级配置${hasAdvancedValues ? '<span class="advanced-dot"></span>' : ''}</div>
     </div>
-    <div class="right-panel-body" id="nodeConfigBody">
+    <div class="right-panel-body" id="nodeConfigBody" ${designerReadonly ? 'style="pointer-events:none;user-select:none;opacity:0.72"' : ''}>
+      ${designerReadonly ? `<div style="position:sticky;top:0;z-index:10;background:#fef9c3;color:#854d0e;font-size:var(--font-size-xs);padding:6px 12px;display:flex;align-items:center;gap:6px;border-bottom:1px solid #fde68a;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        只读模式，配置不可编辑
+      </div>` : ''}
       ${isAdvanced ? renderAdvancedConfig(node) : renderNodeConfigFields(node, nt)}
     </div>`;
 }
@@ -4370,6 +4374,7 @@ function onCanvasWheel(e) {
 }
 
 function onCanvasDblClick(e) {
+  if (designerReadonly) return;
   if (e.target.closest('.canvas-node')) return;
   // Show quick search
   showQuickNodeSearch(e);
@@ -4392,7 +4397,7 @@ function updateCanvasTransform() {
 
 // --- Node Interaction ---
 function onNodeMouseDown(e, nodeId) {
-  if (designerDebugMode) return;
+  if (designerDebugMode || designerReadonly) return;
   e.stopPropagation();
 
   const node = designerNodes.find(n => n.id === nodeId);
@@ -4558,6 +4563,7 @@ function deleteSelectedNode() {
 
 // --- Connections (Drag-to-Connect) ---
 function startConnection(fromNodeId, fromPort, e) {
+  if (designerReadonly) return;
   designerConnecting = { fromNodeId, fromPort };
   const rect = document.getElementById('canvasContainer').getBoundingClientRect();
   designerConnectingMouse = {
