@@ -146,9 +146,15 @@ function openDesigner(wsId, wfId) {
   designerGridSnap = true;
   designerMinimapVisible = true;
 
-  // Multi-person collaborative editing — no edit lock
-  designerReadonly = false;
-  designerReadonlyUser = '';
+  // Set readonly for viewer-role members
+  const _ws = workspaces.find(w => w.id === wsId);
+  if (_ws && _ws.myRole === 'viewer') {
+    designerReadonly = true;
+    designerReadonlyUser = 'viewer';
+  } else {
+    designerReadonly = false;
+    designerReadonlyUser = '';
+  }
 
   // Simulate online collaborators for demo
   designerOnlineUsers = _getSimulatedOnlineUsers(wfId);
@@ -562,6 +568,10 @@ function renderDesigner() {
   const statusClass = { draft: 'status-draft', published: 'status-published', disabled: 'status-disabled' };
 
   shell.innerHTML = `
+    ${designerReadonly && !designerDebugMode ? `<div class="readonly-mode-bar active">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      <span>只读查看模式 — 您在此空间的角色为「只读查看者」，无法编辑工作流</span>
+    </div>` : ''}
     ${designerDebugMode ? `<div class="debug-mode-bar active">${designerDebugPaused ? icons.pause : icons.play} <span>${designerDebugPaused ? '调试已暂停 - 断点命中' : ((designerWf?.type || 'app') === 'chat' ? '对话预览模式 - 画布只读' : '调试模式 - 画布只读')}</span> ${designerDebugPaused ? `<button class="btn btn-sm debug-btn-resume" onclick="resumeDebug()" title="继续执行到下一个断点或结束">${icons.play}<span>继续执行</span></button><button class="btn btn-sm debug-btn-step" onclick="stepDebug()" title="单步执行下一个节点">${icons.chevronRight}<span>单步执行</span></button>` : ''} <button class="btn btn-sm" style="height:24px;padding:0 12px;background:rgba(239,68,68,0.1);color:var(--md-error);border-radius:var(--radius-full);font-size:11px" onclick="exitDebugMode()">终止调试</button></div>` : ''}
     ${designerFullscreen ? `<button class="fullscreen-exit-btn" onclick="toggleDesignerFullscreen()" title="退出全屏 (F11)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="4 14 4 20 10 20"/><polyline points="20 10 20 4 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg> 退出全屏</button>` : ''}
     <div class="designer-toolbar">
@@ -577,14 +587,14 @@ function renderDesigner() {
         <span class="designer-save-indicator" id="designerSaveIndicator">${icons.check} <span>已保存</span></span>
       </div>
       <div class="designer-toolbar-center">
-        <button class="toolbar-btn" onclick="designerUndo()" title="撤销上一步操作 (Ctrl+Z)">${icons.arrowLeft}</button>
-        <span class="toolbar-divider"></span>
+        ${!designerReadonly ? `<button class="toolbar-btn" onclick="designerUndo()" title="撤销上一步操作 (Ctrl+Z)">${icons.arrowLeft}</button>
+        <span class="toolbar-divider"></span>` : ''}
         <button class="toolbar-btn" onclick="openDesignerSearch()" title="搜索节点 (Ctrl+F)">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
           <span>搜索</span>
         </button>
         <span class="toolbar-divider"></span>
-        <button class="toolbar-btn" onclick="autoLayout()" title="自动优化节点排列">${icons.workflow}</button>
+        ${!designerReadonly ? `<button class="toolbar-btn" onclick="autoLayout()" title="自动优化节点排列">${icons.workflow}</button>` : ''}
         <button class="toolbar-btn ${designerMinimapVisible ? 'active' : ''}" onclick="toggleMinimap()" title="${designerMinimapVisible ? '隐藏小地图' : '显示小地图'}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2"/><rect x="12" y="12" width="8" height="8" rx="1"/></svg>
         </button>
@@ -607,6 +617,11 @@ function renderDesigner() {
       <div class="designer-toolbar-right">
         ${_renderOnlineUsers()}
         ${designerOnlineUsers.length > 1 ? '<span class="toolbar-divider"></span>' : ''}
+        ${designerReadonly ? `
+        <span style="display:inline-flex;align-items:center;gap:4px;font-size:var(--font-size-xs);color:var(--md-outline);background:var(--md-surface-variant);padding:3px 10px;border-radius:var(--radius-full);border:1px solid var(--md-outline-variant)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          只读查看
+        </span>` : `
         <button class="btn btn-secondary btn-sm" onclick="enterDebugMode()" ${designerDebugMode ? 'disabled style="opacity:0.5"' : ''} title="调试运行工作流 (模拟执行)">${icons.play}<span>调试</span></button>
         <button class="btn btn-secondary btn-sm" onclick="designerSave()" title="手动保存草稿 (Ctrl+S)">${icons.check}<span>保存</span></button>
         <div class="designer-more-menu-wrap" style="position:relative">
@@ -632,7 +647,7 @@ function renderDesigner() {
               ${icons.alertTriangle || ''} <span>强制发布</span>
             </div>
           </div>` : ''}
-        </div>
+        </div>`}
       </div>
     </div>
 
