@@ -284,7 +284,17 @@ let wsWorkflows = {
   3: [{ id: 30, name: '数据格式校验', code: 'DC_VALIDATE', desc: '校验上游数据格式', type: 'app', allowRef: true, status: 'published', version: 1, creator: 'Sukey Wu', owners: [101], folderId: null, wsId: 3, createdAt: '2025-02-25', editedAt: '2025-04-11 16:45', lastRun: 'success', runningCount: 0, execCount: 80, debugPassed: true, versions: [
       { v: 1, status: 'current', publishedAt: '2025-04-11 16:45', publisher: 'Sukey Wu', note: '初始版本', tags: [] },
     ] }],
-  4: [], 5: [], 6: [],
+  4: [
+    { id: 40, name: '日销售报表生成', code: 'RPT_DAILY_SALES', desc: '每日自动汇总销售数据并生成报表', type: 'app', allowRef: false, status: 'published', version: 3, creator: 'Admin', lastEditor: 'Admin', owners: [102], folderId: null, wsId: 4, createdAt: '2025-03-10', editedAt: '2025-04-10 09:00', lastRun: 'success', runningCount: 0, execCount: 30, debugPassed: true, versions: [
+      { v: 3, status: 'current', publishedAt: '2025-04-01 09:00', publisher: 'Admin', note: '增加环比分析', tags: [] },
+      { v: 2, status: 'history', publishedAt: '2025-03-20 10:00', publisher: 'Admin', note: '修复数据空值问题', tags: [] },
+      { v: 1, status: 'history', publishedAt: '2025-03-10 14:00', publisher: 'Admin', note: '初始版本', tags: [] },
+    ] },
+    { id: 41, name: '周维度汇总报表', code: 'RPT_WEEKLY', desc: '每周业务数据汇总统计', type: 'app', allowRef: false, status: 'published', version: 1, creator: 'Admin', lastEditor: 'Admin', owners: [102], folderId: null, wsId: 4, createdAt: '2025-03-15', editedAt: '2025-04-07 10:30', lastRun: 'success', runningCount: 0, execCount: 4, debugPassed: true, versions: [
+      { v: 1, status: 'current', publishedAt: '2025-03-25 11:00', publisher: 'Admin', note: '初始发布', tags: [] },
+    ] },
+    { id: 42, name: '异常数据告警', code: 'RPT_ANOMALY_ALERT', desc: '检测报表数据异常并发送告警通知', type: 'app', allowRef: false, status: 'draft', version: 0, creator: 'Admin', lastEditor: 'Admin', owners: [102], folderId: null, wsId: 4, createdAt: '2025-04-05', editedAt: '2025-04-10 11:20', lastRun: null, runningCount: 0, execCount: 0, debugPassed: false, versions: [] },
+  ], 5: [], 6: [],
 };
 
 // Execution records per workspace
