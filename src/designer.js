@@ -3918,7 +3918,7 @@ function renderBottomPanel() {
       </div>
       <div class="bottom-panel-actions">
         ${designerBottomTab === 'debug' && logs.length > 0 ? `<div class="debug-log-filters"><span class="debug-log-chip ${designerDebugLogFilter === 'all' ? 'active' : ''}" onclick="setDebugLogFilter('all')">全部</span><span class="debug-log-chip ${designerDebugLogFilter === 'info' ? 'active' : ''}" onclick="setDebugLogFilter('info')">信息</span><span class="debug-log-chip ${designerDebugLogFilter === 'warn' ? 'active' : ''}" onclick="setDebugLogFilter('warn')">警告${warnCount > 0 ? `(${warnCount})` : ''}</span><span class="debug-log-chip ${designerDebugLogFilter === 'error' ? 'active' : ''}" onclick="setDebugLogFilter('error')">错误${errorCount > 0 ? `(${errorCount})` : ''}</span><span class="debug-log-chip ${designerDebugLogFilter === 'debug' ? 'active' : ''}" onclick="setDebugLogFilter('debug')">调试</span></div>` : ''}
-        ${designerBottomTab === 'variables' ? `<button class="toolbar-btn" style="height:24px;font-size:11px" onclick="showAddVariableDialog()">${icons.plus} 新增全局变量</button>` : ''}
+        ${designerBottomTab === 'variables' && !designerReadonly ? `<button class="toolbar-btn" style="height:24px;font-size:11px" onclick="showAddVariableDialog()">${icons.plus} 新增全局变量</button>` : ''}
         <button class="canvas-control-btn" style="width:24px;height:24px" onclick="closeBottomPanel()">${icons.close}</button>
       </div>
     </div>
@@ -4011,8 +4011,10 @@ function renderVariablesPanel(vars) {
       ${v.schema && v.schema.length > 0 ? `<span style="font-size:var(--font-size-xs);color:var(--md-primary);margin-left:4px;flex-shrink:0">• ${v.schema.length}个字段</span>` : ''}
       ${v.defaultValue ? `<span style="font-size:var(--font-size-xs);color:var(--md-outline);font-family:var(--font-family-mono);margin-left:4px">= ${v.defaultValue}</span>` : ''}
       ${v.desc ? `<span style="font-size:var(--font-size-xs);color:var(--md-outline);margin-left:8px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${v.desc}</span>` : '<span style="flex:1"></span>'}
+      ${!designerReadonly ? `
       <button class="table-action-btn" style="width:24px;height:24px;margin-left:auto;flex-shrink:0" onclick="showToast('info','编辑变量','${v.name}')">${icons.edit}</button>
       <button class="table-action-btn danger" style="width:24px;height:24px;flex-shrink:0" onclick="showDeleteVarConfirm('${v.name}')">${icons.trash}</button>
+      ` : ''}
     </div>
   `).join('');
 }
