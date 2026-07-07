@@ -1,0 +1,2653 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Beaver - 表单引擎</title>
+  <meta name="description" content="Beaver 表单引擎 - 可视化表单设计与管理" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+/* ============================================
+   Beaver - 表单引擎 原型
+   Design System (from style.css / designer.css)
+   ============================================ */
+:root {
+  --md-primary: #6750A4;
+  --md-on-primary: #FFFFFF;
+  --md-primary-container: #F0EBFF;
+  --md-on-primary-container: #21005D;
+  --md-secondary: #5F6368;
+  --md-on-secondary: #FFFFFF;
+  --md-secondary-container: #E8EAED;
+  --md-error: #D93025;
+  --md-on-error: #FFFFFF;
+  --md-error-container: #FCE8E6;
+  --md-surface: #FFFFFF;
+  --md-surface-dim: #E8EAED;
+  --md-surface-container-low: #F8F9FA;
+  --md-surface-container: #F1F3F5;
+  --md-surface-container-high: #E8EAED;
+  --md-surface-container-highest: #DADCE0;
+  --md-content-bg: #F8F9FA;
+  --md-on-surface: #1F1F1F;
+  --md-on-surface-variant: #5F6368;
+  --md-outline: #9AA0A6;
+  --md-outline-variant: #E0E3E7;
+  --md-success: #188038;
+  --md-success-container: #E6F4EA;
+  --md-warning: #E37400;
+  --md-warning-container: #FEF7E0;
+  --md-info: #1A73E8;
+  --md-info-container: #E8F0FE;
+  --md-scrim: rgba(0,0,0,0.25);
+  --color-primary: var(--md-primary);
+  --color-primary-hover: #5B44A0;
+  --color-primary-light: var(--md-primary-container);
+  --color-primary-subtle: rgba(103,80,164,0.06);
+  --color-primary-muted: rgba(103,80,164,0.10);
+  --color-bg-page: #F8F9FA;
+  --color-bg-sidebar: #FFFFFF;
+  --color-bg-card: #FFFFFF;
+  --color-text-primary: var(--md-on-surface);
+  --color-text-secondary: var(--md-on-surface-variant);
+  --color-text-tertiary: var(--md-outline);
+  --color-text-placeholder: #BDC1C6;
+  --color-success: var(--md-success);
+  --color-success-bg: var(--md-success-container);
+  --color-warning: var(--md-warning);
+  --color-error: var(--md-error);
+  --color-error-bg: var(--md-error-container);
+  --color-info: var(--md-info);
+  --color-border: var(--md-outline-variant);
+  --color-border-focus: var(--md-primary);
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-lg: 0 4px 6px rgba(0,0,0,0.04), 0 1px 3px rgba(0,0,0,0.06);
+  --shadow-xl: 0 8px 16px rgba(0,0,0,0.06), 0 2px 4px rgba(0,0,0,0.04);
+  --shadow-modal: 0 16px 48px rgba(0,0,0,0.12), 0 4px 8px rgba(0,0,0,0.04);
+  --space-1:4px; --space-2:8px; --space-3:12px; --space-4:16px;
+  --space-5:20px; --space-6:24px; --space-8:32px; --space-10:40px;
+  --font-family: 'Inter','Roboto',system-ui,-apple-system,sans-serif;
+  --font-family-mono: 'Roboto Mono','SF Mono',monospace;
+  --font-size-xs:11px; --font-size-sm:12px; --font-size-base:14px;
+  --font-size-lg:16px; --font-size-xl:22px; --font-size-2xl:24px;
+  --radius-sm:6px; --radius-md:10px; --radius-lg:12px; --radius-xl:14px;
+  --radius-full:9999px;
+  --transition-fast:150ms cubic-bezier(0.2,0,0,1);
+  --transition-base:200ms cubic-bezier(0.2,0,0,1);
+  --transition-smooth:300ms cubic-bezier(0.2,0,0,1);
+  --header-height:56px;
+  --sidebar-width:240px;
+}
+/* Reset */
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+html{font-size:var(--font-size-base);-webkit-font-smoothing:antialiased;}
+body{font-family:var(--font-family);color:var(--md-on-surface);background:var(--color-bg-page);line-height:1.5;overflow:hidden;}
+a{text-decoration:none;color:inherit;}
+button{cursor:pointer;font-family:inherit;border:none;background:none;}
+input,select,textarea{font-family:inherit;font-size:inherit;}
+::-webkit-scrollbar{width:6px;height:6px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--color-border);border-radius:var(--radius-full);}
+::-webkit-scrollbar-thumb:hover{background:var(--md-outline);}
+
+/* === App Shell === */
+.app-shell{display:flex;height:100vh;width:100vw;overflow:hidden;}
+
+/* Sidebar */
+.sidebar{width:var(--sidebar-width);min-width:var(--sidebar-width);background:#fff;border-right:1px solid var(--md-outline-variant);display:flex;flex-direction:column;height:100vh;overflow:hidden;}
+.sidebar-header{height:var(--header-height);display:flex;align-items:center;padding:0 var(--space-4) 0 var(--space-5);gap:var(--space-3);flex-shrink:0;}
+.sidebar-logo{width:32px;height:32px;background:var(--md-primary);border-radius:var(--radius-lg);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.sidebar-logo svg{width:18px;height:18px;color:var(--md-on-primary);}
+.sidebar-brand{font-size:var(--font-size-xl);font-weight:500;color:var(--md-on-surface);}
+.sidebar-nav{flex:1;overflow-y:auto;padding:var(--space-2) var(--space-3);}
+.nav-section{margin-bottom:var(--space-1);}
+.nav-section-title{font-size:var(--font-size-xs);font-weight:500;color:var(--md-on-surface-variant);text-transform:uppercase;letter-spacing:0.05em;padding:var(--space-4) var(--space-4) var(--space-2);}
+.nav-item{display:flex;align-items:center;gap:var(--space-3);padding:0 var(--space-4);height:48px;border-radius:var(--radius-sm);color:var(--md-on-surface-variant);font-size:var(--font-size-base);font-weight:400;transition:var(--transition-base);cursor:pointer;user-select:none;position:relative;margin-bottom:2px;}
+.nav-item:hover{background:#F1F3F5;color:var(--md-on-surface);}
+.nav-item.active{background:var(--color-primary-muted);color:var(--md-primary);font-weight:500;}
+.nav-item.active::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:3px;height:20px;background:var(--md-primary);border-radius:0 4px 4px 0;}
+.nav-item svg{width:20px;height:20px;flex-shrink:0;}
+.sidebar-footer{padding:var(--space-4) var(--space-5);border-top:1px solid var(--md-outline-variant);flex-shrink:0;}
+.sidebar-footer-text{font-size:var(--font-size-xs);color:var(--md-on-surface-variant);}
+
+/* Main */
+.main-area{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0;}
+.header{height:var(--header-height);background:#fff;border-bottom:1px solid var(--md-outline-variant);display:flex;align-items:center;justify-content:space-between;padding:0 var(--space-4) 0 var(--space-6);flex-shrink:0;}
+.header-left{display:flex;align-items:center;gap:var(--space-2);}
+.breadcrumb{display:flex;align-items:center;gap:var(--space-2);font-size:var(--font-size-sm);}
+.breadcrumb-item{color:var(--md-on-surface-variant);cursor:pointer;}
+.breadcrumb-item.current{color:var(--md-on-surface);font-weight:500;cursor:default;}
+.breadcrumb-separator{color:var(--md-outline);font-size:var(--font-size-xs);}
+.header-right{display:flex;align-items:center;gap:var(--space-1);}
+.header-text-btn{display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:var(--radius-full);color:var(--md-on-surface-variant);font-size:var(--font-size-sm);transition:var(--transition-base);white-space:nowrap;}
+.header-text-btn:hover{background:rgba(17,24,39,0.06);color:var(--md-on-surface);}
+.header-text-btn svg{width:18px;height:18px;flex-shrink:0;}
+.header-user{display:flex;align-items:center;gap:var(--space-3);padding-left:var(--space-3);margin-left:var(--space-2);}
+.header-avatar{width:32px;height:32px;border-radius:var(--radius-full);background:var(--md-primary);display:flex;align-items:center;justify-content:center;font-size:var(--font-size-sm);font-weight:500;color:var(--md-on-primary);}
+.header-username{font-size:var(--font-size-base);font-weight:500;color:var(--md-on-surface);}
+.content{flex:1;overflow-y:auto;padding:0;background:var(--md-content-bg);}
+
+/* === Buttons === */
+.btn{display:inline-flex;align-items:center;gap:var(--space-2);padding:0 var(--space-5);height:40px;border-radius:var(--radius-full);font-size:var(--font-size-base);font-weight:500;transition:var(--transition-base);white-space:nowrap;border:none;cursor:pointer;}
+.btn svg{width:18px;height:18px;}
+.btn-primary{background:var(--md-primary);color:var(--md-on-primary);}
+.btn-primary:hover{background:var(--color-primary-hover);}
+.btn-outlined{background:transparent;color:var(--md-primary);border:1px solid var(--md-outline-variant);}
+.btn-outlined:hover{background:var(--color-primary-subtle);border-color:var(--md-primary);}
+.btn-text{background:transparent;color:var(--md-primary);padding:0 var(--space-3);}
+.btn-text:hover{background:var(--color-primary-subtle);}
+.btn-sm{height:32px;padding:0 var(--space-3);font-size:var(--font-size-sm);}
+.btn-sm svg{width:16px;height:16px;}
+.btn-danger{background:transparent;color:var(--md-error);border:1px solid var(--color-border);}
+.btn-danger:hover{background:var(--color-error-bg);border-color:var(--md-error);}
+.btn-icon{width:36px;height:36px;padding:0;border-radius:var(--radius-full);display:inline-flex;align-items:center;justify-content:center;color:var(--md-on-surface-variant);transition:var(--transition-fast);}
+.btn-icon:hover{background:rgba(0,0,0,0.06);}
+.btn-icon svg{width:18px;height:18px;}
+.btn:disabled,.btn.disabled{opacity:0.38;cursor:not-allowed;pointer-events:none;}
+
+/* === Card === */
+.card{background:var(--color-bg-card);border-radius:var(--radius-lg);border:1px solid var(--color-border);box-shadow:var(--shadow-sm);}
+.card-header{padding:var(--space-5) var(--space-6);border-bottom:1px solid var(--color-border);display:flex;align-items:center;justify-content:space-between;}
+.card-body{padding:var(--space-5) var(--space-6);}
+
+/* === Table === */
+.data-table{width:100%;border-collapse:collapse;}
+.data-table th{text-align:left;padding:var(--space-3) var(--space-4);font-size:var(--font-size-xs);font-weight:500;color:var(--md-on-surface-variant);border-bottom:1px solid var(--color-border);background:var(--md-surface-container-low);}
+.data-table td{padding:var(--space-4) var(--space-4);font-size:var(--font-size-base);border-bottom:1px solid var(--color-border);color:var(--md-on-surface);vertical-align:middle;}
+.data-table tbody tr{transition:var(--transition-fast);}
+.data-table tbody tr:hover{background:rgba(103,80,164,0.03);}
+.data-table tbody tr:last-child td{border-bottom:none;}
+.cell-desc{max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+/* === Action Dropdown === */
+.action-cell{position:relative;}
+.action-cell-inner{display:inline-flex;align-items:center;gap:var(--space-2);}
+.action-edit-btn{display:inline-flex;align-items:center;gap:5px;padding:6px 10px;border:none;background:transparent;border-radius:var(--radius-sm);font-size:var(--font-size-sm);font-weight:500;color:var(--md-primary);cursor:pointer;transition:var(--transition-fast);white-space:nowrap;}
+.action-edit-btn:hover{background:rgba(103,80,164,0.08);}
+.action-edit-btn svg{width:15px;height:15px;flex-shrink:0;}
+.action-btn{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border:none;background:transparent;border-radius:var(--radius-sm);cursor:pointer;color:var(--md-on-surface-variant);transition:var(--transition-fast);}
+.action-btn:hover{background:rgba(103,80,164,0.08);color:var(--md-on-surface);}
+.action-btn svg{width:18px;height:18px;}
+.action-menu{position:absolute;right:var(--space-4);top:calc(100% + 4px);min-width:140px;background:#fff;border:1px solid var(--color-border);border-radius:var(--radius-md);box-shadow:0 4px 16px rgba(0,0,0,0.12);z-index:100;overflow:hidden;opacity:0;visibility:hidden;transform:translateY(-4px);transition:var(--transition-fast);}
+.action-menu.open{opacity:1;visibility:visible;transform:translateY(0);}
+.action-menu.flip{top:auto;bottom:calc(100% + 4px);transform:translateY(4px);}
+.action-menu.flip.open{transform:translateY(0);}
+.action-menu-item{display:flex;align-items:center;gap:var(--space-2);padding:var(--space-2) var(--space-4);font-size:var(--font-size-sm);color:var(--md-on-surface);cursor:pointer;transition:var(--transition-fast);}
+.action-menu-item:hover{background:rgba(103,80,164,0.06);color:var(--md-primary);}
+.action-menu-item.danger{color:var(--md-error);}
+.action-menu-item.danger:hover{background:rgba(179,38,38,0.06);}
+.action-menu-item svg{width:16px;height:16px;flex-shrink:0;}
+
+/* === Status Badge === */
+.badge{display:inline-flex;align-items:center;gap:4px;padding:2px 10px;border-radius:var(--radius-full);font-size:var(--font-size-xs);font-weight:500;}
+.badge-success{background:var(--color-success-bg);color:var(--color-success);}
+.badge-warning{background:var(--md-warning-container);color:var(--color-warning);}
+.badge-info{background:var(--md-info-container);color:var(--color-info);}
+.badge-error{background:var(--color-error-bg);color:var(--color-error);}
+.badge-neutral{background:var(--md-surface-container);color:var(--md-on-surface-variant);}
+
+/* === Form Controls === */
+.form-group{margin-bottom:var(--space-5);}
+.form-label{display:block;font-size:var(--font-size-sm);font-weight:500;color:var(--md-on-surface);margin-bottom:var(--space-2);}
+.form-label .required{color:var(--md-error);margin-left:2px;}
+.form-input{width:100%;height:40px;padding:0 var(--space-3);border:1px solid var(--md-outline-variant);border-radius:var(--radius-sm);font-size:var(--font-size-base);color:var(--md-on-surface);background:var(--md-surface);outline:none;transition:var(--transition-base);}
+.form-input:focus{border-color:var(--md-primary);border-width:2px;padding:0 calc(var(--space-3) - 1px);}
+.form-input::placeholder{color:var(--color-text-placeholder);}
+.form-input.error{border-color:var(--md-error);}
+.form-textarea{width:100%;padding:var(--space-3);border:1px solid var(--md-outline-variant);border-radius:var(--radius-sm);font-size:var(--font-size-base);color:var(--md-on-surface);background:var(--md-surface);outline:none;resize:vertical;transition:var(--transition-base);min-height:80px;}
+.form-textarea:focus{border-color:var(--md-primary);border-width:2px;padding:calc(var(--space-3) - 1px);}
+.form-select{width:100%;height:40px;padding:0 var(--space-8) 0 var(--space-3);border:1px solid var(--md-outline-variant);border-radius:var(--radius-sm);font-size:var(--font-size-base);color:var(--md-on-surface);background:var(--md-surface);appearance:none;outline:none;cursor:pointer;transition:var(--transition-base);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2349454F' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;}
+.form-select:focus{border-color:var(--md-primary);border-width:2px;}
+.form-hint{font-size:var(--font-size-xs);color:var(--md-on-surface-variant);margin-top:var(--space-1);}
+.form-error{font-size:var(--font-size-xs);color:var(--md-error);margin-top:var(--space-1);}
+.form-check{display:inline-flex;align-items:center;gap:var(--space-2);cursor:pointer;user-select:none;font-size:var(--font-size-base);}
+.form-check input{cursor:pointer;margin:0;accent-color:var(--md-primary);}
+
+/* === Page Header === */
+.page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-8);}
+.page-title{font-size:var(--font-size-2xl);font-weight:400;color:var(--md-on-surface);}
+.page-subtitle{font-size:var(--font-size-sm);color:var(--md-on-surface-variant);margin-top:var(--space-1);}
+
+/* === Empty State === */
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:var(--space-10) var(--space-8);text-align:center;}
+.empty-state-icon{width:80px;height:80px;border-radius:var(--radius-xl);background:var(--md-surface-container);display:flex;align-items:center;justify-content:center;margin-bottom:var(--space-5);}
+.empty-state-icon svg{width:40px;height:40px;color:var(--md-outline);}
+.empty-state-title{font-size:var(--font-size-lg);font-weight:500;color:var(--md-on-surface);margin-bottom:var(--space-2);}
+.empty-state-desc{font-size:var(--font-size-sm);color:var(--md-on-surface-variant);margin-bottom:var(--space-6);max-width:360px;}
+
+/* === Modal === */
+.modal-overlay{position:fixed;inset:0;z-index:1000;background:var(--md-scrim);display:flex;align-items:center;justify-content:center;opacity:0;visibility:hidden;transition:opacity 0.2s,visibility 0.2s;}
+.modal-overlay.active{opacity:1;visibility:visible;}
+.modal{background:#fff;border-radius:var(--radius-xl);box-shadow:var(--shadow-modal);max-width:560px;width:90%;max-height:80vh;display:flex;flex-direction:column;animation:modalIn 0.25s cubic-bezier(0.2,0,0,1);}
+@keyframes modalIn{from{opacity:0;transform:scale(0.95) translateY(-10px);}to{opacity:1;transform:scale(1) translateY(0);}}
+.modal-header{padding:var(--space-6);display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--color-border);}
+.modal-title{font-size:var(--font-size-lg);font-weight:500;color:var(--md-on-surface);}
+.modal-body{padding:var(--space-6);overflow-y:auto;flex:1;}
+.modal-footer{padding:var(--space-4) var(--space-6);border-top:1px solid var(--color-border);display:flex;justify-content:flex-end;gap:var(--space-3);}
+
+/* === Toast === */
+.toast-container{position:fixed;top:var(--space-6);right:var(--space-6);z-index:2000;display:flex;flex-direction:column;gap:var(--space-2);pointer-events:none;}
+.toast{display:flex;align-items:center;gap:var(--space-3);padding:var(--space-3) var(--space-5);border-radius:var(--radius-md);background:#fff;box-shadow:var(--shadow-xl);font-size:var(--font-size-sm);color:var(--md-on-surface);animation:toastIn 0.3s ease;pointer-events:auto;max-width:400px;}
+.toast.success{border-left:3px solid var(--color-success);}
+.toast.error{border-left:3px solid var(--color-error);}
+.toast.info{border-left:3px solid var(--color-info);}
+@keyframes toastIn{from{opacity:0;transform:translateX(20px);}to{opacity:1;transform:translateX(0);}}
+
+/* ============================================
+   表单管理列表页
+   ============================================ */
+.form-list-toolbar{display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-5);}
+.form-search{display:flex;align-items:center;gap:var(--space-2);background:var(--md-surface);border:1px solid var(--md-outline);border-radius:var(--radius-sm);padding:0 var(--space-3);height:40px;min-width:280px;transition:var(--transition-base);}
+.form-search:focus-within{border-color:var(--md-primary);border-width:2px;padding:0 calc(var(--space-3) - 1px);}
+.form-search svg{width:18px;height:18px;color:var(--md-on-surface-variant);flex-shrink:0;}
+.form-search input{border:none;background:transparent;outline:none;flex:1;height:100%;font-size:var(--font-size-base);color:var(--md-on-surface);}
+.form-search input::placeholder{color:var(--md-on-surface-variant);}
+.form-list-actions{margin-left:auto;display:flex;gap:var(--space-3);}
+.form-card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:var(--space-5);}
+.form-card{background:#fff;border-radius:var(--radius-lg);border:1px solid var(--color-border);padding:var(--space-5);transition:var(--transition-base);cursor:pointer;position:relative;}
+.form-card:hover{box-shadow:var(--shadow-md);border-color:var(--md-primary);}
+.form-card-name{font-size:var(--font-size-lg);font-weight:500;color:var(--md-on-surface);margin-bottom:var(--space-2);}
+.form-card-desc{font-size:var(--font-size-sm);color:var(--md-on-surface-variant);margin-bottom:var(--space-4);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:42px;}
+.form-card-meta{display:flex;align-items:center;gap:var(--space-4);font-size:var(--font-size-xs);color:var(--md-outline);}
+.form-card-meta svg{width:14px;height:14px;}
+.form-card-meta-item{display:flex;align-items:center;gap:4px;}
+.form-card-actions{position:absolute;top:var(--space-4);right:var(--space-4);display:flex;gap:var(--space-1);opacity:0;transition:var(--transition-fast);}
+.form-card:hover .form-card-actions{opacity:1;}
+.form-card-actions .btn-icon{width:32px;height:32px;}
+.form-card-actions .btn-icon svg{width:16px;height:16px;}
+
+/* ============================================
+   表单设计器
+   ============================================ */
+.designer-shell{position:fixed;inset:0;z-index:900;display:flex;flex-direction:column;background:#fff;opacity:0;visibility:hidden;transition:opacity 0.3s cubic-bezier(0.2,0,0,1);}
+.designer-shell.active{opacity:1;visibility:visible;}
+
+/* 顶部工具栏 */
+.fd-toolbar{height:52px;background:#fff;border-bottom:1px solid var(--md-outline-variant);display:flex;align-items:center;padding:0 var(--space-4);gap:var(--space-2);flex-shrink:0;z-index:10;}
+.fd-toolbar-left{display:flex;align-items:center;gap:var(--space-3);min-width:200px;}
+.fd-back-btn{width:36px;height:36px;border-radius:var(--radius-full);display:flex;align-items:center;justify-content:center;color:var(--md-on-surface-variant);transition:var(--transition-base);}
+.fd-back-btn:hover{background:rgba(0,0,0,0.06);color:var(--md-on-surface);}
+.fd-back-btn svg{width:20px;height:20px;}
+.fd-form-name{font-size:var(--font-size-base);font-weight:500;color:var(--md-on-surface);padding:4px 8px;border-radius:var(--radius-sm);cursor:pointer;transition:var(--transition-fast);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border:1px solid transparent;}
+.fd-form-name:hover{background:rgba(0,0,0,0.03);}
+.fd-form-name:focus{outline:none;border-color:var(--md-primary);background:#fff;}
+.fd-toolbar-center{flex:1;display:flex;justify-content:center;}
+.fd-toolbar-right{display:flex;align-items:center;gap:var(--space-2);min-width:200px;justify-content:flex-end;}
+
+/* 三栏布局 */
+.fd-main{flex:1;display:flex;overflow:hidden;}
+
+/* 左侧字段面板 */
+.fd-field-panel{width:240px;background:#fff;border-right:1px solid var(--md-outline-variant);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden;}
+.fd-panel-header{height:44px;display:flex;align-items:center;padding:0 var(--space-4);border-bottom:1px solid var(--md-outline-variant);font-size:var(--font-size-sm);font-weight:600;color:var(--md-on-surface);flex-shrink:0;}
+.fd-field-list{flex:1;overflow-y:auto;padding:var(--space-2) var(--space-3);}
+.fd-field-type{display:flex;align-items:center;gap:var(--space-3);padding:var(--space-2) var(--space-3);border-radius:var(--radius-sm);cursor:pointer;transition:var(--transition-fast);user-select:none;margin-bottom:2px;}
+.fd-field-type:hover{background:rgba(103,80,164,0.06);}
+.fd-field-type:active{background:rgba(103,80,164,0.12);}
+.fd-field-type-icon{width:32px;height:32px;border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:14px;font-weight:600;}
+.fd-field-type-info{flex:1;min-width:0;}
+.fd-field-type-name{font-size:var(--font-size-sm);font-weight:500;color:var(--md-on-surface);}
+.fd-field-type-desc{font-size:11px;color:var(--md-outline);line-height:1.3;}
+/* 字段类型颜色 */
+.ft-color-input{background:#E3F2FD;color:#1565C0;}
+.ft-color-text{background:#E8F5E9;color:#2E7D32;}
+.ft-color-number{background:#FFF3E0;color:#E65100;}
+.ft-color-select{background:#F3E5F5;color:#6A1B9A;}
+.ft-color-date{background:#FFF8E1;color:#F57F17;}
+.ft-color-person{background:#E0F2F1;color:#00695C;}
+.ft-color-layout{background:#ECEFF1;color:#37474F;}
+.ft-color-display{background:#FCE4EC;color:#AD1457;}
+.ft-color-detail{background:#E8EAF6;color:#283593;}
+
+/* 中间画布 */
+.fd-canvas{flex:1;background:var(--md-content-bg);overflow-y:auto;position:relative;}
+.fd-canvas-inner{max-width:720px;margin:0 auto;padding:var(--space-8) var(--space-6);}
+.fd-canvas-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:400px;color:var(--md-outline);}
+.fd-canvas-empty svg{width:64px;height:64px;margin-bottom:var(--space-4);opacity:0.5;}
+.fd-canvas-empty-text{font-size:var(--font-size-base);margin-bottom:var(--space-2);}
+.fd-canvas-empty-hint{font-size:var(--font-size-sm);color:var(--color-text-placeholder);}
+
+/* 画布中的字段 */
+.fd-canvas-field{background:#fff;border:2px solid var(--color-border);border-radius:var(--radius-md);padding:var(--space-4) var(--space-5);margin-bottom:var(--space-3);cursor:pointer;transition:var(--transition-fast);position:relative;}
+.fd-canvas-field:hover{border-color:var(--md-primary);box-shadow:var(--shadow-sm);}
+.fd-canvas-field.selected{border-color:var(--md-primary);box-shadow:0 0 0 3px rgba(103,80,164,0.15);}
+.fd-canvas-field .field-label{font-size:var(--font-size-sm);font-weight:500;color:var(--md-on-surface);margin-bottom:var(--space-2);display:flex;align-items:center;gap:var(--space-1);}
+.fd-canvas-field .field-label .required-star{color:var(--md-error);font-size:16px;}
+.fd-canvas-field .field-control{pointer-events:none;}
+.fd-canvas-field .field-control input,.fd-canvas-field .field-control textarea,.fd-canvas-field .field-control select{width:100%;height:36px;padding:0 var(--space-3);border:1px solid var(--md-outline-variant);border-radius:var(--radius-sm);font-size:var(--font-size-sm);color:var(--color-text-placeholder);background:var(--md-surface-container-low);pointer-events:none;}
+.fd-canvas-field .field-control textarea{height:72px;padding:var(--space-2) var(--space-3);}
+.fd-canvas-field .field-actions{position:absolute;top:var(--space-2);right:var(--space-2);display:flex;gap:2px;opacity:0;transition:var(--transition-fast);}
+.fd-canvas-field:hover .field-actions,.fd-canvas-field.selected .field-actions{opacity:1;}
+.fd-canvas-field .field-actions button{width:28px;height:28px;border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;color:var(--md-on-surface-variant);transition:var(--transition-fast);}
+.fd-canvas-field .field-actions button:hover{background:rgba(0,0,0,0.06);}
+.fd-canvas-field .field-actions button.delete:hover{background:var(--color-error-bg);color:var(--md-error);}
+.fd-canvas-field .field-actions svg{width:16px;height:16px;}
+
+/* 单选/多选预览 */
+.fd-radio-list,.fd-checkbox-list{display:flex;flex-direction:column;gap:var(--space-2);}
+.fd-radio-list.horizontal,.fd-checkbox-list.horizontal{flex-direction:row;gap:var(--space-5);}
+.fd-radio-item,.fd-checkbox-item{display:flex;align-items:center;gap:var(--space-2);font-size:var(--font-size-sm);color:var(--md-on-surface-variant);}
+.fd-radio-circle{width:18px;height:18px;border-radius:50%;border:2px solid var(--md-outline);flex-shrink:0;}
+.fd-checkbox-box{width:18px;height:18px;border-radius:3px;border:2px solid var(--md-outline);flex-shrink:0;}
+
+/* 分栏 */
+.fd-columns{display:flex;gap:var(--space-3);}
+.fd-column{flex:1;border:2px dashed var(--md-outline-variant);border-radius:var(--radius-sm);min-height:80px;padding:var(--space-3);display:flex;flex-direction:column;gap:var(--space-3);}
+.fd-column-empty{display:flex;align-items:center;justify-content:center;flex:1;color:var(--color-text-placeholder);font-size:var(--font-size-xs);border:1px dashed var(--md-outline-variant);border-radius:var(--radius-sm);min-height:60px;}
+
+/* 明细 */
+.fd-detail-table{width:100%;border-collapse:collapse;font-size:var(--font-size-sm);}
+.fd-detail-table th{background:var(--md-surface-container-low);padding:var(--space-2) var(--space-3);font-weight:500;color:var(--md-on-surface-variant);border:1px solid var(--md-outline-variant);text-align:left;}
+.fd-detail-table td{padding:var(--space-2) var(--space-3);border:1px solid var(--md-outline-variant);color:var(--color-text-placeholder);font-size:var(--font-size-xs);}
+
+/* 只读文本 */
+.fd-readonly-text{font-size:var(--font-size-sm);color:var(--md-on-surface-variant);line-height:1.6;}
+.fd-readonly-text.style-title{font-size:var(--font-size-lg);font-weight:600;color:var(--md-on-surface);}
+.fd-readonly-text.style-desc{font-size:var(--font-size-xs);color:var(--md-outline);}
+
+/* 右侧属性面板 */
+.fd-props-panel{width:320px;background:#fff;border-left:1px solid var(--md-outline-variant);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden;}
+.fd-props-header{height:44px;display:flex;align-items:center;padding:0 var(--space-4);border-bottom:1px solid var(--md-outline-variant);font-size:var(--font-size-sm);font-weight:600;color:var(--md-on-surface);flex-shrink:0;}
+.fd-props-body{flex:1;overflow-y:auto;padding:var(--space-4);}
+.fd-props-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:200px;color:var(--md-outline);font-size:var(--font-size-sm);text-align:center;}
+.fd-props-empty svg{width:36px;height:36px;margin-bottom:var(--space-3);opacity:0.4;}
+.fd-props-section{margin-bottom:var(--space-5);}
+.fd-props-section-title{font-size:var(--font-size-xs);font-weight:600;color:var(--md-on-surface-variant);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:var(--space-3);}
+.fd-prop-row{margin-bottom:var(--space-4);}
+.fd-prop-label{font-size:var(--font-size-sm);font-weight:500;color:var(--md-on-surface);margin-bottom:var(--space-1);display:block;}
+.fd-prop-input{width:100%;height:36px;padding:0 var(--space-3);border:1px solid var(--md-outline-variant);border-radius:var(--radius-sm);font-size:var(--font-size-sm);color:var(--md-on-surface);outline:none;transition:var(--transition-fast);}
+.fd-prop-input:focus{border-color:var(--md-primary);}
+.fd-prop-select{width:100%;height:36px;padding:0 var(--space-6) 0 var(--space-3);border:1px solid var(--md-outline-variant);border-radius:var(--radius-sm);font-size:var(--font-size-sm);color:var(--md-on-surface);appearance:none;outline:none;background:#fff;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2349454F' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;}
+.fd-prop-check{display:flex;align-items:center;gap:var(--space-2);font-size:var(--font-size-sm);cursor:pointer;user-select:none;}
+.fd-prop-check input{accent-color:var(--md-primary);cursor:pointer;}
+
+/* 选项列表配置 */
+.fd-option-list{display:flex;flex-direction:column;gap:var(--space-2);}
+.fd-option-item{display:flex;align-items:center;gap:var(--space-2);}
+.fd-option-item .opt-radio{width:16px;height:16px;border-radius:50%;border:2px solid var(--md-outline);flex-shrink:0;}
+.fd-option-item .opt-check{width:16px;height:16px;border-radius:3px;border:2px solid var(--md-outline);flex-shrink:0;}
+.fd-option-item input{flex:1;height:32px;padding:0 var(--space-2);border:1px solid var(--md-outline-variant);border-radius:var(--radius-sm);font-size:var(--font-size-sm);outline:none;}
+.fd-option-item input:focus{border-color:var(--md-primary);}
+.fd-option-item .opt-del{width:28px;height:28px;border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;color:var(--md-outline);cursor:pointer;transition:var(--transition-fast);flex-shrink:0;}
+.fd-option-item .opt-del:hover{color:var(--md-error);background:var(--color-error-bg);}
+.fd-option-item .opt-del svg{width:14px;height:14px;}
+.fd-add-option{display:flex;align-items:center;gap:var(--space-1);font-size:var(--font-size-sm);color:var(--md-primary);cursor:pointer;padding:var(--space-1) 0;font-weight:500;}
+.fd-add-option:hover{text-decoration:underline;}
+.fd-add-option svg{width:16px;height:16px;}
+
+/* 明细列配置 */
+.fd-col-config{display:flex;flex-direction:column;gap:var(--space-3);}
+.fd-col-config-item{display:flex;align-items:center;gap:var(--space-2);padding:var(--space-2);background:var(--md-surface-container-low);border-radius:var(--radius-sm);font-size:var(--font-size-sm);}
+.fd-col-config-item input{flex:1;height:28px;padding:0 var(--space-2);border:1px solid transparent;border-radius:3px;font-size:var(--font-size-sm);outline:none;background:transparent;}
+.fd-col-config-item input:focus{border-color:var(--md-primary);background:#fff;}
+.fd-col-config-item select{height:28px;border:1px solid var(--md-outline-variant);border-radius:3px;font-size:11px;padding:0 var(--space-5) 0 var(--space-1);appearance:none;background:#fff;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2349454F' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 4px center;cursor:pointer;outline:none;}
+.fd-col-config-item .col-req{font-size:11px;color:var(--md-on-surface-variant);cursor:pointer;user-select:none;display:flex;align-items:center;gap:2px;}
+.fd-col-config-item .col-req input{width:auto;accent-color:var(--md-primary);}
+.fd-col-config-item .col-del{width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:3px;color:var(--md-outline);cursor:pointer;flex-shrink:0;}
+.fd-col-config-item .col-del:hover{color:var(--md-error);background:var(--color-error-bg);}
+.fd-col-config-item .col-del svg{width:14px;height:14px;}
+
+/* ============================================
+   表单预览模式
+   ============================================ */
+.fd-preview-overlay{position:fixed;inset:0;z-index:950;background:var(--md-content-bg);display:flex;flex-direction:column;opacity:0;visibility:hidden;transition:opacity 0.3s;overflow-y:auto;}
+.fd-preview-overlay.active{opacity:1;visibility:visible;}
+.fd-preview-header{height:52px;background:#fff;border-bottom:1px solid var(--md-outline-variant);display:flex;align-items:center;padding:0 var(--space-5);gap:var(--space-3);flex-shrink:0;}
+.fd-preview-body{flex:1;overflow-y:auto;padding:var(--space-8);}
+.fd-preview-inner{max-width:680px;margin:0 auto;background:#fff;border-radius:var(--radius-lg);border:1px solid var(--color-border);padding:var(--space-8);}
+.fd-preview-title{font-size:var(--font-size-xl);font-weight:500;color:var(--md-on-surface);margin-bottom:var(--space-2);}
+.fd-preview-desc{font-size:var(--font-size-sm);color:var(--md-on-surface-variant);margin-bottom:var(--space-6);line-height:1.6;}
+.fd-preview-field{margin-bottom:var(--space-5);}
+.fd-preview-field .field-label{font-size:var(--font-size-sm);font-weight:500;color:var(--md-on-surface);margin-bottom:var(--space-2);display:flex;align-items:center;gap:4px;}
+.fd-preview-field .field-label .required-star{color:var(--md-error);}
+.fd-preview-field input,.fd-preview-field textarea,.fd-preview-field select{width:100%;height:40px;padding:0 var(--space-3);border:1px solid var(--md-outline-variant);border-radius:var(--radius-sm);font-size:var(--font-size-base);color:var(--md-on-surface);background:var(--md-surface);outline:none;transition:var(--transition-base);}
+.fd-preview-field input:focus,.fd-preview-field textarea:focus,.fd-preview-field select:focus{border-color:var(--md-primary);}
+.fd-preview-field textarea{height:96px;padding:var(--space-3);}
+.fd-preview-field select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2349454F' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:36px;}
+.fd-preview-field .field-placeholder{color:var(--color-text-placeholder);}
+.fd-preview-field .field-error{color:var(--md-error);font-size:var(--font-size-xs);margin-top:4px;display:none;}
+.fd-preview-field.has-error input,.fd-preview-field.has-error textarea,.fd-preview-field.has-error select{border-color:var(--md-error);}
+.fd-preview-field.has-error .field-error{display:block;}
+.fd-preview-columns{display:flex;gap:var(--space-5);}
+.fd-preview-column{flex:1;}
+.fd-preview-detail-table{width:100%;border-collapse:collapse;margin-top:var(--space-2);}
+.fd-preview-detail-table th{background:var(--md-surface-container-low);padding:var(--space-2) var(--space-3);font-size:var(--font-size-sm);font-weight:500;color:var(--md-on-surface);border:1px solid var(--md-outline-variant);text-align:left;}
+.fd-preview-detail-table td{padding:var(--space-2);border:1px solid var(--md-outline-variant);}
+.fd-preview-detail-table td input{height:32px;font-size:var(--font-size-sm);}
+.fd-preview-detail-table td select{height:32px;font-size:var(--font-size-sm);}
+.fd-preview-submit{display:flex;justify-content:flex-end;margin-top:var(--space-8);padding-top:var(--space-5);border-top:1px solid var(--color-border);}
+
+/* Radio/Checkbox in preview */
+.fd-preview-radio,.fd-preview-checkbox{display:flex;flex-direction:column;gap:var(--space-2);margin-top:var(--space-1);}
+.fd-preview-radio.horizontal,.fd-preview-checkbox.horizontal{flex-direction:row;gap:var(--space-5);}
+.fd-preview-radio label,.fd-preview-checkbox label{display:flex;align-items:center;gap:var(--space-2);cursor:pointer;font-size:var(--font-size-base);color:var(--md-on-surface);}
+.fd-preview-radio input[type="radio"]{accent-color:var(--md-primary);width:18px;height:18px;cursor:pointer;}
+.fd-preview-checkbox input[type="checkbox"]{accent-color:var(--md-primary);width:18px;height:18px;cursor:pointer;}
+
+/* Person selector mock */
+.fd-person-selector{display:flex;align-items:center;gap:var(--space-2);height:40px;padding:0 var(--space-3);border:1px solid var(--md-outline-variant);border-radius:var(--radius-sm);background:var(--md-surface);cursor:pointer;transition:var(--transition-base);}
+.fd-person-selector:hover{border-color:var(--md-primary);}
+.fd-person-selector svg{width:18px;height:18px;color:var(--md-outline);}
+.fd-person-selector span{font-size:var(--font-size-base);color:var(--color-text-placeholder);}
+
+/* Tags */
+.tag{display:inline-flex;align-items:center;gap:4px;height:24px;padding:0 var(--space-2);border-radius:var(--radius-full);background:rgba(103,80,164,0.08);color:var(--md-primary);font-size:var(--font-size-xs);}
+.tag-close{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;cursor:pointer;transition:var(--transition-fast);}
+.tag-close:hover{background:rgba(103,80,164,0.15);}
+
+/* Utility */
+.text-center{text-align:center;}
+.mt-2{margin-top:var(--space-2);}
+.mt-4{margin-top:var(--space-4);}
+.mb-2{margin-bottom:var(--space-2);}
+.mb-4{margin-bottom:var(--space-4);}
+.flex-center{display:flex;align-items:center;justify-content:center;}
+.gap-2{gap:var(--space-2);}
+.gap-3{gap:var(--space-3);}
+.hidden{display:none!important;}
+
+/* === Tabs (from index.html design) === */
+.tabs-header{display:flex;border-bottom:1px solid var(--md-outline-variant);padding:0 var(--space-4);background:#FAFBFC;}
+.tab-item{display:flex;align-items:center;gap:var(--space-2);padding:var(--space-4) var(--space-5);font-size:var(--font-size-base);font-weight:500;color:var(--md-on-surface-variant);cursor:pointer;position:relative;transition:var(--transition-base);white-space:nowrap;}
+.tab-item svg{width:18px;height:18px;}
+.tab-item:hover{color:var(--md-on-surface);background:rgba(17,24,39,0.03);}
+.tab-item.active{color:var(--md-primary);}
+.tab-item.active::after{content:'';position:absolute;bottom:0;left:var(--space-4);right:var(--space-4);height:3px;background:var(--md-primary);border-radius:var(--radius-full) var(--radius-full) 0 0;}
+.tab-content{padding:var(--space-6);}
+
+/* ============================================
+   增补样式（拖拽 / 分栏 / 自定义下拉 / 人员选择 / 明细校验）
+   ============================================ */
+/* 拖拽 */
+.fd-field-type{cursor:grab;}
+.fd-field-type:active{cursor:grabbing;}
+.fd-canvas-field.dragging{opacity:0.4;}
+.fd-canvas-field.drop-before{box-shadow:0 -3px 0 0 var(--md-primary);}
+.fd-canvas-field.drop-after{box-shadow:0 3px 0 0 var(--md-primary);}
+.fd-column.drag-over{border-color:var(--md-primary);background:var(--color-primary-subtle);}
+/* 分栏栏位内字段卡片 */
+.fd-col-field{border:1px solid var(--md-outline-variant);border-radius:var(--radius-sm);padding:var(--space-2) var(--space-3);background:#fff;cursor:pointer;position:relative;transition:var(--transition-fast);}
+.fd-col-field:hover{border-color:var(--md-primary);}
+.fd-col-field.selected{border-color:var(--md-primary);box-shadow:0 0 0 2px rgba(103,80,164,0.15);}
+.fd-col-field .cf-label{font-size:var(--font-size-xs);font-weight:500;color:var(--md-on-surface);margin-bottom:4px;display:flex;align-items:center;gap:2px;padding-right:20px;}
+.fd-col-field .cf-label .required-star{color:var(--md-error);}
+.fd-col-field .cf-ctrl{height:24px;border:1px solid var(--md-outline-variant);border-radius:4px;background:var(--md-surface-container-low);font-size:10px;color:var(--color-text-placeholder);display:flex;align-items:center;padding:0 var(--space-2);}
+.fd-col-field .cf-del{position:absolute;top:4px;right:4px;width:20px;height:20px;border-radius:4px;display:flex;align-items:center;justify-content:center;color:var(--md-outline);opacity:0;transition:var(--transition-fast);cursor:pointer;}
+.fd-col-field:hover .cf-del{opacity:1;}
+.fd-col-field .cf-del:hover{color:var(--md-error);background:var(--color-error-bg);}
+.fd-col-field .cf-del svg{width:12px;height:12px;}
+.fd-col-add{display:flex;align-items:center;justify-content:center;gap:4px;height:30px;border:1px dashed var(--md-outline-variant);border-radius:var(--radius-sm);color:var(--md-primary);font-size:var(--font-size-xs);cursor:pointer;transition:var(--transition-fast);user-select:none;}
+.fd-col-add:hover{border-color:var(--md-primary);background:var(--color-primary-subtle);}
+/* 自定义下拉（预览） */
+.pv-dd{position:relative;}
+.pv-dd-trigger{min-height:40px;display:flex;flex-wrap:wrap;align-items:center;gap:4px;padding:4px var(--space-3);border:1px solid var(--md-outline-variant);border-radius:var(--radius-sm);cursor:pointer;background:var(--md-surface);transition:var(--transition-fast);font-size:var(--font-size-base);}
+.pv-dd-trigger:hover{border-color:var(--md-primary);}
+.pv-dd.open .pv-dd-trigger{border-color:var(--md-primary);}
+.pv-dd.disabled .pv-dd-trigger{background:var(--md-surface-container-low);cursor:not-allowed;}
+.pv-dd.disabled .pv-dd-trigger:hover{border-color:var(--md-outline-variant);}
+.pv-dd-placeholder{color:var(--color-text-placeholder);}
+.pv-dd-caret{margin-left:auto;color:var(--md-outline);display:flex;align-items:center;flex-shrink:0;}
+.pv-dd-caret svg{width:16px;height:16px;}
+.pv-dd-panel{position:absolute;top:calc(100% + 4px);left:0;right:0;background:#fff;border:1px solid var(--color-border);border-radius:var(--radius-md);box-shadow:var(--shadow-lg);z-index:500;max-height:240px;overflow-y:auto;padding:4px;}
+.pv-dd-option{display:flex;align-items:center;gap:var(--space-2);padding:8px 12px;border-radius:var(--radius-sm);font-size:var(--font-size-base);cursor:pointer;transition:var(--transition-fast);}
+.pv-dd-option:hover{background:var(--color-primary-subtle);}
+.pv-dd-option.selected{color:var(--md-primary);font-weight:500;}
+.pv-dd-option input{accent-color:var(--md-primary);cursor:pointer;}
+.pv-dd-status{padding:var(--space-4);text-align:center;font-size:var(--font-size-sm);color:var(--md-on-surface-variant);display:flex;align-items:center;justify-content:center;gap:var(--space-2);}
+.pv-dd-retry{color:var(--md-primary);cursor:pointer;}
+.pv-dd-retry:hover{text-decoration:underline;}
+.pv-spinner{width:16px;height:16px;border:2px solid var(--md-outline-variant);border-top-color:var(--md-primary);border-radius:50%;animation:pvspin .8s linear infinite;display:inline-block;flex-shrink:0;}
+@keyframes pvspin{to{transform:rotate(360deg);}}
+.btn .pv-spinner{border-color:rgba(255,255,255,0.4);border-top-color:#fff;}
+/* 人员选择弹窗 */
+.pv-person-list{max-height:280px;overflow-y:auto;margin-top:var(--space-3);}
+.pv-person-item{display:flex;align-items:center;gap:var(--space-3);padding:10px 12px;border-radius:var(--radius-sm);cursor:pointer;transition:var(--transition-fast);}
+.pv-person-item:hover{background:var(--color-primary-subtle);}
+.pv-person-avatar{width:32px;height:32px;border-radius:50%;background:var(--md-primary-container);color:var(--md-primary);display:flex;align-items:center;justify-content:center;font-size:var(--font-size-sm);font-weight:600;flex-shrink:0;}
+.pv-person-dept{margin-left:auto;font-size:var(--font-size-xs);color:var(--md-outline);}
+.pv-person-item input{accent-color:var(--md-primary);cursor:pointer;}
+/* 明细单元格错误 */
+.dt-cell-err{display:none;color:var(--md-error);font-size:var(--font-size-xs);margin-top:2px;}
+.dt-cell.error input,.dt-cell.error select{border-color:var(--md-error);}
+.dt-cell.error .dt-cell-err{display:block;}
+/* 预览提示条 */
+.pv-tip-bar{background:var(--md-info-container);color:var(--md-info);font-size:var(--font-size-sm);padding:var(--space-2) var(--space-5);text-align:center;flex-shrink:0;}
+/* 属性面板 - 请求参数行 */
+.fd-param-item{display:flex;flex-direction:column;gap:var(--space-1);padding:var(--space-2);background:var(--md-surface-container-low);border-radius:var(--radius-sm);margin-bottom:var(--space-2);}
+.fd-param-item .param-line{display:flex;align-items:center;gap:var(--space-1);}
+.fd-param-item input,.fd-param-item select{flex:1;height:28px;padding:0 var(--space-2);border:1px solid var(--md-outline-variant);border-radius:3px;font-size:var(--font-size-sm);outline:none;background:#fff;min-width:0;}
+.fd-param-item input:focus,.fd-param-item select:focus{border-color:var(--md-primary);}
+.fd-param-item .col-del{width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:3px;color:var(--md-outline);cursor:pointer;flex-shrink:0;}
+.fd-param-item .col-del:hover{color:var(--md-error);background:var(--color-error-bg);}
+.fd-param-item .col-del svg{width:14px;height:14px;}
+/* 手机端：分栏堆叠 */
+@media (max-width:768px){
+  .fd-preview-columns{flex-direction:column;gap:0;}
+  .fd-columns{flex-direction:column;}
+}
+  </style>
+</head>
+<body>
+  <div class="app-shell" id="app">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-logo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+        </div>
+        <span class="sidebar-brand">Beaver</span>
+      </div>
+      <nav class="sidebar-nav">
+        <div class="nav-section">
+          <div class="nav-section-title">管理</div>
+          <div class="nav-item" id="navWorkspace" onclick="window.location.href='./index.html'">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+            <span>空间管理</span>
+          </div>
+          <div class="nav-item" onclick="window.location.href='./approval-flow.html'">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+            <span>我的审批</span>
+          </div>
+          <div class="nav-item active" id="navFormEngine">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
+            <span>表单管理</span>
+          </div>
+        </div>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="sidebar-footer-text">&copy; 2025 DidaTravel 道旅科技</div>
+      </div>
+    </aside>
+
+    <!-- Main Area -->
+    <div class="main-area">
+      <header class="header">
+        <div class="header-left">
+          <nav class="breadcrumb" id="breadcrumb">
+            <span class="breadcrumb-item" onclick="showToast('info','空间管理','返回空间列表')">空间管理</span>
+            <span class="breadcrumb-separator">/</span>
+            <span class="breadcrumb-item current">酒店预订流程</span>
+          </nav>
+        </div>
+        <div class="header-right">
+          <button class="header-text-btn" title="帮助" onclick="showToast('info','帮助中心','该功能将在后续版本中实现')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
+            <span>帮助</span>
+          </button>
+          <div class="header-user">
+            <div class="header-avatar">W</div>
+            <span class="header-username">Sukey Wu</span>
+          </div>
+        </div>
+      </header>
+
+      <main class="content" id="mainContent">
+        <!-- JS 动态渲染 -->
+      </main>
+    </div>
+  </div>
+
+  <!-- 表单设计器 (全屏覆盖层) -->
+  <div class="designer-shell" id="designerShell">
+    <div class="fd-toolbar">
+      <div class="fd-toolbar-left">
+        <button class="fd-back-btn" onclick="closeDesigner()" title="返回">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg>
+        </button>
+        <input class="fd-form-name" id="fdFormName" value="出差申请表" onfocus="this.select()" oninput="formSettings.name=this.value" />
+      </div>
+      <div class="fd-toolbar-center">
+        <button class="btn btn-text btn-sm" onclick="showFormSettings()" id="fdSettingsBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+          表单设置
+        </button>
+      </div>
+      <div class="fd-toolbar-right">
+        <button class="btn btn-outlined btn-sm" onclick="openPreview()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          预览
+        </button>
+        <button class="btn btn-primary btn-sm" onclick="saveForm()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+          保存
+        </button>
+      </div>
+    </div>
+    <div class="fd-main">
+      <!-- 左侧字段面板 -->
+      <div class="fd-field-panel">
+        <div class="fd-panel-header">字段类型</div>
+        <div class="fd-field-list" id="fdFieldList">
+          <!-- JS 渲染 -->
+        </div>
+      </div>
+      <!-- 中间画布 -->
+      <div class="fd-canvas" id="fdCanvas" onclick="handleCanvasClick(event)" ondragover="onCanvasDragOver(event)" ondrop="onCanvasDrop(event)">
+        <div class="fd-canvas-inner" id="fdCanvasInner">
+          <!-- JS 渲染 -->
+        </div>
+      </div>
+      <!-- 右侧属性面板 -->
+      <div class="fd-props-panel">
+        <div class="fd-panel-header">属性配置</div>
+        <div class="fd-props-body" id="fdPropsBody">
+          <!-- JS 渲染 -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 表单预览覆盖层 -->
+  <div class="fd-preview-overlay" id="previewOverlay">
+    <div class="fd-preview-header">
+      <button class="fd-back-btn" onclick="closePreview()" title="关闭预览">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg>
+      </button>
+      <span style="font-size:14px;font-weight:500;">预览模式 — 以填写者视角查看表单</span>
+    </div>
+    <div class="pv-tip-bar">预览模式 — 可填写但不会实际提交</div>
+    <div class="fd-preview-body">
+      <div class="fd-preview-inner" id="previewInner">
+        <!-- JS 渲染 -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal -->
+  <div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+    <div class="modal" id="modalContent" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <span class="modal-title" id="modalTitle">提示</span>
+        <button class="btn-icon" onclick="closeModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+      </div>
+      <div class="modal-body" id="modalBody"></div>
+      <div class="modal-footer" id="modalFooter"></div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast-container" id="toastContainer"></div>
+
+<script>
+// ============================================
+// 表单引擎原型 - 交互逻辑
+// ============================================
+
+// --- 数据模型 ---
+// referencedBy: 引用该表单的流程名称列表；为空数组时表单可删除（D-13/D-14）
+let forms = [
+  { id: 1, name: '出差申请表', desc: '员工出差时填写，包含出差目的地、时间、交通方式等信息', fieldCount: 8, updatedAt: '2025-06-28', referencedBy: ['出差审批流程', '紧急出差审批'] },
+  { id: 2, name: '报销单', desc: '费用报销申请表单，支持填写费用明细和附件上传', fieldCount: 6, updatedAt: '2025-06-25', referencedBy: ['费用报销流程'] },
+  { id: 3, name: '请假申请', desc: '员工请假使用，支持年假、事假、病假等类型', fieldCount: 5, updatedAt: '2025-06-20', referencedBy: [] },
+  { id: 4, name: '采购申请单', desc: '部门采购需求申请', fieldCount: 7, updatedAt: '2025-06-18', referencedBy: [] },
+  { id: 5, name: '旧版出差申请表', desc: '2024 版出差申请表，已由新版出差申请表替代', fieldCount: 6, updatedAt: '2025-05-10', referencedBy: [] },
+];
+
+// --- HTML 转义（用户输入插入 HTML 前必须转义） ---
+function escHtml(s) {
+  return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// 当前设计器状态
+let currentForm = null;
+let selectedFieldIndex = -1;
+let selectedColPos = null; // 选中分栏内字段时为 [栏索引, 字段索引]，否则为 null
+let designerFields = [];
+let formSettings = { name: '', desc: '', submitBtnText: '提交申请' };
+
+// 获取当前选中的字段对象（可能位于分栏栏位内）
+function getSelectedField() {
+  if (selectedFieldIndex < 0 || selectedFieldIndex >= designerFields.length) return null;
+  const f = designerFields[selectedFieldIndex];
+  if (selectedColPos && f.type === 'columns') {
+    const colArr = (f.props.columns_data || [])[selectedColPos[0]] || [];
+    return colArr[selectedColPos[1]] || null;
+  }
+  return f;
+}
+
+// 字段类型定义
+const FIELD_TYPES = [
+  { type: 'shortText', name: '短文本', desc: '单行输入框', icon: 'Aa', colorClass: 'ft-color-input' },
+  { type: 'longText', name: '长文本', desc: '多行输入框', icon: '¶', colorClass: 'ft-color-text' },
+  { type: 'number', name: '数字', desc: '数字输入', icon: '#', colorClass: 'ft-color-number' },
+  { type: 'radio', name: '单选', desc: '单选按钮组', icon: '◉', colorClass: 'ft-color-select' },
+  { type: 'checkbox', name: '多选', desc: '多选勾选框', icon: '☑', colorClass: 'ft-color-select' },
+  { type: 'dropdown', name: '下拉选择', desc: '下拉列表', icon: '▾', colorClass: 'ft-color-select' },
+  { type: 'datetime', name: '日期时间', desc: '日期时间选择', icon: '📅', colorClass: 'ft-color-date' },
+  { type: 'person', name: '人员选择', desc: '选择人员', icon: '👤', colorClass: 'ft-color-person' },
+  { type: 'columns', name: '分栏', desc: '2栏/3栏布局', icon: '▥', colorClass: 'ft-color-layout' },
+  { type: 'detail', name: '明细', desc: '多行数据表格', icon: '☰', colorClass: 'ft-color-detail' },
+  { type: 'readonlyText', name: '只读文本', desc: '展示说明文字', icon: 'T', colorClass: 'ft-color-display' },
+];
+
+// --- 当前激活的 Tab ---
+let activeTab = 'forms';
+
+// --- 渲染页面（含 Tab 栏） ---
+function renderPage() {
+  const tabs = [
+    { key: 'workflows', label: '工作流', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 6v6m11-7h-6m-6 0H1m15.36-5.64l-4.24 4.24M7.88 16.12l-4.24 4.24m0-12.72l4.24 4.24m8.48 8.48l4.24 4.24"/></svg>' },
+    { key: 'forms', label: '表单管理', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>' },
+    { key: 'executions', label: '执行记录', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg>' },
+    { key: 'settings', label: '空间设置', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>' }
+  ];
+
+  const tabsHtml = `<div class="tabs-header">${tabs.map(t => `<div class="tab-item ${activeTab === t.key ? 'active' : ''}" onclick="switchTab('${t.key}')">${t.icon}<span>${t.label}</span></div>`).join('')}</div>`;
+
+  let contentHtml = '';
+  if (activeTab === 'forms') {
+    contentHtml = renderFormListContent();
+  } else if (activeTab === 'workflows') {
+    contentHtml = '<div class="empty-state"><div class="empty-state-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 6v6m11-7h-6m-6 0H1m15.36-5.64l-4.24 4.24M7.88 16.12l-4.24 4.24m0-12.72l4.24 4.24m8.48 8.48l4.24 4.24"/></svg></div><div class="empty-state-title">工作流管理</div><div class="empty-state-desc">工作流管理功能请在主原型 index.html 中体验</div></div>';
+  } else if (activeTab === 'executions') {
+    contentHtml = '<div class="empty-state"><div class="empty-state-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg></div><div class="empty-state-title">执行记录</div><div class="empty-state-desc">该功能将在后续版本中实现</div></div>';
+  } else if (activeTab === 'settings') {
+    contentHtml = '<div class="empty-state"><div class="empty-state-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></div><div class="empty-state-title">空间设置</div><div class="empty-state-desc">空间设置功能请在主原型 index.html 中体验</div></div>';
+  }
+
+  document.getElementById('mainContent').innerHTML = tabsHtml + '<div class="tab-content">' + contentHtml + '</div>';
+}
+
+function switchTab(tab) {
+  activeTab = tab;
+  renderPage();
+}
+
+// --- 表单管理 Tab 内容 ---
+function renderFormListContent() {
+  return `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-5);">
+      <div class="form-search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        <input type="text" placeholder="搜索表单名称..." oninput="onSearchInput(this.value)" oncompositionstart="onSearchCompositionStart()" oncompositionend="onSearchCompositionEnd(this.value)" />
+      </div>
+      <button class="btn btn-primary" onclick="createNewForm()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+        新建表单
+      </button>
+    </div>
+    ${forms.length === 0 ? renderFormsEmptyState() : renderFormsTable()}
+  `;
+}
+
+function renderFormsTable() {
+  return `
+    <div class="card">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th style="width:200px;">表单名称</th>
+            <th>描述</th>
+            <th style="width:100px;">引用状态</th>
+            <th style="width:140px;">最后修改</th>
+            <th style="width:140px;text-align:right;">操作</th>
+          </tr>
+        </thead>
+        <tbody id="formTableBody">
+          ${forms.map(f => renderFormRow(f)).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function renderFormsEmptyState() {
+  return `
+    <div class="card">
+      <div class="empty-state" style="padding:var(--space-10) var(--space-8);">
+        <div class="empty-state-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></div>
+        <div class="empty-state-title">暂无表单</div>
+        <div class="empty-state-desc">还没有创建任何表单，点击「新建表单」开始创建</div>
+        <button class="btn btn-primary" onclick="createNewForm()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+          新建表单
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+// --- 表单列表页（兼容旧调用） ---
+function renderFormList() {
+  activeTab = 'forms';
+  renderPage();
+}
+
+function renderFormRow(f) {
+  const refCount = (f.referencedBy || []).length;
+  const refBadge = refCount > 0
+    ? '<span class="badge badge-info">已被引用</span>'
+    : '<span style="font-size:var(--font-size-sm);color:var(--md-outline);">—</span>';
+  return `
+    <tr>
+      <td><a href="javascript:void(0)" onclick="openDesigner(${f.id})" style="color:var(--md-primary);font-weight:500;cursor:pointer;">${escHtml(f.name)}</a></td>
+      <td class="cell-desc" style="color:var(--md-on-surface-variant);font-size:var(--font-size-sm);">${escHtml(f.desc) || '暂无描述'}</td>
+      <td>${refBadge}</td>
+      <td style="color:var(--md-on-surface-variant);font-size:var(--font-size-sm);">${f.updatedAt}</td>
+      <td class="action-cell" style="text-align:right;">
+        <div class="action-cell-inner">
+          <button class="action-edit-btn" onclick="openDesigner(${f.id})">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+            编辑
+          </button>
+          <button class="action-btn" onclick="toggleActionMenu(event, ${f.id})" title="更多操作">
+            <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
+          </button>
+        </div>
+        <div class="action-menu" id="actionMenu-${f.id}">
+          <div class="action-menu-item" onclick="closeActionMenu();previewFormById(${f.id})">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            预览
+          </div>
+          <div class="action-menu-item" onclick="closeActionMenu();copyForm(${f.id})">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            复制
+          </div>
+          <div class="action-menu-item danger" onclick="closeActionMenu();deleteForm(${f.id})">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            删除
+          </div>
+        </div>
+      </td>
+    </tr>
+  `;
+}
+
+function toggleActionMenu(e, formId) {
+  e.stopPropagation();
+  document.querySelectorAll('.action-menu.open').forEach(m => { if (m.id !== 'actionMenu-' + formId) { m.classList.remove('open'); m.classList.remove('flip'); } });
+  const menu = document.getElementById('actionMenu-' + formId);
+  if (!menu) return;
+  if (menu.classList.contains('open')) { menu.classList.remove('open'); menu.classList.remove('flip'); return; }
+  menu.classList.remove('flip');
+  menu.classList.add('open');
+  const rect = menu.getBoundingClientRect();
+  if (rect.bottom > window.innerHeight) { menu.classList.add('flip'); }
+}
+function closeActionMenu() {
+  document.querySelectorAll('.action-menu.open').forEach(m => m.classList.remove('open'));
+}
+document.addEventListener('click', closeActionMenu);
+
+// --- 列表搜索（300ms 防抖 + 中文输入法合成期间不触发） ---
+let searchDebounceTimer = null;
+let searchComposing = false;
+function onSearchInput(value) {
+  if (searchComposing) return;
+  clearTimeout(searchDebounceTimer);
+  searchDebounceTimer = setTimeout(() => filterForms(value), 300);
+}
+function onSearchCompositionStart() { searchComposing = true; }
+function onSearchCompositionEnd(value) {
+  searchComposing = false;
+  onSearchInput(value);
+}
+
+function filterForms(keyword) {
+  const tbody = document.getElementById('formTableBody');
+  if (!tbody) return;
+  const filtered = forms.filter(f => f.name.toLowerCase().includes(keyword.trim().toLowerCase()));
+  tbody.innerHTML = filtered.length
+    ? filtered.map(f => renderFormRow(f)).join('')
+    : '<tr><td colspan="5" style="text-align:center;padding:var(--space-10);color:var(--md-outline);">没有找到匹配的表单</td></tr>';
+}
+
+function showFormList() {
+  activeTab = 'forms';
+  renderPage();
+}
+
+// --- 创建新表单 ---
+function createNewForm() {
+  const newId = forms.length ? Math.max(...forms.map(f => f.id)) + 1 : 1;
+  const newForm = { id: newId, name: '未命名表单', desc: '', fieldCount: 0, updatedAt: new Date().toISOString().split('T')[0], referencedBy: [] };
+  forms.unshift(newForm);
+  openDesigner(newId);
+}
+
+// --- 复制表单 ---
+function copyForm(id) {
+  const f = forms.find(x => x.id === id);
+  if (!f) return;
+  const newId = Math.max(...forms.map(x => x.id)) + 1;
+  forms.unshift({ ...f, id: newId, name: f.name + ' (副本)', referencedBy: [], updatedAt: new Date().toISOString().split('T')[0] });
+  renderFormList();
+  showToast('success', '复制成功', `已创建「${escHtml(f.name)} (副本)」`);
+}
+
+// --- 删除表单 ---
+function deleteForm(id) {
+  const f = forms.find(x => x.id === id);
+  if (!f) return;
+  const refs = f.referencedBy || [];
+  if (refs.length > 0) {
+    const refList = refs.map(r => `<li>${escHtml(r)}</li>`).join('');
+    showModal('无法删除', `<div style="display:flex;gap:12px;align-items:flex-start;"><div style="color:var(--md-warning);flex-shrink:0;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:24px;height:24px;"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></div><div><p style="margin-bottom:8px;">该表单正在被流程使用，无法删除</p><ul style="padding-left:20px;color:var(--md-on-surface-variant);">${refList}</ul></div></div>`, [
+      { text: '我知道了', class: 'btn btn-primary', onclick: 'closeModal()' }
+    ]);
+    return;
+  }
+  showModal('确认删除', `<p>确定要删除表单「<strong>${escHtml(f.name)}</strong>」吗？此操作不可撤销。</p>`, [
+    { text: '取消', class: 'btn btn-outlined', onclick: 'closeModal()' },
+    { text: '删除', class: 'btn btn-primary', style: 'background:var(--md-error);', onclick: `confirmDeleteForm(${id})` }
+  ]);
+}
+
+function confirmDeleteForm(id) {
+  forms = forms.filter(f => f.id !== id);
+  closeModal();
+  renderFormList();
+  showToast('success', '删除成功', '表单已删除');
+}
+
+// --- 表单设计器 ---
+function openDesigner(id) {
+  currentForm = forms.find(f => f.id === id);
+  if (!currentForm) return;
+  formSettings.name = currentForm.name;
+  formSettings.desc = currentForm.desc;
+  formSettings.submitBtnText = '提交申请';
+  document.getElementById('fdFormName').value = currentForm.name;
+  selectedFieldIndex = -1;
+  selectedColPos = null;
+
+  // 初始化示例字段
+  designerFields = getSampleFields(currentForm.name);
+
+  renderFieldPanel();
+  renderCanvas();
+  renderProps();
+
+  document.getElementById('designerShell').classList.add('active');
+}
+
+function closeDesigner() {
+  document.getElementById('designerShell').classList.remove('active');
+  renderFormList();
+}
+
+function getSampleFields(formName) {
+  if (formName.includes('出差')) {
+    return [
+      { type: 'readonlyText', name: '填写说明', props: { text: '请如实填写出差信息，提交后将进入审批流程。', style: 'desc' } },
+      { type: 'shortText', name: '出差人姓名', props: { placeholder: '请输入姓名', required: true, maxLength: 20 } },
+      { type: 'dropdown', name: '出差城市', props: { placeholder: '请选择城市', required: true, mode: 'single', source: 'manual', options: ['上海', '北京', '深圳', '广州', '成都'] } },
+      { type: 'dropdown', name: '入住酒店', props: { placeholder: '请选择酒店', required: false, mode: 'single', source: 'api', apiUrl: 'https://api.example.com/hotels', apiMethod: 'GET', displayField: 'name', valueField: 'code', params: [{ name: 'city', valueType: 'ref', value: '出差城市' }] } },
+      { type: 'columns', name: '分栏', props: { colCount: 2, columns_data: [
+        [{ type: 'datetime', name: '出发日期', props: { format: 'date', required: true } }],
+        [{ type: 'datetime', name: '返回日期', props: { format: 'date', required: true } }]
+      ] } },
+      { type: 'radio', name: '出行方式', props: { required: true, layout: 'vertical', options: ['飞机', '高铁', '自驾', '其他'] } },
+      { type: 'person', name: '随行人员', props: { required: false, personMode: 'multi', personScope: 'all' } },
+      { type: 'detail', name: '费用明细', props: { required: true, minRows: 1, maxRows: 10, columns: [
+        { name: '费用类型', type: 'dropdown', required: true, options: ['交通费', '住宿费', '餐饮费', '其他'] },
+        { name: '金额', type: 'number', required: true },
+        { name: '日期', type: 'date', required: false },
+        { name: '备注', type: 'text', required: false }
+      ] } },
+    ];
+  }
+  if (formName.includes('报销')) {
+    return [
+      { type: 'shortText', name: '报销人', props: { required: true, placeholder: '请输入姓名' } },
+      { type: 'radio', name: '报销类型', props: { required: true, layout: 'vertical', options: ['差旅报销', '日常报销', '项目报销'] } },
+      { type: 'detail', name: '费用明细', props: { required: true, minRows: 1, columns: [
+        { name: '费用项目', type: 'text', required: true },
+        { name: '金额', type: 'number', required: true },
+        { name: '日期', type: 'date', required: true }
+      ] } },
+      { type: 'number', name: '报销总金额', props: { required: true, unit: '元', min: 0, max: 100000, decimal: 2 } },
+      { type: 'longText', name: '报销说明', props: { placeholder: '请描述报销事由', required: false, rows: 4 } },
+      { type: 'shortText', name: '银行账号', props: { placeholder: '请输入收款银行账号', required: true } },
+    ];
+  }
+  return [];
+}
+
+// --- 左侧字段面板渲染 ---
+function renderFieldPanel() {
+  const html = FIELD_TYPES.map(ft => `
+    <div class="fd-field-type" draggable="true" ondragstart="onPaletteDragStart(event,'${ft.type}')" ondragend="onDragEnd(event)" onclick="addField('${ft.type}')">
+      <div class="fd-field-type-icon ${ft.colorClass}">${ft.icon}</div>
+      <div class="fd-field-type-info">
+        <div class="fd-field-type-name">${ft.name}</div>
+        <div class="fd-field-type-desc">${ft.desc}</div>
+      </div>
+    </div>
+  `).join('');
+  document.getElementById('fdFieldList').innerHTML = html;
+}
+
+// --- 拖拽状态 ---
+let dragState = null; // { kind:'palette', type } 或 { kind:'sort', index }
+
+function onPaletteDragStart(e, type) {
+  dragState = { kind: 'palette', type };
+  e.dataTransfer.effectAllowed = 'copy';
+  e.dataTransfer.setData('text/plain', type);
+}
+
+function onFieldDragStart(e, index) {
+  dragState = { kind: 'sort', index };
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', String(index));
+  e.target.classList.add('dragging');
+}
+
+function onDragEnd() {
+  dragState = null;
+  clearDropIndicators();
+  document.querySelectorAll('.fd-canvas-field.dragging').forEach(el => el.classList.remove('dragging'));
+}
+
+function clearDropIndicators() {
+  document.querySelectorAll('.drop-before,.drop-after').forEach(el => { el.classList.remove('drop-before'); el.classList.remove('drop-after'); });
+  document.querySelectorAll('.fd-column.drag-over').forEach(el => el.classList.remove('drag-over'));
+}
+
+function onCanvasFieldDragOver(e, index) {
+  if (!dragState) return;
+  e.preventDefault();
+  e.stopPropagation();
+  clearDropIndicators();
+  const el = e.currentTarget;
+  const rect = el.getBoundingClientRect();
+  const before = e.clientY < rect.top + rect.height / 2;
+  el.classList.add(before ? 'drop-before' : 'drop-after');
+}
+
+function onCanvasFieldDrop(e, index) {
+  if (!dragState) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const rect = e.currentTarget.getBoundingClientRect();
+  const before = e.clientY < rect.top + rect.height / 2;
+  let insertAt = before ? index : index + 1;
+  if (dragState.kind === 'palette') {
+    addField(dragState.type, insertAt);
+  } else if (dragState.kind === 'sort') {
+    const from = dragState.index;
+    if (from !== index) {
+      const [moved] = designerFields.splice(from, 1);
+      if (from < insertAt) insertAt--;
+      designerFields.splice(insertAt, 0, moved);
+      selectedFieldIndex = insertAt;
+      selectedColPos = null;
+      renderCanvas();
+      renderProps();
+    }
+  }
+  onDragEnd();
+}
+
+function onCanvasDragOver(e) {
+  if (!dragState) return;
+  e.preventDefault();
+}
+
+function onCanvasDrop(e) {
+  if (!dragState) return;
+  e.preventDefault();
+  if (dragState.kind === 'palette') {
+    addField(dragState.type);
+  } else if (dragState.kind === 'sort') {
+    const from = dragState.index;
+    const [moved] = designerFields.splice(from, 1);
+    designerFields.push(moved);
+    selectedFieldIndex = designerFields.length - 1;
+    selectedColPos = null;
+    renderCanvas();
+    renderProps();
+  }
+  onDragEnd();
+}
+
+// 拖入分栏栏位
+function onColumnDragOver(e) {
+  if (!dragState || dragState.kind !== 'palette') return;
+  if (dragState.type === 'columns' || dragState.type === 'detail') return;
+  e.preventDefault();
+  e.stopPropagation();
+  clearDropIndicators();
+  e.currentTarget.classList.add('drag-over');
+}
+
+function onColumnDrop(e, fieldIndex, colIndex) {
+  if (!dragState || dragState.kind !== 'palette') return;
+  if (dragState.type === 'columns' || dragState.type === 'detail') return;
+  e.preventDefault();
+  e.stopPropagation();
+  addFieldToColumn(fieldIndex, colIndex, dragState.type);
+  onDragEnd();
+}
+
+// --- Delete 键删除选中字段 ---
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'Delete') return;
+  const tag = (document.activeElement && document.activeElement.tagName) || '';
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (document.activeElement && document.activeElement.isContentEditable)) return;
+  if (!document.getElementById('designerShell').classList.contains('active')) return;
+  if (document.getElementById('previewOverlay').classList.contains('active')) return;
+  if (document.getElementById('modalOverlay').classList.contains('active')) return;
+  if (selectedFieldIndex < 0) return;
+  if (selectedColPos) {
+    deleteColumnField(selectedFieldIndex, selectedColPos[0], selectedColPos[1]);
+  } else {
+    deleteField(selectedFieldIndex);
+  }
+});
+
+// --- 画布渲染 ---
+function renderCanvas() {
+  const inner = document.getElementById('fdCanvasInner');
+  if (designerFields.length === 0) {
+    inner.innerHTML = `
+      <div class="fd-canvas-empty">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        <div class="fd-canvas-empty-text">点击或拖拽左侧字段类型添加字段</div>
+        <div class="fd-canvas-empty-hint">支持拖拽排序，选中后按 Delete 键删除</div>
+      </div>`;
+    return;
+  }
+  inner.innerHTML = designerFields.map((f, i) => renderCanvasField(f, i)).join('');
+}
+
+function renderCanvasField(field, index) {
+  const selected = (index === selectedFieldIndex && !selectedColPos) ? 'selected' : '';
+  const reqStar = field.props && field.props.required ? '<span class="required-star">*</span>' : '';
+  let controlHtml = '';
+
+  switch (field.type) {
+    case 'shortText':
+      controlHtml = `<div class="field-control"><input type="text" placeholder="${escHtml(field.props?.placeholder || '')}" readonly /></div>`;
+      break;
+    case 'longText':
+      controlHtml = `<div class="field-control"><textarea placeholder="${escHtml(field.props?.placeholder || '')}" readonly></textarea></div>`;
+      break;
+    case 'number':
+      const unitHtml = field.props?.unit ? `<span style="margin-left:8px;font-size:12px;color:var(--md-on-surface-variant);">${escHtml(field.props.unit)}</span>` : '';
+      controlHtml = `<div class="field-control" style="display:flex;align-items:center;"><input type="text" placeholder="请输入数字" readonly style="flex:1;" />${unitHtml}</div>`;
+      break;
+    case 'radio':
+      const layout = field.props?.layout === 'horizontal' ? 'horizontal' : '';
+      const opts = (field.props?.options || ['选项1', '选项2']).map(o => `<div class="fd-radio-item"><div class="fd-radio-circle"></div>${escHtml(o)}</div>`).join('');
+      controlHtml = `<div class="fd-radio-list ${layout}">${opts}</div>`;
+      break;
+    case 'checkbox':
+      const cLayout = field.props?.layout === 'horizontal' ? 'horizontal' : '';
+      const cOpts = (field.props?.options || ['选项1', '选项2']).map(o => `<div class="fd-checkbox-item"><div class="fd-checkbox-box"></div>${escHtml(o)}</div>`).join('');
+      controlHtml = `<div class="fd-checkbox-list ${cLayout}">${cOpts}</div>`;
+      break;
+    case 'dropdown':
+      controlHtml = `<div class="field-control"><select disabled><option>${escHtml(field.props?.placeholder || '请选择')}</option></select></div>`;
+      break;
+    case 'datetime':
+      controlHtml = `<div class="field-control"><input type="text" placeholder="请选择日期" readonly /></div>`;
+      break;
+    case 'person':
+      controlHtml = `<div class="fd-person-selector"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><span>点击选择人员</span></div>`;
+      break;
+    case 'columns':
+      controlHtml = renderDesignerColumns(field, index);
+      break;
+    case 'detail':
+      const cols2 = field.props?.columns || [];
+      const headerRow = '<tr>' + cols2.map(c => `<th>${escHtml(c.name)}</th>`).join('') + '<th style="width:50px;">操作</th></tr>';
+      const dataRow = '<tr>' + cols2.map(() => '<td>...</td>').join('') + '<td style="text-align:center;color:var(--md-outline);">删除</td></tr>';
+      controlHtml = `<div style="overflow-x:auto;"><table class="fd-detail-table">${headerRow}${dataRow}</table></div>
+        <div style="text-align:center;margin-top:8px;font-size:12px;color:var(--md-primary);cursor:pointer;">+ 添加一行</div>`;
+      break;
+    case 'readonlyText':
+      const styleClass = field.props?.style === 'title' ? 'style-title' : field.props?.style === 'desc' ? 'style-desc' : '';
+      controlHtml = `<div class="fd-readonly-text ${styleClass}">${escHtml(field.props?.text || '只读文本内容')}</div>`;
+      break;
+  }
+
+  return `
+    <div class="fd-canvas-field ${selected}" draggable="true"
+      ondragstart="onFieldDragStart(event, ${index})" ondragend="onDragEnd(event)"
+      ondragover="onCanvasFieldDragOver(event, ${index})" ondragleave="clearDropIndicators()"
+      ondrop="onCanvasFieldDrop(event, ${index})"
+      onclick="selectField(${index}, event)" data-index="${index}">
+      <div class="field-actions">
+        <button onclick="copyField(${index}, event)" title="复制">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        </button>
+        <button class="delete" onclick="deleteField(${index}, event)" title="删除">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+        </button>
+      </div>
+      <div class="field-label">${reqStar}${escHtml(field.name)}</div>
+      ${controlHtml}
+    </div>
+  `;
+}
+
+// --- 设计器画布中的分栏渲染 ---
+function renderDesignerColumns(field, fieldIndex) {
+  const colCount = Number(field.props?.colCount) || 2;
+  const colsData = field.props?.columns_data || [];
+  const cols = Array.from({ length: colCount }, (_, ci) => {
+    const colFields = colsData[ci] || [];
+    const fieldsHtml = colFields.map((cf, fi) => renderDesignerColField(cf, fieldIndex, ci, fi)).join('');
+    return `<div class="fd-column" ondragover="onColumnDragOver(event)" ondragleave="clearDropIndicators()" ondrop="onColumnDrop(event, ${fieldIndex}, ${ci})">
+      ${fieldsHtml}
+      <div class="fd-col-add" onclick="showColumnFieldPicker(${fieldIndex}, ${ci}, event)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+        添加字段
+      </div>
+    </div>`;
+  }).join('');
+  return `<div class="fd-columns">${cols}</div>`;
+}
+
+function renderDesignerColField(cf, fieldIndex, colIndex, fi) {
+  const isSel = selectedFieldIndex === fieldIndex && selectedColPos && selectedColPos[0] === colIndex && selectedColPos[1] === fi;
+  const star = cf.props?.required ? '<span class="required-star">*</span>' : '';
+  const ft = FIELD_TYPES.find(t => t.type === cf.type);
+  return `<div class="fd-col-field ${isSel ? 'selected' : ''}" onclick="selectColumnField(${fieldIndex}, ${colIndex}, ${fi}, event)">
+    <div class="cf-del" onclick="deleteColumnField(${fieldIndex}, ${colIndex}, ${fi}, event)" title="删除">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+    </div>
+    <div class="cf-label">${star}${escHtml(cf.name)}</div>
+    <div class="cf-ctrl">${ft ? ft.name : cf.type}</div>
+  </div>`;
+}
+
+// --- 属性面板渲染 ---
+function renderProps() {
+  const body = document.getElementById('fdPropsBody');
+  const field = getSelectedField();
+  if (!field) {
+    body.innerHTML = `<div class="fd-props-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg><div>点击画布中的字段<br/>配置属性</div></div>`;
+    return;
+  }
+  body.innerHTML = renderPropsForField(field);
+}
+
+// 当前表单内其他字段名（含分栏内，排除自身；供「引用字段」下拉）
+function getOtherFieldNames(exclude) {
+  const names = [];
+  const walk = (f) => {
+    if (f === exclude || f.type === 'readonlyText' || f.type === 'columns') {
+      if (f.type === 'columns') (f.props?.columns_data || []).forEach(col => col.forEach(walk));
+      return;
+    }
+    names.push(f.name);
+  };
+  designerFields.forEach(walk);
+  return names;
+}
+
+function renderPropsForField(field) {
+  let html = '<div class="fd-props-section"><div class="fd-props-section-title">基础属性</div>';
+  // 字段名称
+  if (field.type !== 'columns') {
+    html += `<div class="fd-prop-row"><label class="fd-prop-label">字段名称</label><input class="fd-prop-input" maxlength="30" value="${escHtml(field.name)}" onchange="updateFieldName(this.value)" /></div>`;
+  }
+
+  switch (field.type) {
+    case 'shortText':
+      html += propInput('placeholder', '占位提示', field.props?.placeholder || '');
+      html += propCheck('required', '是否必填', field.props?.required);
+      html += propInput('maxLength', '最大长度', field.props?.maxLength || '', 'number');
+      html += propInput('defaultValue', '默认值', field.props?.defaultValue || '');
+      break;
+    case 'longText':
+      html += propInput('placeholder', '占位提示', field.props?.placeholder || '');
+      html += propCheck('required', '是否必填', field.props?.required);
+      html += propInput('maxLength', '最大长度', field.props?.maxLength || '', 'number');
+      html += propInput('rows', '行数', field.props?.rows || 4, 'number');
+      html += propInput('defaultValue', '默认值', field.props?.defaultValue || '');
+      break;
+    case 'number':
+      html += propCheck('required', '是否必填', field.props?.required);
+      html += propInput('min', '最小值', field.props?.min ?? '', 'number');
+      html += propInput('max', '最大值', field.props?.max ?? '', 'number');
+      html += propInput('decimal', '小数位数', field.props?.decimal || 0, 'number');
+      html += propInput('unit', '单位', field.props?.unit || '');
+      html += propInput('defaultValue', '默认值', field.props?.defaultValue || '', 'number');
+      break;
+    case 'radio':
+      html += '</div><div class="fd-props-section"><div class="fd-props-section-title">选项列表</div>';
+      html += renderOptionList(field.props?.options || [], 'radio');
+      html += propCheck('required', '是否必填', field.props?.required);
+      html += renderDefaultCheckedSelect(field, false);
+      html += propSelect('layout', '排列方式', field.props?.layout || 'vertical', [['vertical', '竖排'], ['horizontal', '横排']]);
+      break;
+    case 'checkbox':
+      html += '</div><div class="fd-props-section"><div class="fd-props-section-title">选项列表</div>';
+      html += renderOptionList(field.props?.options || [], 'checkbox');
+      html += propCheck('required', '是否必填', field.props?.required);
+      html += propInput('minSelect', '最少选几项', field.props?.minSelect || '', 'number');
+      html += propInput('maxSelect', '最多选几项', field.props?.maxSelect || '', 'number');
+      html += renderDefaultCheckedSelect(field, true);
+      html += propSelect('layout', '排列方式', field.props?.layout || 'vertical', [['vertical', '竖排'], ['horizontal', '横排']]);
+      break;
+    case 'dropdown':
+      html += propSelect('mode', '选择模式', field.props?.mode || 'single', [['single', '单选'], ['multi', '多选']]);
+      html += propInput('placeholder', '占位提示', field.props?.placeholder || '请选择');
+      html += propCheck('required', '是否必填', field.props?.required);
+      html += propSelect('source', '数据来源', field.props?.source || 'manual', [['manual', '手动填写'], ['api', '从接口获取']]);
+      if (field.props?.source === 'api') {
+        html += '</div><div class="fd-props-section"><div class="fd-props-section-title">接口配置</div>';
+        html += propInput('apiUrl', '接口地址', field.props?.apiUrl || '', 'url');
+        html += propSelect('apiMethod', '请求方式', field.props?.apiMethod || 'GET', [['GET', 'GET'], ['POST', 'POST']]);
+        html += propInput('displayField', '显示字段', field.props?.displayField || '');
+        html += propInput('valueField', '值字段', field.props?.valueField || '');
+        html += '</div><div class="fd-props-section"><div class="fd-props-section-title">请求参数</div>';
+        html += renderApiParams(field);
+        html += `<div class="fd-prop-row"><button class="btn btn-outlined btn-sm" onclick="testApiConfig()">测试</button></div>`;
+      } else {
+        html += '</div><div class="fd-props-section"><div class="fd-props-section-title">选项列表</div>';
+        html += renderOptionList(field.props?.options || [], 'radio');
+        html += renderDefaultCheckedSelect(field, field.props?.mode === 'multi');
+      }
+      break;
+    case 'datetime':
+      html += propSelect('format', '格式', field.props?.format || 'datetime', [['date', '仅日期'], ['datetime', '日期+时间']]);
+      html += propCheck('required', '是否必填', field.props?.required);
+      html += propInput('minDate', '最早可选日期', field.props?.minDate || '', 'date');
+      html += propInput('maxDate', '最晚可选日期', field.props?.maxDate || '', 'date');
+      html += propInput('defaultValue', '默认值', field.props?.defaultValue || '');
+      html += `<div class="fd-prop-row"><div class="form-hint">默认值可填固定日期，或填「当前时间」表示打开表单时的时间</div></div>`;
+      break;
+    case 'person':
+      html += propCheck('required', '是否必填', field.props?.required);
+      html += propSelect('personMode', '选择模式', field.props?.personMode || 'single', [['single', '单人'], ['multi', '多人']]);
+      html += propSelect('personScope', '选择范围', field.props?.personScope || 'all', [['all', '全部'], ['employee', '仅员工'], ['dept', '仅部门'], ['role', '仅角色']]);
+      html += propInput('defaultValue', '默认值', field.props?.defaultValue || '');
+      break;
+    case 'columns':
+      html += propSelect('colCount', '栏数', field.props?.colCount || 2, [[2, '2 栏'], [3, '3 栏']]);
+      html += `<div class="fd-prop-row"><div class="fd-prop-label" style="font-size:11px;color:var(--md-outline);">各栏宽度自动等分</div></div>`;
+      break;
+    case 'detail':
+      html += propCheck('required', '是否必填', field.props?.required);
+      html += propInput('minRows', '最少行数', field.props?.minRows || 1, 'number');
+      html += propInput('maxRows', '最多行数', field.props?.maxRows || '', 'number');
+      html += '</div><div class="fd-props-section"><div class="fd-props-section-title">列配置</div>';
+      html += renderColumnConfig(field.props?.columns || []);
+      break;
+    case 'readonlyText':
+      html += `<div class="fd-prop-row"><label class="fd-prop-label">文本内容</label><textarea class="fd-prop-input" style="height:80px;padding:8px 12px;resize:vertical;" onchange="updateFieldProp('text',this.value)">${escHtml(field.props?.text || '')}</textarea></div>`;
+      html += propSelect('style', '样式', field.props?.style || 'body', [['title', '标题（大号加粗）'], ['body', '正文（常规）'], ['desc', '说明（小号灰色）']]);
+      break;
+  }
+  html += '</div>';
+  return html;
+}
+
+// 默认选中配置（单选=单选下拉；多选=逗号分隔的多选值，简单用下拉多次选择或输入）
+function renderDefaultCheckedSelect(field, isMulti) {
+  const options = field.props?.options || [];
+  const current = field.props?.defaultChecked;
+  if (isMulti) {
+    const curArr = Array.isArray(current) ? current : (current ? [current] : []);
+    const checks = options.map(o => `<label class="fd-prop-check" style="margin-bottom:4px;"><input type="checkbox" value="${escHtml(o)}" ${curArr.includes(o) ? 'checked' : ''} onchange="updateDefaultCheckedMulti()" />${escHtml(o)}</label>`).join('');
+    return `<div class="fd-prop-row" id="defaultCheckedGroup"><label class="fd-prop-label">默认选中</label>${checks || '<div class="form-hint">请先添加选项</div>'}</div>`;
+  }
+  const opts = ['<option value="">无</option>'].concat(options.map(o => `<option value="${escHtml(o)}" ${current === o ? 'selected' : ''}>${escHtml(o)}</option>`)).join('');
+  return `<div class="fd-prop-row"><label class="fd-prop-label">默认选中</label><select class="fd-prop-select" onchange="updateFieldProp('defaultChecked',this.value)">${opts}</select></div>`;
+}
+
+function updateDefaultCheckedMulti() {
+  const field = getSelectedField();
+  if (!field) return;
+  const group = document.getElementById('defaultCheckedGroup');
+  const vals = Array.from(group.querySelectorAll('input:checked')).map(i => i.value);
+  field.props.defaultChecked = vals;
+  renderCanvas();
+}
+
+// --- 接口请求参数配置 ---
+function renderApiParams(field) {
+  const params = field.props?.params || [];
+  const otherNames = getOtherFieldNames(field);
+  let html = '';
+  params.forEach((p, i) => {
+    let valueCtrl;
+    if (p.valueType === 'ref') {
+      const opts = ['<option value="">请选择字段</option>'].concat(otherNames.map(n => `<option value="${escHtml(n)}" ${p.value === n ? 'selected' : ''}>${escHtml(n)}</option>`)).join('');
+      valueCtrl = `<select onchange="updateApiParam(${i},'value',this.value)">${opts}</select>`;
+    } else {
+      valueCtrl = `<input placeholder="参数值" value="${escHtml(p.value || '')}" onchange="updateApiParam(${i},'value',this.value)" />`;
+    }
+    html += `<div class="fd-param-item">
+      <div class="param-line">
+        <input placeholder="参数名" value="${escHtml(p.name || '')}" onchange="updateApiParam(${i},'name',this.value)" />
+        <select onchange="updateApiParam(${i},'valueType',this.value)">
+          <option value="fixed" ${p.valueType !== 'ref' ? 'selected' : ''}>固定值</option>
+          <option value="ref" ${p.valueType === 'ref' ? 'selected' : ''}>引用字段</option>
+        </select>
+        <div class="col-del" onclick="deleteApiParam(${i})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></div>
+      </div>
+      <div class="param-line">${valueCtrl}</div>
+    </div>`;
+  });
+  html += `<div class="fd-add-option" onclick="addApiParam()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14"/><path d="M5 12h14"/></svg>添加参数</div>`;
+  return `<div class="fd-prop-row">${html}</div>`;
+}
+
+function addApiParam() {
+  const field = getSelectedField();
+  if (!field) return;
+  if (!field.props.params) field.props.params = [];
+  field.props.params.push({ name: '', valueType: 'fixed', value: '' });
+  renderProps();
+}
+
+function updateApiParam(index, key, value) {
+  const field = getSelectedField();
+  if (!field || !field.props.params) return;
+  field.props.params[index][key] = value;
+  if (key === 'valueType') { field.props.params[index].value = ''; renderProps(); }
+}
+
+function deleteApiParam(index) {
+  const field = getSelectedField();
+  if (!field || !field.props.params) return;
+  field.props.params.splice(index, 1);
+  renderProps();
+}
+
+// --- 「测试」按钮：mock 返回选项列表预览 ---
+function testApiConfig() {
+  const field = getSelectedField();
+  if (!field) return;
+  if (!field.props.apiUrl) { showToast('error', '测试失败', '请先填写接口地址'); return; }
+  const mockOptions = ['上海', '北京', '深圳', '广州', '成都'];
+  const list = mockOptions.map(o => `<li style="padding:6px 0;border-bottom:1px solid var(--color-border);">${escHtml(o)}</li>`).join('');
+  showModal('接口测试结果', `
+    <div class="form-hint" style="margin-bottom:12px;">请求 <code>${escHtml(field.props.apiUrl)}</code> 成功，返回 ${mockOptions.length} 条选项（mock 演示数据）：</div>
+    <ul style="list-style:none;">${list}</ul>
+  `, [
+    { text: '关闭', class: 'btn btn-primary', onclick: 'closeModal()' }
+  ]);
+}
+
+function propInput(key, label, value, type = 'text') {
+  return `<div class="fd-prop-row"><label class="fd-prop-label">${label}</label><input class="fd-prop-input" type="${type}" value="${escHtml(value)}" onchange="updateFieldProp('${key}',this.value)" /></div>`;
+}
+function propCheck(key, label, checked) {
+  return `<div class="fd-prop-row"><label class="fd-prop-check"><input type="checkbox" ${checked ? 'checked' : ''} onchange="updateFieldProp('${key}',this.checked)" />${label}</label></div>`;
+}
+function propSelect(key, label, value, options) {
+  const opts = options.map(o => `<option value="${o[0]}" ${String(o[0]) === String(value) ? 'selected' : ''}>${o[1]}</option>`).join('');
+  return `<div class="fd-prop-row"><label class="fd-prop-label">${label}</label><select class="fd-prop-select" onchange="updateFieldProp('${key}',this.value)">${opts}</select></div>`;
+}
+
+function renderOptionList(options, iconType) {
+  const icon = iconType === 'radio' ? '<div class="opt-radio"></div>' : '<div class="opt-check"></div>';
+  let html = '<div class="fd-option-list">';
+  options.forEach((opt, i) => {
+    html += `<div class="fd-option-item">${icon}<input value="${escHtml(opt)}" onchange="updateOption(${i},this.value)" /><div class="opt-del" onclick="deleteOption(${i})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></div></div>`;
+  });
+  html += `<div class="fd-add-option" onclick="addOption()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14"/><path d="M5 12h14"/></svg>添加选项</div>`;
+  html += '</div>';
+  return `<div class="fd-prop-row">${html}</div>`;
+}
+
+// --- 明细列配置（可编辑） ---
+function renderColumnConfig(columns) {
+  let html = '<div class="fd-col-config">';
+  columns.forEach((col, i) => {
+    html += renderColumnConfigItem(col, i);
+  });
+  html += '</div><div class="fd-add-option" onclick="addDetailColumn()" style="margin-top:8px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14"/><path d="M5 12h14"/></svg>添加列</div>';
+  return html;
+}
+
+function renderColumnConfigItem(col, i) {
+  const typeOpts = [['text', '文本'], ['number', '数字'], ['date', '日期'], ['dropdown', '下拉选择']]
+    .map(t => `<option value="${t[0]}" ${col.type === t[0] ? 'selected' : ''}>${t[1]}</option>`).join('');
+  let html = `<div>
+    <div class="fd-col-config-item">
+      <input value="${escHtml(col.name)}" placeholder="列名" maxlength="30" style="max-width:80px;" onchange="updateDetailColumn(${i},'name',this.value)" />
+      <select onchange="updateDetailColumn(${i},'type',this.value)">${typeOpts}</select>
+      <label class="col-req"><input type="checkbox" ${col.required ? 'checked' : ''} onchange="updateDetailColumn(${i},'required',this.checked)" />必填</label>
+      <div class="col-del" onclick="deleteDetailColumn(${i})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></div>
+    </div>`;
+  if (col.type === 'dropdown') {
+    html += `<div style="padding:8px 8px 0 8px;">${renderDetailColOptions(col, i)}</div>`;
+  }
+  html += '</div>';
+  return html;
+}
+
+function renderDetailColOptions(col, colIndex) {
+  const options = col.options || [];
+  let html = '<div class="fd-option-list">';
+  options.forEach((opt, oi) => {
+    html += `<div class="fd-option-item"><div class="opt-radio"></div><input value="${escHtml(opt)}" onchange="updateDetailColOption(${colIndex},${oi},this.value)" /><div class="opt-del" onclick="deleteDetailColOption(${colIndex},${oi})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></div></div>`;
+  });
+  html += `<div class="fd-add-option" onclick="addDetailColOption(${colIndex})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14"/><path d="M5 12h14"/></svg>添加选项</div>`;
+  html += '</div>';
+  return html;
+}
+
+function addDetailColumn() {
+  const field = getSelectedField();
+  if (!field || field.type !== 'detail') return;
+  if (!field.props.columns) field.props.columns = [];
+  field.props.columns.push({ name: '新列' + (field.props.columns.length + 1), type: 'text', required: false });
+  renderCanvas();
+  renderProps();
+}
+
+function updateDetailColumn(index, key, value) {
+  const field = getSelectedField();
+  if (!field || !field.props.columns) return;
+  const col = field.props.columns[index];
+  if (!col) return;
+  if (key === 'name') value = String(value).slice(0, 30);
+  col[key] = value;
+  if (key === 'type' && value === 'dropdown' && !col.options) col.options = ['选项1', '选项2'];
+  renderCanvas();
+  renderProps();
+}
+
+function deleteDetailColumn(index) {
+  const field = getSelectedField();
+  if (!field || !field.props.columns) return;
+  field.props.columns.splice(index, 1);
+  renderCanvas();
+  renderProps();
+}
+
+function addDetailColOption(colIndex) {
+  const field = getSelectedField();
+  if (!field) return;
+  const col = field.props.columns[colIndex];
+  if (!col.options) col.options = [];
+  col.options.push('新选项');
+  renderProps();
+}
+
+function updateDetailColOption(colIndex, optIndex, value) {
+  const field = getSelectedField();
+  if (!field) return;
+  field.props.columns[colIndex].options[optIndex] = value;
+}
+
+function deleteDetailColOption(colIndex, optIndex) {
+  const field = getSelectedField();
+  if (!field) return;
+  field.props.columns[colIndex].options.splice(optIndex, 1);
+  renderProps();
+}
+
+// --- 交互方法 ---
+function selectField(index, event) {
+  if (event) event.stopPropagation();
+  selectedFieldIndex = index;
+  selectedColPos = null;
+  renderCanvas();
+  renderProps();
+}
+
+function selectColumnField(fieldIndex, colIndex, fi, event) {
+  if (event) event.stopPropagation();
+  selectedFieldIndex = fieldIndex;
+  selectedColPos = [colIndex, fi];
+  renderCanvas();
+  renderProps();
+}
+
+function handleCanvasClick(event) {
+  if (event.target.id === 'fdCanvas' || event.target.id === 'fdCanvasInner') {
+    selectedFieldIndex = -1;
+    selectedColPos = null;
+    renderCanvas();
+    renderProps();
+  }
+}
+
+function buildDefaultField(type) {
+  const ft = FIELD_TYPES.find(t => t.type === type);
+  const field = { type, name: ft.name, props: {} };
+  switch (type) {
+    case 'shortText': field.props = { placeholder: '', required: false }; break;
+    case 'longText': field.props = { placeholder: '', required: false, rows: 4 }; break;
+    case 'number': field.props = { required: false, decimal: 0 }; break;
+    case 'radio': field.props = { required: false, layout: 'vertical', options: ['选项1', '选项2'] }; break;
+    case 'checkbox': field.props = { required: false, layout: 'vertical', options: ['选项1', '选项2'] }; break;
+    case 'dropdown': field.props = { required: false, mode: 'single', source: 'manual', placeholder: '请选择', options: ['选项1', '选项2'] }; break;
+    case 'datetime': field.props = { required: false, format: 'datetime' }; break;
+    case 'person': field.props = { required: false, personMode: 'single', personScope: 'all' }; break;
+    case 'columns': field.props = { colCount: 2, columns_data: [[], []] }; break;
+    case 'detail': field.props = { required: true, minRows: 1, columns: [{ name: '列1', type: 'text', required: false }] }; break;
+    case 'readonlyText': field.props = { text: '请输入说明文本', style: 'body' }; break;
+  }
+  return field;
+}
+
+function addField(type, insertAt) {
+  const field = buildDefaultField(type);
+  if (insertAt === undefined || insertAt === null || insertAt > designerFields.length) insertAt = designerFields.length;
+  designerFields.splice(insertAt, 0, field);
+  selectedFieldIndex = insertAt;
+  selectedColPos = null;
+  renderCanvas();
+  renderProps();
+  showToast('success', '添加成功', `已添加「${FIELD_TYPES.find(t => t.type === type).name}」字段`);
+}
+
+// --- 分栏栏位内字段操作 ---
+function addFieldToColumn(fieldIndex, colIndex, type) {
+  const colField = designerFields[fieldIndex];
+  if (!colField || colField.type !== 'columns') return;
+  if (!colField.props.columns_data) colField.props.columns_data = [[], []];
+  while (colField.props.columns_data.length <= colIndex) colField.props.columns_data.push([]);
+  const newField = buildDefaultField(type);
+  colField.props.columns_data[colIndex].push(newField);
+  selectedFieldIndex = fieldIndex;
+  selectedColPos = [colIndex, colField.props.columns_data[colIndex].length - 1];
+  renderCanvas();
+  renderProps();
+  showToast('success', '添加成功', `已添加「${FIELD_TYPES.find(t => t.type === type).name}」字段到栏位 ${colIndex + 1}`);
+}
+
+function deleteColumnField(fieldIndex, colIndex, fi, event) {
+  if (event) { event.stopPropagation(); event.preventDefault(); }
+  const colField = designerFields[fieldIndex];
+  if (!colField || !colField.props.columns_data) return;
+  colField.props.columns_data[colIndex].splice(fi, 1);
+  selectedColPos = null;
+  renderCanvas();
+  renderProps();
+}
+
+// 栏位「+」按钮：弹窗选择字段类型（排除分栏/明细）
+function showColumnFieldPicker(fieldIndex, colIndex, event) {
+  if (event) event.stopPropagation();
+  const items = FIELD_TYPES.filter(t => t.type !== 'columns' && t.type !== 'detail').map(ft => `
+    <div class="fd-field-type" onclick="closeModal();addFieldToColumn(${fieldIndex}, ${colIndex}, '${ft.type}')">
+      <div class="fd-field-type-icon ${ft.colorClass}">${ft.icon}</div>
+      <div class="fd-field-type-info">
+        <div class="fd-field-type-name">${ft.name}</div>
+        <div class="fd-field-type-desc">${ft.desc}</div>
+      </div>
+    </div>
+  `).join('');
+  showModal('选择字段类型', `<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;">${items}</div>`, [
+    { text: '取消', class: 'btn btn-outlined', onclick: 'closeModal()' }
+  ]);
+}
+
+function deleteField(index, event) {
+  if (event) { event.stopPropagation(); event.preventDefault(); }
+  designerFields.splice(index, 1);
+  if (selectedFieldIndex >= designerFields.length) selectedFieldIndex = designerFields.length - 1;
+  selectedColPos = null;
+  renderCanvas();
+  renderProps();
+}
+
+function copyField(index, event) {
+  if (event) { event.stopPropagation(); event.preventDefault(); }
+  const copy = JSON.parse(JSON.stringify(designerFields[index]));
+  copy.name = copy.name + ' (副本)';
+  designerFields.splice(index + 1, 0, copy);
+  selectedFieldIndex = index + 1;
+  selectedColPos = null;
+  renderCanvas();
+  renderProps();
+  showToast('success', '复制成功', '已复制字段');
+}
+
+function updateFieldName(value) {
+  const field = getSelectedField();
+  if (!field) return;
+  field.name = value;
+  renderCanvas();
+}
+
+function updateFieldProp(key, value) {
+  const field = getSelectedField();
+  if (!field) return;
+  // 分栏切换栏数：3→2 时把第 3 栏字段并入第 2 栏
+  if (field.type === 'columns' && key === 'colCount') {
+    const newCount = Number(value);
+    const data = field.props.columns_data || [];
+    while (data.length < newCount) data.push([]);
+    if (newCount < data.length) {
+      const removed = data.splice(newCount);
+      removed.forEach(colArr => { data[newCount - 1] = data[newCount - 1].concat(colArr); });
+    }
+    field.props.colCount = newCount;
+    field.props.columns_data = data;
+    selectedColPos = null;
+    renderCanvas();
+    renderProps();
+    return;
+  }
+  field.props[key] = value;
+  // 数据来源/选择模式切换需要重绘属性面板
+  if (key === 'source' || key === 'mode') renderProps();
+  renderCanvas();
+}
+
+function addOption() {
+  const field = getSelectedField();
+  if (!field) return;
+  if (!field.props.options) field.props.options = [];
+  field.props.options.push('新选项');
+  renderCanvas();
+  renderProps();
+}
+
+function deleteOption(index) {
+  const field = getSelectedField();
+  if (!field || !field.props.options) return;
+  field.props.options.splice(index, 1);
+  renderCanvas();
+  renderProps();
+}
+
+function updateOption(index, value) {
+  const field = getSelectedField();
+  if (!field || !field.props.options) return;
+  field.props.options[index] = value;
+}
+
+// --- 保存校验（PRD 7.1 九条，递归含分栏内字段） ---
+function collectAllFields() {
+  // 返回 [{field, ordinal}]，ordinal 为顶层序号（分栏内字段沿用所在分栏的序号）
+  const result = [];
+  designerFields.forEach((f, i) => {
+    if (f.type === 'columns') {
+      (f.props?.columns_data || []).forEach(col => col.forEach(cf => result.push({ field: cf, ordinal: i + 1 })));
+    } else {
+      result.push({ field: f, ordinal: i + 1 });
+    }
+  });
+  return result;
+}
+
+function validateFormForSave() {
+  const errors = [];
+  const name = document.getElementById('fdFormName').value.trim();
+  if (!name) errors.push('请输入表单名称');
+  const all = collectAllFields();
+  if (designerFields.length === 0) {
+    errors.push('请至少添加一个字段');
+    return errors;
+  }
+  // 字段名称为空 / 超长
+  all.forEach(({ field, ordinal }) => {
+    const fname = (field.name || '').trim();
+    if (field.type === 'readonlyText') return;
+    if (!fname) {
+      errors.push(`第 ${ordinal} 个字段的名称不能为空`);
+    } else if (fname.length > 30) {
+      errors.push(`字段「${fname}」名称不能超过 30 个字符`);
+    }
+  });
+  // 字段名称重复
+  const seen = new Set();
+  const dupReported = new Set();
+  all.forEach(({ field }) => {
+    if (field.type === 'readonlyText') return;
+    const fname = (field.name || '').trim();
+    if (!fname) return;
+    if (seen.has(fname) && !dupReported.has(fname)) {
+      errors.push(`字段名称「${fname}」重复，请修改`);
+      dupReported.add(fname);
+    }
+    seen.add(fname);
+  });
+  // 各类型专项校验
+  all.forEach(({ field }) => {
+    const fname = (field.name || '').trim() || '(未命名)';
+    if (field.type === 'radio' || field.type === 'checkbox') {
+      if (!(field.props?.options || []).length) errors.push(`字段「${fname}」至少需要添加一个选项`);
+    }
+    if (field.type === 'dropdown') {
+      if (field.props?.source === 'api') {
+        if (!(field.props?.apiUrl || '').trim()) errors.push(`字段「${fname}」的数据来源接口地址不能为空`);
+        if (!(field.props?.displayField || '').trim() || !(field.props?.valueField || '').trim()) errors.push(`字段「${fname}」的显示字段和值字段不能为空`);
+      } else {
+        if (!(field.props?.options || []).length) errors.push(`字段「${fname}」至少需要添加一个选项`);
+      }
+    }
+    if (field.type === 'detail') {
+      if (!(field.props?.columns || []).length) errors.push(`字段「${fname}」至少需要添加一个列`);
+    }
+  });
+  return errors;
+}
+
+function saveForm() {
+  const errors = validateFormForSave();
+  if (errors.length > 0) {
+    if (errors.length === 1) {
+      showToast('error', '无法保存', escHtml(errors[0]));
+    } else {
+      const list = errors.map(e => `<li style="margin-bottom:6px;">${escHtml(e)}</li>`).join('');
+      showModal('无法保存', `<ul style="padding-left:20px;color:var(--md-error);">${list}</ul>`, [
+        { text: '我知道了', class: 'btn btn-primary', onclick: 'closeModal()' }
+      ]);
+    }
+    return;
+  }
+  const name = document.getElementById('fdFormName').value.trim();
+  if (currentForm) {
+    currentForm.name = name;
+    currentForm.desc = formSettings.desc;
+    currentForm.fieldCount = collectAllFields().length;
+    currentForm.updatedAt = new Date().toISOString().split('T')[0];
+  }
+  showToast('success', '保存成功', `表单「${escHtml(name)}」已保存`);
+}
+
+function showFormSettings() {
+  showModal('表单设置', `
+    <div class="form-group">
+      <label class="form-label">表单名称 <span class="required">*</span></label>
+      <input class="form-input" id="settingsName" value="${escHtml(formSettings.name || document.getElementById('fdFormName').value)}" maxlength="50" />
+      <div class="form-hint">最长 50 字符</div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">表单描述</label>
+      <textarea class="form-textarea" id="settingsDesc" maxlength="200" rows="3">${escHtml(formSettings.desc || '')}</textarea>
+      <div class="form-hint">最长 200 字符，展示在表单顶部</div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">提交按钮文案</label>
+      <input class="form-input" id="settingsSubmitBtn" value="${escHtml(formSettings.submitBtnText)}" />
+      <div class="form-hint">默认「提交申请」，可自定义</div>
+    </div>
+  `, [
+    { text: '取消', class: 'btn btn-outlined', onclick: 'closeModal()' },
+    { text: '确定', class: 'btn btn-primary', onclick: 'applyFormSettings()' }
+  ]);
+}
+
+function applyFormSettings() {
+  formSettings.name = document.getElementById('settingsName').value;
+  formSettings.desc = document.getElementById('settingsDesc').value;
+  formSettings.submitBtnText = document.getElementById('settingsSubmitBtn').value;
+  document.getElementById('fdFormName').value = formSettings.name;
+  closeModal();
+  showToast('success', '设置已更新', '');
+}
+
+// --- 预览模式 ---
+let pvDD = {};        // 自定义下拉状态 by 预览字段 id
+let pvPersons = {};   // 人员选择结果 by 预览字段 id
+let pvFields = [];    // 预览字段扁平列表 [{field, id}]
+let pvLinkTimers = {};// 联动防抖定时器
+let pvSubmitting = false;
+
+const MOCK_PERSONS = [
+  { name: '张三', dept: '行政部' }, { name: '李四', dept: '财务部' }, { name: '王五', dept: '技术部' },
+  { name: '王经理', dept: '销售部' }, { name: '李总监', dept: '市场部' }, { name: '张副总', dept: '总经办' },
+  { name: '赵工', dept: '技术部' }, { name: '钱主管', dept: '人事部' }
+];
+const MOCK_API_OPTIONS = ['上海', '北京', '深圳', '广州', '成都'];
+function buildLinkedOptions(upValue) {
+  return [`${upValue}国贸大酒店`, `${upValue}中心假日酒店`, `${upValue}滨江万豪酒店`];
+}
+
+function flattenPreviewFields() {
+  const list = [];
+  designerFields.forEach((f, i) => {
+    if (f.type === 'columns') {
+      (f.props?.columns_data || []).forEach((col, ci) => {
+        col.forEach((cf, fi) => list.push({ field: cf, id: `${i}_${ci}_${fi}` }));
+      });
+    } else {
+      list.push({ field: f, id: String(i) });
+    }
+  });
+  return list;
+}
+
+function openPreview() {
+  if (designerFields.length === 0) { showToast('info', '提示', '请先添加字段'); return; }
+  pvDD = {}; pvPersons = {}; pvLinkTimers = {}; pvSubmitting = false;
+  renderPreview();
+  document.getElementById('previewOverlay').classList.add('active');
+}
+
+function closePreview() {
+  document.getElementById('previewOverlay').classList.remove('active');
+}
+
+function previewFormById(id) {
+  const f = forms.find(x => x.id === id);
+  if (!f) return;
+  currentForm = f;
+  designerFields = getSampleFields(f.name);
+  formSettings.name = f.name;
+  formSettings.desc = f.desc;
+  formSettings.submitBtnText = '提交申请';
+  openPreview();
+}
+
+function renderPreview() {
+  pvFields = flattenPreviewFields();
+  const inner = document.getElementById('previewInner');
+  let html = `<div class="fd-preview-title">${escHtml(formSettings.name || document.getElementById('fdFormName').value)}</div>`;
+  if (formSettings.desc) {
+    html += `<div class="fd-preview-desc">${escHtml(formSettings.desc)}</div>`;
+  }
+  designerFields.forEach((field, i) => {
+    if (field.type === 'columns') {
+      html += renderPreviewColumns(field, i);
+    } else {
+      html += renderPreviewField(field, String(i));
+    }
+  });
+  html += `<div class="fd-preview-submit"><button class="btn btn-primary" id="pvSubmitBtn" onclick="handlePreviewSubmit(this)">${escHtml(formSettings.submitBtnText || '提交申请')}</button></div>`;
+  inner.innerHTML = html;
+  // 初始化明细按钮状态与联动禁用状态
+  pvFields.forEach(({ field, id }) => {
+    if (field.type === 'detail') pvUpdateDetailButtons(id);
+    if (field.type === 'dropdown' && pvDD[id] && pvDD[id].refField) pvRefreshLinkState(id, true);
+  });
+}
+
+// 分栏预览：按栏并排渲染真实控件（<768px 时 CSS 堆叠为单列）
+function renderPreviewColumns(field, index) {
+  const colCount = Number(field.props?.colCount) || 2;
+  const colsData = field.props?.columns_data || [];
+  let html = '<div class="fd-preview-columns">';
+  for (let ci = 0; ci < colCount; ci++) {
+    const colFields = colsData[ci] || [];
+    const colHtml = colFields.map((cf, fi) => renderPreviewField(cf, `${index}_${ci}_${fi}`)).join('');
+    html += `<div class="fd-preview-column">${colHtml}</div>`;
+  }
+  html += '</div>';
+  return html;
+}
+
+function renderPreviewField(field, id) {
+  const req = field.props?.required ? '<span class="required-star">*</span>' : '';
+  let html = `<div class="fd-preview-field" id="pvf_${id}">`;
+
+  if (field.type === 'readonlyText') {
+    const cls = field.props?.style === 'title' ? 'style-title' : field.props?.style === 'desc' ? 'style-desc' : '';
+    html += `<div class="fd-readonly-text ${cls}">${escHtml(field.props?.text || '').replace(/\n/g, '<br/>')}</div></div>`;
+    return html;
+  }
+
+  html += `<div class="field-label">${req}${escHtml(field.name)}</div>`;
+
+  switch (field.type) {
+    case 'shortText': {
+      const maxAttr = field.props?.maxLength ? `maxlength="${Number(field.props.maxLength)}"` : '';
+      html += `<input type="text" ${maxAttr} placeholder="${escHtml(field.props?.placeholder || '')}" value="${escHtml(field.props?.defaultValue || '')}" onchange="pvFieldChanged('${id}')" />`;
+      break;
+    }
+    case 'longText': {
+      const maxAttr = field.props?.maxLength ? `maxlength="${Number(field.props.maxLength)}"` : '';
+      html += `<textarea ${maxAttr} placeholder="${escHtml(field.props?.placeholder || '')}" rows="${Number(field.props?.rows) || 4}">${escHtml(field.props?.defaultValue || '')}</textarea>`;
+      break;
+    }
+    case 'number': {
+      const u = field.props?.unit ? `<span style="margin-left:8px;font-size:12px;color:var(--md-on-surface-variant);">${escHtml(field.props.unit)}</span>` : '';
+      html += `<div style="display:flex;align-items:center;"><input type="number" placeholder="请输入数字" style="flex:1;" value="${escHtml(field.props?.defaultValue ?? '')}" onchange="pvFieldChanged('${id}')" />${u}</div>`;
+      break;
+    }
+    case 'radio': {
+      const rLayout = field.props?.layout === 'horizontal' ? 'horizontal' : '';
+      const defChecked = field.props?.defaultChecked;
+      const items = (field.props?.options || []).map(o => {
+        const chk = defChecked === o ? 'checked' : '';
+        return `<label><input type="radio" name="field_${id}" value="${escHtml(o)}" ${chk} onchange="pvFieldChanged('${id}')" />${escHtml(o)}</label>`;
+      }).join('');
+      html += `<div class="fd-preview-radio ${rLayout}">${items}</div>`;
+      break;
+    }
+    case 'checkbox': {
+      const cbLayout = field.props?.layout === 'horizontal' ? 'horizontal' : '';
+      const defArr = Array.isArray(field.props?.defaultChecked) ? field.props.defaultChecked : [];
+      const items = (field.props?.options || []).map(o => {
+        const chk = defArr.includes(o) ? 'checked' : '';
+        return `<label><input type="checkbox" name="field_${id}" value="${escHtml(o)}" ${chk} />${escHtml(o)}</label>`;
+      }).join('');
+      html += `<div class="fd-preview-checkbox ${cbLayout}">${items}</div>`;
+      break;
+    }
+    case 'dropdown':
+      pvInitDropdown(field, id);
+      html += `<div class="pv-dd" id="pvdd_${id}"><div class="pv-dd-trigger" onclick="ddToggle('${id}', event)">${ddTriggerInner(id)}</div></div>`;
+      break;
+    case 'datetime': {
+      const isDate = field.props?.format === 'date';
+      const dtType = isDate ? 'date' : 'datetime-local';
+      let defVal = field.props?.defaultValue || '';
+      if (defVal === '当前时间') {
+        defVal = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, isDate ? 10 : 16);
+      }
+      const minAttr = field.props?.minDate ? `min="${escHtml(field.props.minDate)}${isDate ? '' : 'T00:00'}"` : '';
+      const maxAttr = field.props?.maxDate ? `max="${escHtml(field.props.maxDate)}${isDate ? '' : 'T23:59'}"` : '';
+      html += `<input type="${dtType}" ${minAttr} ${maxAttr} value="${escHtml(defVal)}" onchange="pvFieldChanged('${id}')" />`;
+      break;
+    }
+    case 'person':
+      if (!pvPersons[id]) pvPersons[id] = [];
+      html += `<div id="pvperson_${id}">${renderPersonFieldInner(field, id)}</div>`;
+      break;
+    case 'detail':
+      html += renderPreviewDetail(field, id);
+      break;
+  }
+
+  html += `<div class="field-error" id="pverr_${id}">此项为必填</div></div>`;
+  return html;
+}
+
+// ========== 自定义下拉组件 ==========
+function pvInitDropdown(field, id) {
+  const params = field.props?.params || [];
+  const refParam = params.find(p => p.valueType === 'ref' && p.value);
+  const refField = refParam ? refParam.value : (field.props?.linkField || null);
+  const isMulti = field.props?.mode === 'multi';
+  const isApi = field.props?.source === 'api';
+  let defValue = isMulti ? [] : null;
+  if (!isApi) {
+    const def = field.props?.defaultChecked;
+    if (isMulti && Array.isArray(def)) defValue = def.slice();
+    else if (!isMulti && def) defValue = def;
+  }
+  pvDD[id] = {
+    field, id,
+    multi: isMulti,
+    api: isApi,
+    refField,
+    options: isApi ? null : (field.props?.options || []).slice(),
+    value: defValue,
+    open: false, loading: false, error: false,
+    loaded: !isApi,
+    disabled: false
+  };
+}
+
+function ddTriggerInner(id) {
+  const st = pvDD[id];
+  const caret = '<span class="pv-dd-caret"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></span>';
+  if (st.disabled) {
+    return `<span class="pv-dd-placeholder">请先选择 ${escHtml(st.refField || '')}</span>${caret}`;
+  }
+  if (st.loading && !st.open) {
+    return `<span class="pv-spinner"></span><span class="pv-dd-placeholder">加载中...</span>${caret}`;
+  }
+  if (st.multi) {
+    const vals = st.value || [];
+    if (vals.length === 0) return `<span class="pv-dd-placeholder">${escHtml(st.field.props?.placeholder || '请选择')}</span>${caret}`;
+    const tags = vals.map((v, i) => `<span class="tag">${escHtml(v)}<span class="tag-close" onclick="ddRemoveTag('${id}',${i},event)">×</span></span>`).join('');
+    return `${tags}${caret}`;
+  }
+  if (st.value) return `<span>${escHtml(st.value)}</span>${caret}`;
+  return `<span class="pv-dd-placeholder">${escHtml(st.field.props?.placeholder || '请选择')}</span>${caret}`;
+}
+
+function ddRefreshTrigger(id) {
+  const wrap = document.getElementById('pvdd_' + id);
+  if (!wrap) return;
+  const trigger = wrap.querySelector('.pv-dd-trigger');
+  if (trigger) trigger.innerHTML = ddTriggerInner(id);
+  wrap.classList.toggle('disabled', !!pvDD[id].disabled);
+  wrap.classList.toggle('open', !!pvDD[id].open);
+}
+
+function ddClosePanel(id) {
+  const st = pvDD[id];
+  st.open = false;
+  const wrap = document.getElementById('pvdd_' + id);
+  if (!wrap) return;
+  const panel = wrap.querySelector('.pv-dd-panel');
+  if (panel) panel.remove();
+  wrap.classList.remove('open');
+}
+
+function ddCloseAll(except) {
+  Object.keys(pvDD).forEach(id => { if (id !== except && pvDD[id].open) ddClosePanel(id); });
+}
+
+document.addEventListener('click', function () { ddCloseAll(); });
+
+function ddToggle(id, event) {
+  if (event) event.stopPropagation();
+  const st = pvDD[id];
+  if (st.disabled) return;
+  if (st.open) { ddClosePanel(id); return; }
+  ddCloseAll(id);
+  st.open = true;
+  ddRenderPanel(id);
+  if (st.api && !st.loaded && !st.loading) ddLoad(id);
+}
+
+function ddPanelInner(id) {
+  const st = pvDD[id];
+  if (st.loading) {
+    return `<div class="pv-dd-status"><span class="pv-spinner"></span>加载中...</div>`;
+  }
+  if (st.error) {
+    return `<div class="pv-dd-status"><span class="pv-dd-retry" onclick="ddRetry('${id}',event)">加载失败，点击重试</span></div>`;
+  }
+  const options = st.options || [];
+  if (options.length === 0) {
+    return `<div class="pv-dd-status">暂无选项</div>`;
+  }
+  if (st.multi) {
+    const vals = st.value || [];
+    return options.map((o, i) => {
+      const chk = vals.includes(o) ? 'checked' : '';
+      return `<div class="pv-dd-option" onclick="ddToggleMulti('${id}',${i},event)"><input type="checkbox" ${chk} onclick="event.stopPropagation();ddToggleMulti('${id}',${i},event)" />${escHtml(o)}</div>`;
+    }).join('');
+  }
+  return options.map((o, i) => {
+    const sel = st.value === o ? 'selected' : '';
+    return `<div class="pv-dd-option ${sel}" onclick="ddSelectSingle('${id}',${i},event)">${escHtml(o)}</div>`;
+  }).join('');
+}
+
+function ddRenderPanel(id) {
+  const wrap = document.getElementById('pvdd_' + id);
+  if (!wrap) return;
+  let panel = wrap.querySelector('.pv-dd-panel');
+  if (!panel) {
+    panel = document.createElement('div');
+    panel.className = 'pv-dd-panel';
+    panel.onclick = function (e) { e.stopPropagation(); };
+    wrap.appendChild(panel);
+  }
+  panel.innerHTML = ddPanelInner(id);
+  wrap.classList.add('open');
+}
+
+function ddLoad(id) {
+  const st = pvDD[id];
+  st.loading = true;
+  st.error = false;
+  if (st.open) ddRenderPanel(id);
+  ddRefreshTrigger(id);
+  setTimeout(() => {
+    st.loading = false;
+    const ok = Math.random() < 0.8;
+    if (!ok) {
+      st.error = true;
+      st.loaded = false;
+    } else {
+      st.error = false;
+      st.loaded = true;
+      if (st.refField) {
+        const upVal = pvGetValueByName(st.refField);
+        st.options = upVal ? buildLinkedOptions(upVal) : [];
+      } else {
+        st.options = MOCK_API_OPTIONS.slice();
+      }
+      // 刷新后原选中值不在新列表中则自动清空
+      if (st.multi) {
+        st.value = (st.value || []).filter(v => st.options.includes(v));
+      } else if (st.value && !st.options.includes(st.value)) {
+        st.value = null;
+      }
+    }
+    if (st.open) ddRenderPanel(id);
+    ddRefreshTrigger(id);
+  }, 600);
+}
+
+function ddRetry(id, event) {
+  if (event) event.stopPropagation();
+  ddLoad(id);
+}
+
+function ddSelectSingle(id, optIndex, event) {
+  if (event) event.stopPropagation();
+  const st = pvDD[id];
+  st.value = st.options[optIndex];
+  ddClosePanel(id);
+  ddRefreshTrigger(id);
+  clearFieldError(id);
+  pvNotifyChange(st.field.name);
+}
+
+function ddToggleMulti(id, optIndex, event) {
+  if (event) event.stopPropagation();
+  const st = pvDD[id];
+  const opt = st.options[optIndex];
+  if (!st.value) st.value = [];
+  const idx = st.value.indexOf(opt);
+  if (idx >= 0) st.value.splice(idx, 1); else st.value.push(opt);
+  ddRefreshTrigger(id);
+  if (st.open) ddRenderPanel(id);
+  pvNotifyChange(st.field.name);
+}
+
+function ddRemoveTag(id, valIndex, event) {
+  if (event) event.stopPropagation();
+  const st = pvDD[id];
+  st.value.splice(valIndex, 1);
+  ddRefreshTrigger(id);
+  if (st.open) ddRenderPanel(id);
+  pvNotifyChange(st.field.name);
+}
+
+// ========== 数据联动 ==========
+function pvGetValueByName(name) {
+  for (const { field, id } of pvFields) {
+    if (field.name !== name) continue;
+    if (field.type === 'dropdown') {
+      const st = pvDD[id];
+      if (!st) return '';
+      return st.multi ? ((st.value && st.value[0]) || '') : (st.value || '');
+    }
+    if (field.type === 'radio') {
+      const checked = document.querySelector(`#pvf_${id} input[type=radio]:checked`);
+      return checked ? checked.value : '';
+    }
+    const el = document.querySelector(`#pvf_${id} input, #pvf_${id} textarea`);
+    return el ? el.value : '';
+  }
+  return '';
+}
+
+function pvFieldChanged(id) {
+  const entry = pvFields.find(e => e.id === id);
+  if (entry) pvNotifyChange(entry.field.name);
+}
+
+// 上游字段值变化 → 300ms 防抖后刷新依赖它的下拉
+function pvNotifyChange(name) {
+  Object.keys(pvDD).forEach(id => {
+    const st = pvDD[id];
+    if (st.refField !== name) return;
+    clearTimeout(pvLinkTimers[id]);
+    pvLinkTimers[id] = setTimeout(() => pvRefreshLinkState(id, false), 300);
+  });
+}
+
+function pvRefreshLinkState(id, initial) {
+  const st = pvDD[id];
+  if (!st || !st.refField) return;
+  const upVal = pvGetValueByName(st.refField);
+  if (!upVal) {
+    // 上游无值/清空：本下拉清空并禁用，提示「请先选择 XXX」
+    st.value = st.multi ? [] : null;
+    st.disabled = true;
+    st.loaded = false;
+    st.options = null;
+    ddClosePanel(id);
+    ddRefreshTrigger(id);
+    return;
+  }
+  // 上游有值：解除禁用，清空旧值并重新加载
+  st.disabled = false;
+  if (!initial) { st.value = st.multi ? [] : null; }
+  st.loaded = false;
+  ddRefreshTrigger(id);
+  ddLoad(id);
+}
+
+// ========== 人员选择（模拟 LionKing） ==========
+function renderPersonFieldInner(field, id) {
+  const selected = pvPersons[id] || [];
+  if (selected.length === 0) {
+    return `<div class="fd-person-selector" onclick="openPersonPicker('${id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><span>点击选择人员</span></div>`;
+  }
+  const tags = selected.map((p, i) => `<span class="tag">${escHtml(p)}<span class="tag-close" onclick="removePerson('${id}',${i},event)">×</span></span>`).join('');
+  return `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-height:40px;padding:4px 12px;border:1px solid var(--md-outline-variant);border-radius:var(--radius-sm);cursor:pointer;" onclick="openPersonPicker('${id}')">${tags}</div>`;
+}
+
+function refreshPersonField(id) {
+  const entry = pvFields.find(e => e.id === id);
+  const wrap = document.getElementById('pvperson_' + id);
+  if (entry && wrap) wrap.innerHTML = renderPersonFieldInner(entry.field, id);
+}
+
+function openPersonPicker(id) {
+  const entry = pvFields.find(e => e.id === id);
+  if (!entry) return;
+  const isMulti = entry.field.props?.personMode === 'multi';
+  const buttons = isMulti
+    ? [{ text: '取消', class: 'btn btn-outlined', onclick: 'closeModal()' }, { text: '确定', class: 'btn btn-primary', onclick: `applyPersonPick('${id}')` }]
+    : [{ text: '取消', class: 'btn btn-outlined', onclick: 'closeModal()' }];
+  showModal(`选择人员（${isMulti ? '多人' : '单人'}）`, `
+    <div class="form-search" style="min-width:0;width:100%;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+      <input type="text" id="personSearchInput" placeholder="搜索姓名或部门..." oninput="renderPersonPickerList('${id}', this.value)" />
+    </div>
+    <div class="pv-person-list" id="personPickerList"></div>
+  `, buttons);
+  renderPersonPickerList(id, '');
+}
+
+function renderPersonPickerList(id, keyword) {
+  const entry = pvFields.find(e => e.id === id);
+  const isMulti = entry && entry.field.props?.personMode === 'multi';
+  const selected = pvPersons[id] || [];
+  const kw = (keyword || '').trim().toLowerCase();
+  const list = MOCK_PERSONS.filter(p => !kw || p.name.toLowerCase().includes(kw) || p.dept.toLowerCase().includes(kw));
+  const container = document.getElementById('personPickerList');
+  if (!container) return;
+  if (list.length === 0) {
+    container.innerHTML = '<div style="text-align:center;padding:24px;color:var(--md-outline);font-size:12px;">未找到匹配的人员</div>';
+    return;
+  }
+  container.innerHTML = list.map(p => {
+    const chkHtml = isMulti ? `<input type="checkbox" value="${escHtml(p.name)}" ${selected.includes(p.name) ? 'checked' : ''} onclick="event.stopPropagation()" />` : '';
+    const clickAttr = isMulti ? '' : `onclick="pickSinglePerson('${id}','${escHtml(p.name)}')"`;
+    return `<div class="pv-person-item" ${clickAttr}>${chkHtml}<div class="pv-person-avatar">${escHtml(p.name.charAt(0))}</div><span>${escHtml(p.name)}</span><span class="pv-person-dept">${escHtml(p.dept)}</span></div>`;
+  }).join('');
+}
+
+function pickSinglePerson(id, name) {
+  pvPersons[id] = [name];
+  closeModal();
+  refreshPersonField(id);
+  clearFieldError(id);
+}
+
+function applyPersonPick(id) {
+  const container = document.getElementById('personPickerList');
+  if (!container) return;
+  // 合并当前已选（搜索过滤时未显示的保持选中）与列表勾选
+  const visibleNames = Array.from(container.querySelectorAll('.pv-person-item input')).map(i => i.value);
+  const checkedNames = Array.from(container.querySelectorAll('.pv-person-item input:checked')).map(i => i.value);
+  const kept = (pvPersons[id] || []).filter(n => !visibleNames.includes(n));
+  pvPersons[id] = kept.concat(checkedNames);
+  closeModal();
+  refreshPersonField(id);
+  if (pvPersons[id].length) clearFieldError(id);
+}
+
+function removePerson(id, index, event) {
+  if (event) event.stopPropagation();
+  pvPersons[id].splice(index, 1);
+  refreshPersonField(id);
+}
+
+// ========== 明细（预览可交互） ==========
+function renderPreviewDetail(field, id) {
+  const cols = field.props?.columns || [];
+  const minRows = Math.max(1, Number(field.props?.minRows) || 1);
+  let html = `<div style="overflow-x:auto;"><table class="fd-preview-detail-table"><thead><tr><th style="width:44px;text-align:center;">序号</th>`;
+  cols.forEach(c => { html += `<th>${escHtml(c.name)}${c.required ? ' <span style="color:var(--md-error);">*</span>' : ''}</th>`; });
+  html += `<th style="width:56px;text-align:center;">操作</th></tr></thead><tbody id="pvdt_body_${id}">`;
+  for (let r = 0; r < minRows; r++) html += pvDetailRowHtml(field, id);
+  html += '</tbody></table></div>';
+  html += `<div style="text-align:center;margin-top:8px;">
+    <button class="btn btn-text btn-sm" id="pvdt_add_${id}" onclick="pvAddDetailRow('${id}')">+ 添加一行</button>
+    <div id="pvdt_hint_${id}" class="form-hint" style="display:none;color:var(--md-warning);"></div>
+  </div>`;
+  return html;
+}
+
+function pvDetailCellHtml(c) {
+  let ctrl;
+  if (c.type === 'dropdown') {
+    const opts = (c.options || []).map(o => `<option value="${escHtml(o)}">${escHtml(o)}</option>`).join('');
+    ctrl = `<select style="width:100%;height:32px;font-size:12px;"><option value="">请选择</option>${opts}</select>`;
+  } else if (c.type === 'date') {
+    ctrl = '<input type="date" style="width:100%;height:32px;font-size:12px;" />';
+  } else if (c.type === 'number') {
+    ctrl = '<input type="number" placeholder="0" style="width:100%;height:32px;font-size:12px;" />';
+  } else {
+    ctrl = '<input type="text" placeholder="请输入" style="width:100%;height:32px;font-size:12px;" />';
+  }
+  return `<td><div class="dt-cell">${ctrl}<div class="dt-cell-err">此项为必填</div></div></td>`;
+}
+
+function pvDetailRowHtml(field, id) {
+  const cols = field.props?.columns || [];
+  const cells = cols.map(c => pvDetailCellHtml(c)).join('');
+  return `<tr>
+    <td class="dt-index" style="text-align:center;color:var(--md-on-surface-variant);font-size:12px;"></td>
+    ${cells}
+    <td style="text-align:center;"><button class="btn-icon pvdt-del" onclick="pvRemoveDetailRow(this,'${id}')" title="删除"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button></td>
+  </tr>`;
+}
+
+function pvGetDetailField(id) {
+  const entry = pvFields.find(e => e.id === id);
+  return entry ? entry.field : null;
+}
+
+function pvAddDetailRow(id) {
+  const field = pvGetDetailField(id);
+  const tbody = document.getElementById('pvdt_body_' + id);
+  if (!field || !tbody) return;
+  const maxRows = Number(field.props?.maxRows) || 0;
+  if (maxRows && tbody.rows.length >= maxRows) {
+    showToast('error', '无法添加', `最多只能添加 ${maxRows} 行`);
+    return;
+  }
+  tbody.insertAdjacentHTML('beforeend', pvDetailRowHtml(field, id));
+  pvUpdateDetailButtons(id);
+}
+
+function pvRemoveDetailRow(btn, id) {
+  const field = pvGetDetailField(id);
+  const tbody = document.getElementById('pvdt_body_' + id);
+  if (!field || !tbody) return;
+  const minRows = Math.max(1, Number(field.props?.minRows) || 1);
+  if (tbody.rows.length <= minRows) return;
+  const tr = btn.closest('tr');
+  if (tr) tr.remove();
+  pvUpdateDetailButtons(id);
+}
+
+function pvUpdateDetailButtons(id) {
+  const field = pvGetDetailField(id);
+  const tbody = document.getElementById('pvdt_body_' + id);
+  if (!field || !tbody) return;
+  const rows = tbody.rows.length;
+  const minRows = Math.max(1, Number(field.props?.minRows) || 1);
+  const maxRows = Number(field.props?.maxRows) || 0;
+  // 序号重排
+  Array.from(tbody.rows).forEach((tr, i) => {
+    const idx = tr.querySelector('.dt-index');
+    if (idx) idx.textContent = i + 1;
+  });
+  // 只剩最少行数时删除按钮置灰
+  tbody.querySelectorAll('.pvdt-del').forEach(b => {
+    b.disabled = rows <= minRows;
+    b.style.opacity = rows <= minRows ? '0.38' : '';
+    b.style.pointerEvents = rows <= minRows ? 'none' : '';
+  });
+  // 达最多行数时添加按钮置灰 + 提示
+  const addBtn = document.getElementById('pvdt_add_' + id);
+  const hint = document.getElementById('pvdt_hint_' + id);
+  const atMax = maxRows > 0 && rows >= maxRows;
+  if (addBtn) addBtn.disabled = atMax;
+  if (hint) {
+    hint.style.display = atMax ? 'block' : 'none';
+    hint.textContent = atMax ? `最多添加 ${maxRows} 行` : '';
+  }
+}
+
+// ========== 提交校验 ==========
+function setFieldError(id, msg) {
+  const el = document.getElementById('pvf_' + id);
+  const err = document.getElementById('pverr_' + id);
+  if (!el) return;
+  el.classList.add('has-error');
+  if (err) err.textContent = msg;
+}
+
+function clearFieldError(id) {
+  const el = document.getElementById('pvf_' + id);
+  if (el) el.classList.remove('has-error');
+}
+
+function pvValidateField(field, id) {
+  // 返回错误文案；无错误返回 null
+  const el = document.getElementById('pvf_' + id);
+  if (!el) return null;
+  const p = field.props || {};
+  switch (field.type) {
+    case 'shortText':
+    case 'longText': {
+      const input = el.querySelector('input, textarea');
+      if (p.required && !(input && input.value.trim())) return '此项为必填';
+      return null;
+    }
+    case 'number': {
+      const input = el.querySelector('input[type=number]');
+      const raw = input ? input.value : '';
+      if (p.required && raw === '') return '此项为必填';
+      if (raw !== '') {
+        const num = Number(raw);
+        const hasMin = p.min !== '' && p.min !== undefined && p.min !== null;
+        const hasMax = p.max !== '' && p.max !== undefined && p.max !== null;
+        if (hasMin && hasMax && (num < Number(p.min) || num > Number(p.max))) return `请输入 ${p.min} 到 ${p.max} 之间的数字`;
+        if (hasMin && !hasMax && num < Number(p.min)) return `请输入不小于 ${p.min} 的数字`;
+        if (!hasMin && hasMax && num > Number(p.max)) return `请输入不大于 ${p.max} 的数字`;
+      }
+      return null;
+    }
+    case 'radio': {
+      if (p.required && !el.querySelector('input[type=radio]:checked')) return '此项为必填';
+      return null;
+    }
+    case 'checkbox': {
+      const count = el.querySelectorAll('input[type=checkbox]:checked').length;
+      if (p.required && count === 0) return '此项为必填';
+      if (p.minSelect && count < Number(p.minSelect)) return `请至少选择 ${p.minSelect} 项`;
+      if (p.maxSelect && count > Number(p.maxSelect)) return `最多只能选择 ${p.maxSelect} 项`;
+      return null;
+    }
+    case 'dropdown': {
+      const st = pvDD[id];
+      if (!st) return null;
+      const empty = st.multi ? !(st.value && st.value.length) : !st.value;
+      if (p.required && empty) return '此项为必填';
+      return null;
+    }
+    case 'datetime': {
+      const input = el.querySelector('input');
+      if (p.required && !(input && input.value)) return '此项为必填';
+      return null;
+    }
+    case 'person': {
+      if (p.required && !(pvPersons[id] && pvPersons[id].length)) return '此项为必填';
+      return null;
+    }
+    case 'detail':
+      return pvValidateDetail(field, id);
+  }
+  return null;
+}
+
+function pvValidateDetail(field, id) {
+  const p = field.props || {};
+  const tbody = document.getElementById('pvdt_body_' + id);
+  if (!tbody) return null;
+  const minRows = Math.max(1, Number(p.minRows) || 1);
+  if (p.required && tbody.rows.length < minRows) return `请至少添加 ${minRows} 行数据`;
+  // 必填列逐行逐列校验，对应单元格标红
+  const cols = p.columns || [];
+  let cellError = false;
+  Array.from(tbody.rows).forEach(tr => {
+    cols.forEach((c, cidx) => {
+      const td = tr.cells[cidx + 1]; // 第 0 列是序号
+      if (!td) return;
+      const cellWrap = td.querySelector('.dt-cell');
+      const ctrl = td.querySelector('input, select');
+      if (!cellWrap || !ctrl) return;
+      if (c.required && !ctrl.value) {
+        cellWrap.classList.add('error');
+        cellError = true;
+      } else {
+        cellWrap.classList.remove('error');
+      }
+    });
+  });
+  return cellError ? '' : null; // '' 表示有单元格级错误（字段下方不再重复提示）
+}
+
+function handlePreviewSubmit(btn) {
+  if (pvSubmitting) return;
+  let firstErrorEl = null;
+  let hasError = false;
+  pvFields.forEach(({ field, id }) => {
+    if (field.type === 'readonlyText') return;
+    const msg = pvValidateField(field, id);
+    if (msg === null) {
+      clearFieldError(id);
+    } else {
+      hasError = true;
+      if (msg) setFieldError(id, msg); else clearFieldError(id);
+      if (!firstErrorEl) firstErrorEl = document.getElementById('pvf_' + id);
+    }
+  });
+  if (hasError) {
+    if (firstErrorEl) firstErrorEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
+  // 提交 loading（防重复点击）
+  pvSubmitting = true;
+  const originalHtml = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="pv-spinner"></span>提交中...';
+  setTimeout(() => {
+    btn.disabled = false;
+    btn.innerHTML = originalHtml;
+    pvSubmitting = false;
+    showToast('success', '提交成功', '表单校验通过，已提交（预览模式不会实际提交）');
+  }, 800);
+}
+
+// --- Modal ---
+function showModal(title, bodyHtml, buttons) {
+  document.getElementById('modalTitle').textContent = title;
+  document.getElementById('modalBody').innerHTML = bodyHtml;
+  document.getElementById('modalFooter').innerHTML = buttons.map(b => {
+    const style = b.style ? ` style="${b.style}"` : '';
+    return `<button class="${b.class}"${style} onclick="${b.onclick}">${b.text}</button>`;
+  }).join('');
+  document.getElementById('modalOverlay').classList.add('active');
+  // 打开后自动聚焦首个输入框
+  setTimeout(() => {
+    const first = document.getElementById('modalBody').querySelector('input, textarea, select');
+    if (first) first.focus();
+  }, 50);
+}
+
+function closeModal(event) {
+  if (event && event.target !== event.currentTarget) return;
+  document.getElementById('modalOverlay').classList.remove('active');
+}
+
+// --- ESC 关闭（弹窗优先，其次预览覆盖层） ---
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'Escape') return;
+  if (document.getElementById('modalOverlay').classList.contains('active')) {
+    closeModal();
+    return;
+  }
+  if (document.getElementById('previewOverlay').classList.contains('active')) {
+    closePreview();
+  }
+});
+
+// --- Toast ---
+function showToast(type, title, msg) {
+  const container = document.getElementById('toastContainer');
+  const icons = {
+    success: '<svg viewBox="0 0 24 24" fill="none" stroke="#188038" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
+    error: '<svg viewBox="0 0 24 24" fill="none" stroke="#D93025" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>',
+    info: '<svg viewBox="0 0 24 24" fill="none" stroke="#1A73E8" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>'
+  };
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.innerHTML = `${icons[type] || icons.info}<div><strong>${title}</strong>${msg ? '<div style="color:var(--md-on-surface-variant);margin-top:2px;">' + msg + '</div>' : ''}</div>`;
+  container.appendChild(toast);
+  setTimeout(() => { toast.style.opacity = '0'; toast.style.transform = 'translateX(20px)'; toast.style.transition = '0.3s'; setTimeout(() => toast.remove(), 300); }, 3000);
+}
+
+// --- 初始化 ---
+renderFormList();
+</script>
+</body>
+</html>

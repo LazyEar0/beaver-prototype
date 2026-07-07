@@ -108,8 +108,62 @@ const nodeTypes = [
   { type: 'http', name: 'HTTP 请求', icon: '🌐', color: 'node-color-integration', category: '集成', desc: 'HTTP 请求调用，支持 GET/POST/PUT/DELETE，可配置请求头和请求体', code: 'http' },
   { type: 'mq', name: 'MQ 发送', icon: '📨', color: 'node-color-integration', category: '集成', desc: '向消息队列发送消息，需配置 Topic，支持消息 Key 和属性', code: 'mq' },
   { type: 'workflow', name: '工作流', icon: '🔗', color: 'node-color-flow', category: '扩展能力', desc: '调用被授权且支持引用的工作流，支持输入参数映射', code: 'wf' },
-  { type: 'placeholder', name: '占位节点', icon: '⬜', color: 'node-color-placeholder', category: '其他', desc: '标记待完善的流程分支，可后续转换为具体节点类型', code: 'placeholder' },
+  { type: 'placeholder', name: '占位节点', icon: '\u2B1C', color: 'node-color-placeholder', category: '其他', desc: '标记待完善的流程分支，可后续转换为具体节点类型', code: 'placeholder' },
 ];
+
+// --- AI Guide Data ---
+const AI_GUIDE_MAP = {
+  trigger: { question: '请描述触发方式和输入参数，例如「接收用户消息并传入订单ID」', hint: '描述触发方式和输入参数', examples: ['接收用户消息，传入订单ID和用户ID', '每天早上9点定时执行，传入日期参数'] },
+  end: { question: '请描述需要输出的变量，例如「返回订单状态和物流信息」', hint: '描述输出变量和映射', examples: ['返回订单状态和物流信息', '输出处理结果和错误信息'] },
+  'if': { question: '请描述判断条件，例如「订单金额大于1000走审批」', hint: '描述判断条件和分支', examples: ['订单金额大于1000走审批', '用户VIP等级为金牌或钻石时走优先通道'] },
+  switch: { question: '请描述匹配变量和分支情况，例如「订单状态有4种分别处理」', hint: '描述匹配变量和各分支', examples: ['订单状态有待支付、已支付、已取消、退款中四种', '消息类型分文字、图片、视频分别处理'] },
+  loop: { question: '请描述要循环的数据和逻辑，例如「遍历订单列表逐条校验」', hint: '描述循环数据和逻辑', examples: ['遍历订单列表逐条校验', '轮询等待直到接口返回成功'] },
+  delay: { question: '请描述需要等待的时间，例如「等待5分钟后再继续」', hint: '描述等待时长或目标时间', examples: ['等待5分钟后再继续', '等到每天上午10点执行'] },
+  assign: { question: '请描述要赋值的变量，例如「将接口返回金额映射到订单总价」', hint: '描述变量赋值规则', examples: ['将接口返回金额映射到订单总价', '计算折扣价格 = 原价 * 折扣率'] },
+  output: { question: '请描述要输出的内容，例如「记录订单创建日志」', hint: '描述输出内容和级别', examples: ['记录订单创建日志', '输出错误信息并触发告警'] },
+  code: { question: '请描述要实现的数据处理逻辑，例如「将CSV数据转为JSON」', hint: '描述处理逻辑', examples: ['将CSV数据转为JSON格式', '计算订单总金额并格式化为货币'] },
+  http: { question: '请描述要调用的接口，例如「查询订单状态的GET接口」', hint: '描述API接口和用途', examples: ['查询订单状态的GET接口', '调用微信支付回调接口POST通知'] },
+  mq: { question: '请描述要发送的消息，例如「发布订单创建事件」', hint: '描述消息主题和内容', examples: ['发布订单创建事件', '推送数据变更通知到Topic'] },
+  workflow: { question: '请描述要复用的流程能力，例如「调用通用审批流程」', hint: '描述要调用的流程', examples: ['调用通用审批流程', '复用数据校验流程'] },
+};
+
+// --- AI Guide: Determine if node is configured ---
+function isNodeConfigured(node) {
+  if (!node) return false;
+  const c = node.config || {};
+  switch (node.type) {
+    case 'trigger': return (c.params && c.params.length > 0) || !!c.schedule;
+    case 'end': return c.outputMappings && c.outputMappings.length > 0;
+    case 'if': return c.conditions && c.conditions.length > 0;
+    case 'switch': return c.branches && c.branches.length > 0 && c.matchExpression;
+    case 'loop': return c.loopType === 'foreach' ? !!c.collectionVar : !!c.loopCondition;
+    case 'delay': return !!c.duration || !!c.delayUntil;
+    case 'assign': return c.rules && c.rules.length > 0;
+    case 'output': return !!c.content;
+    case 'code': return !!c.code && c.code.trim().length > 10;
+    case 'http': return !!c.url;
+    case 'mq': return !!c.topic && !!c.message;
+    case 'workflow': return !!c.targetWfId;
+    default: return false;
+  }
+}
+
+// --- AI Guide: Get summary text for collapsed state ---
+function getAIGuideSummary(node) {
+  if (!node) return '';
+  const nt = nodeTypes.find(t => t.type === node.type);
+  const c = node.config || {};
+  switch (node.type) {
+    case 'switch': return `${(c.branches||[]).length} 个分支 · ${c.matchMode === 'all' ? '所有匹配' : '首次匹配'}`;
+    case 'if': return c.conditions && c.conditions.length > 0 ? `判断 ${c.conditions.length} 个条件` : '条件判断';
+    case 'http': return c.method ? `${c.method.toUpperCase()} ${c.url || '(未配置)'}`.substring(0, 30) : 'HTTP 请求';
+    case 'loop': return c.loopType === 'foreach' ? `遍历 ${c.collectionVar || '...'}` : c.loopCondition ? `While ${c.loopCondition.substring(0, 20)}` : '循环';
+    case 'delay': return c.duration ? `等待 ${c.duration}` : '延迟';
+    case 'trigger': return c.schedule ? '定时触发' : '手动触发';
+    case 'end': return c.outputMappings && c.outputMappings.length > 0 ? `返回 ${c.outputMappings.length} 个变量` : '结束';
+    default: return nt ? nt.name : '已配置';
+  }
+}
 
 // --- Open / Close Designer ---
 function openDesigner(wsId, wfId) {
@@ -1353,11 +1407,15 @@ function renderNodeConfigPanel() {
   const hasAdvancedValues = checkHasAdvancedValues(node);
   const isAdvanced = designerActiveConfigTab === 'advanced';
   const canConvert = node.type !== 'trigger' && node.type !== 'end';
+  const configured = isNodeConfigured(node);
+  const skipped = designerAIGuideSkipped[node.id];
+  const showAIIcon = skipped || configured;
 
   return `
     <div class="right-panel-header">
       <span class="right-panel-title"><span class="canvas-node-icon ${nt.color || ''}" style="width:22px;height:22px;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;font-size:11px">${nt.icon || ''}</span> ${node.name}</span>
       ${canConvert && !designerReadonly ? `<button class="node-type-convert-btn" onclick="showConvertNodeMenu(${node.id})" title="切换节点类型">🔄</button>` : ''}
+      ${showAIIcon && !designerReadonly ? `<button class="ai-guide-header-btn" onclick="showAIGuideFromHeader(${node.id})" title="AI 引导">${icons.sparkle}</button>` : ''}
       <button class="right-panel-close" onclick="deselectNode()">${icons.close}</button>
     </div>
     <div class="right-panel-tabs">
@@ -1374,7 +1432,45 @@ function renderNodeConfigPanel() {
 }
 
 function renderNodeConfigFields(node, nt) {
-  let html = `
+  const configured = isNodeConfigured(node);
+  const skipped = designerAIGuideSkipped[node.id];
+  const forceExpand = designerAIGuideExpanded[node.id];
+  const guideData = AI_GUIDE_MAP[node.type];
+  const showGuide = guideData && !skipped && (!configured || forceExpand);
+  const showSummary = guideData && configured && !forceExpand && !skipped;
+
+  let html = '';
+
+  // AI Guide Bar
+  if (guideData && !designerReadonly) {
+    if (showGuide) {
+      html += `<div class="ai-guide-bar" id="aiGuideBar_${node.id}">
+        <div class="ai-guide-prompt">
+          <span class="ai-guide-icon">${icons.sparkle}</span>
+          <span class="ai-guide-question">${guideData.question}</span>
+        </div>
+        <div class="ai-guide-input-row">
+          <input class="ai-guide-input" id="aiGuideInput_${node.id}" placeholder="${guideData.hint}" onkeydown="if(event.key==='Enter')generateAIConfig(${node.id})" />
+          <button class="ai-guide-gen-btn" onclick="generateAIConfig(${node.id})">生成配置</button>
+        </div>
+        <div class="ai-guide-examples">
+          ${guideData.examples.map(ex => `<span class="ai-guide-example-chip" onclick="document.getElementById('aiGuideInput_${node.id}').value='${ex}';generateAIConfig(${node.id})">${ex}</span>`).join('')}
+        </div>
+        <div class="ai-guide-actions">
+          <button class="ai-guide-skip-btn" onclick="skipAIGuide(${node.id})">跳过</button>
+          ${configured ? `<button class="ai-guide-collapse-btn" onclick="collapseAIGuide(${node.id})">收起</button>` : ''}
+        </div>
+      </div>`;
+    } else if (showSummary) {
+      html += `<div class="ai-guide-summary" id="aiGuideSummary_${node.id}" onclick="expandAIGuide(${node.id})" title="点击展开 AI 引导">
+        <span class="ai-guide-summary-icon">${icons.sparkle}</span>
+        <span class="ai-guide-summary-text">${getAIGuideSummary(node)}</span>
+        <span class="ai-guide-summary-expand">${icons.chevronDown}</span>
+      </div>`;
+    }
+  }
+
+  html += `
     <div class="config-section">
       <div class="config-section-title">节点信息</div>
       <div class="config-field">
@@ -1462,6 +1558,131 @@ function renderNodeConfigFields(node, nt) {
   </div>`;
 
   return html;
+}
+
+// --- AI Guide Interaction Functions ---
+function skipAIGuide(nodeId) {
+  designerAIGuideSkipped[nodeId] = true;
+  delete designerAIGuideExpanded[nodeId];
+  refreshNodeConfigPanel();
+}
+
+function expandAIGuide(nodeId) {
+  designerAIGuideExpanded[nodeId] = true;
+  delete designerAIGuideSkipped[nodeId];
+  refreshNodeConfigPanel();
+}
+
+function collapseAIGuide(nodeId) {
+  delete designerAIGuideExpanded[nodeId];
+  refreshNodeConfigPanel();
+}
+
+function showAIGuideFromHeader(nodeId) {
+  delete designerAIGuideSkipped[nodeId];
+  designerAIGuideExpanded[nodeId] = true;
+  refreshNodeConfigPanel();
+}
+
+function generateAIConfig(nodeId) {
+  const node = designerNodes.find(n => n.id === nodeId);
+  if (!node) return;
+  const input = document.getElementById(`aiGuideInput_${nodeId}`);
+  const userInput = input ? input.value.trim() : '';
+  if (!userInput) {
+    if (input) { input.style.borderColor = 'var(--md-error)'; setTimeout(() => { if (input) input.style.borderColor = ''; }, 1500); }
+    return;
+  }
+
+  // Simulate AI generation with loading state
+  const bar = document.getElementById(`aiGuideBar_${nodeId}`);
+  if (bar) {
+    const inputRow = bar.querySelector('.ai-guide-input-row');
+    if (inputRow) {
+      inputRow.innerHTML = `<div class="ai-guide-loading"><span class="ai-guide-loading-dot"></span><span class="ai-guide-loading-dot"></span><span class="ai-guide-loading-dot"></span> AI 正在生成配置…</div>`;
+    }
+    const examples = bar.querySelector('.ai-guide-examples');
+    if (examples) examples.style.display = 'none';
+  }
+
+  setTimeout(() => {
+    // Mock AI filling — apply some default config based on node type
+    if (!node.config) node.config = {};
+    switch (node.type) {
+      case 'switch':
+        if (!node.config.matchExpression) node.config.matchExpression = '${order.status}';
+        if (!node.config.branches || node.config.branches.length === 0) {
+          node.config.branches = [
+            { name: '待支付', condMode: 'visual', conditions: [{ field: 'order.status', op: 'eq', value: 'pending' }] },
+            { name: '已支付', condMode: 'visual', conditions: [{ field: 'order.status', op: 'eq', value: 'paid' }] },
+            { name: '已取消', condMode: 'visual', conditions: [{ field: 'order.status', op: 'eq', value: 'cancelled' }] },
+          ];
+        }
+        break;
+      case 'if':
+        if (!node.config.conditions || node.config.conditions.length === 0) {
+          node.config.conditions = [{ field: 'amount', op: 'gt', value: '1000', logic: 'and' }];
+          node.config.conditionMode = 'visual';
+        }
+        break;
+      case 'http':
+        if (!node.config.url) { node.config.url = 'https://api.example.com/orders'; node.config.method = 'get'; }
+        break;
+      case 'loop':
+        if (!node.config.loopType) { node.config.loopType = 'foreach'; node.config.collectionVar = '${orderList}'; node.config.itemVar = 'item'; }
+        break;
+      case 'delay':
+        if (!node.config.duration) { node.config.duration = '5分钟'; node.config.delayType = 'fixed'; }
+        break;
+      case 'trigger':
+        if (!node.config.params || node.config.params.length === 0) {
+          node.config.params = [{ name: 'orderId', type: 'String', required: true, desc: '订单ID' }];
+        }
+        break;
+      case 'end':
+        if (!node.config.outputMappings || node.config.outputMappings.length === 0) {
+          node.config.outputMappings = [{ target: 'result', source: '${http_1.response}' }];
+        }
+        break;
+      case 'assign':
+        if (!node.config.rules || node.config.rules.length === 0) {
+          node.config.rules = [{ target: 'totalPrice', expr: '${http_1.response.price}' }];
+        }
+        break;
+      case 'output':
+        if (!node.config.content) { node.config.content = '订单处理完成'; node.config.level = 'INFO'; }
+        break;
+      case 'code':
+        if (!node.config.code) { node.config.code = '// AI 生成\nreturn input;'; node.config.language = 'javascript'; }
+        break;
+      case 'mq':
+        if (!node.config.topic) { node.config.topic = 'order-events'; node.config.message = '${orderData}'; }
+        break;
+      case 'workflow':
+        if (!node.config.targetWfId) { node.config.targetWfId = 'wf_mock_1'; }
+        break;
+    }
+    delete designerAIGuideExpanded[nodeId];
+    designerDirty = true;
+    refreshNodeConfigPanel();
+  }, 1200);
+}
+
+function refreshNodeConfigPanel() {
+  const node = designerNodes.find(n => n.id === designerSelectedNodeId);
+  if (!node) return;
+  const nt = nodeTypes.find(t => t.type === node.type) || {};
+  const body = document.getElementById('nodeConfigBody');
+  if (body) {
+    const isAdvanced = designerActiveConfigTab === 'advanced';
+    body.innerHTML = isAdvanced ? renderAdvancedConfig(node) : renderNodeConfigFields(node, nt);
+  }
+  // Also refresh the header to update ✦ icon visibility
+  const panel = document.getElementById('rightPanel');
+  if (panel) {
+    const headerHtml = renderNodeConfigPanel();
+    panel.innerHTML = headerHtml;
+  }
 }
 
 function parseCronToText(expr) {
@@ -3551,7 +3772,7 @@ function renderDesignerSettingsPanel() {
         <div class="settings-section-title">${icons.info} 基本信息</div>
         <div class="settings-hint">带 <span class="required">*</span> 标记的为必填项</div>
         <div class="config-field"><div class="config-field-label">名称 <span class="required">*</span></div><input class="config-input" value="${wf.name}" placeholder="输入工作流名称" /></div>
-        <div class="config-field"><div class="config-field-label">编号</div><input class="config-input" value="${wf.code}" style="font-family:var(--font-family-mono);color:var(--md-outline)" readonly /><div class="config-field-help">系统自动生成，不可修改</div></div>
+        <div class="config-field"><div class="config-field-label">编号</div><input class="config-input" value="${wf.code}" style="font-family:var(--font-family-mono);color:var(--md-outline)" readonly /><div class="config-field-help">创建时根据名称自动生成，创建后可编辑</div></div>
         <div class="config-field"><div class="config-field-label">描述</div><textarea class="config-textarea" style="min-height:50px" placeholder="描述工作流的用途和业务场景">${wf.desc || ''}</textarea></div>
         <div class="config-field"><div class="config-field-label">流程负责人 <span class="required">*</span></div>${buildPersonPickerHtml('designerOwner', wf.owners || [], true)}<div class="config-field-help">负责流程的维护和问题处理</div></div>
         <div class="config-field"><div class="config-field-label">类型</div><div class="config-readonly-value">${wf.type === 'app' ? '应用流' : '对话流'}</div><div class="config-field-help">创建后不可修改</div></div>
