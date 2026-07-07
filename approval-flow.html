@@ -366,10 +366,10 @@ input,select,textarea{font-family:inherit;font-size:inherit;}
 .designer-toolbar{display:flex;align-items:center;justify-content:space-between;padding:var(--space-3) var(--space-6);background:#fff;border-bottom:1px solid var(--color-border);flex-shrink:0;}
 .designer-toolbar-left{display:flex;align-items:center;gap:var(--space-3);}
 .designer-toolbar-right{display:flex;align-items:center;gap:var(--space-2);}
-.designer-canvas{flex:1;overflow:auto;background:var(--md-surface-container-low);padding:var(--space-10) var(--space-8);position:relative;background-image:radial-gradient(circle, var(--md-outline-variant) 1px, transparent 1px);background-size:20px 20px;}
+.designer-canvas{flex:1;overflow-y:auto;background:var(--md-surface-container-low);padding:var(--space-10) var(--space-8);position:relative;background-image:radial-gradient(circle, var(--md-outline-variant) 1px, transparent 1px);background-size:20px 20px;}
 
-/* 节点卡片 */
-.node-card{position:absolute;background:#fff;border:2px solid var(--color-border);border-radius:var(--radius-lg);box-shadow:var(--shadow-md);min-width:200px;cursor:pointer;transition:var(--transition-base);user-select:none;}
+/* 节点卡片（垂直流程图） */
+.node-card{position:relative;background:#fff;border:2px solid var(--color-border);border-radius:var(--radius-lg);box-shadow:var(--shadow-md);width:320px;cursor:pointer;transition:var(--transition-base);user-select:none;}
 .node-card:hover{border-color:var(--md-primary);box-shadow:var(--shadow-lg);transform:translateY(-1px);}
 .node-card.selected{border-color:var(--md-primary);box-shadow:0 0 0 3px rgba(103,80,164,0.15);}
 .node-card-header{display:flex;align-items:center;gap:var(--space-2);padding:var(--space-3) var(--space-4);border-bottom:1px solid var(--md-outline-variant);}
@@ -385,23 +385,37 @@ input,select,textarea{font-family:inherit;font-size:inherit;}
 .node-card-summary.warning{color:var(--color-warning);}
 .node-card-code{font-size:10px;color:var(--md-outline);font-family:var(--font-family-mono);padding:0 var(--space-4) var(--space-2);}
 
-/* 连线 */
-.node-arrow{position:absolute;height:2px;background:var(--md-outline-variant);}
-.node-arrow::after{content:'';position:absolute;right:0;top:-4px;border:5px solid transparent;border-left-color:var(--md-outline-variant);}
+/* 节点删除按钮 */
+.node-card-del{position:absolute;top:-9px;right:-9px;width:22px;height:22px;border-radius:50%;background:#fff;border:1px solid var(--md-outline-variant);color:var(--md-on-surface-variant);display:none;align-items:center;justify-content:center;cursor:pointer;box-shadow:var(--shadow-sm);z-index:2;font-size:0;}
+.node-card-del svg{width:12px;height:12px;}
+.node-card-del:hover{background:var(--color-error-bg);border-color:var(--md-error);color:var(--md-error);}
+.node-card:hover .node-card-del{display:flex;}
 
-/* 节点面板 */
-.node-palette{position:absolute;left:var(--space-4);top:var(--space-4);background:#fff;border:1px solid var(--color-border);border-radius:var(--radius-lg);box-shadow:var(--shadow-md);padding:var(--space-3);width:180px;z-index:10;}
-.node-palette-title{font-size:var(--font-size-xs);font-weight:600;color:var(--md-on-surface-variant);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:var(--space-2);padding:0 var(--space-2);}
-.node-palette-item{display:flex;align-items:center;gap:var(--space-2);padding:var(--space-2) var(--space-3);border-radius:var(--radius-sm);cursor:grab;transition:var(--transition-fast);}
-.node-palette-item:hover{background:var(--md-surface-container-low);}
-.node-palette-item .node-card-icon{width:24px;height:24px;}
-.node-palette-item .node-card-icon svg{width:14px;height:14px;}
-.node-palette-item-label{font-size:var(--font-size-sm);color:var(--md-on-surface);}
+/* 垂直连线 + 插入节点按钮 */
+.flow-column{display:flex;flex-direction:column;align-items:center;padding-bottom:var(--space-10);}
+.flow-connector{display:flex;flex-direction:column;align-items:center;position:relative;}
+.flow-connector-line{width:2px;height:22px;background:var(--md-outline-variant);}
+.flow-connector-line.arrow{position:relative;}
+.flow-connector-line.arrow::after{content:'';position:absolute;left:-4px;bottom:0;border:5px solid transparent;border-top-color:var(--md-outline-variant);}
+.flow-add-btn{width:26px;height:26px;border-radius:50%;background:#fff;border:1px solid var(--md-outline-variant);color:var(--md-primary);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:var(--transition-fast);box-shadow:var(--shadow-sm);position:relative;z-index:2;}
+.flow-add-btn svg{width:14px;height:14px;}
+.flow-add-btn:hover{transform:scale(1.25);background:var(--md-primary);border-color:var(--md-primary);color:var(--md-on-primary);box-shadow:var(--shadow-md);}
+
+/* 插入节点浮层菜单 */
+.add-node-menu{position:fixed;background:#fff;border:1px solid var(--color-border);border-radius:var(--radius-lg);box-shadow:var(--shadow-modal);padding:var(--space-2);width:220px;z-index:950;}
+.add-node-menu-item{display:flex;align-items:center;gap:var(--space-3);padding:var(--space-2) var(--space-3);border-radius:var(--radius-sm);cursor:pointer;transition:var(--transition-fast);}
+.add-node-menu-item:hover{background:var(--color-primary-subtle);}
+.add-node-menu-item.disabled{opacity:0.5;cursor:not-allowed;}
+.add-node-menu-item.disabled:hover{background:none;}
+.add-node-menu-item .node-card-icon{width:26px;height:26px;}
+.add-node-menu-item .node-card-icon svg{width:14px;height:14px;}
+.add-node-menu-label{font-size:var(--font-size-sm);color:var(--md-on-surface);}
+.add-node-menu-note{font-size:10px;color:var(--md-outline);margin-top:1px;}
 
 /* ============================================
    配置面板 (右侧抽屉)
    ============================================ */
-.config-drawer{position:fixed;top:0;right:0;width:440px;height:100vh;background:#fff;box-shadow:var(--shadow-modal);z-index:900;display:flex;flex-direction:column;transform:translateX(100%);transition:transform 0.3s cubic-bezier(0.2,0,0,1);}
+.config-drawer{position:fixed;top:0;right:0;width:420px;height:100vh;background:#fff;box-shadow:var(--shadow-modal);z-index:900;display:flex;flex-direction:column;transform:translateX(100%);transition:transform 0.3s cubic-bezier(0.2,0,0,1);}
 .config-drawer.open{transform:translateX(0);}
 .config-drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.15);z-index:899;opacity:0;visibility:hidden;transition:opacity 0.3s,visibility 0.3s;}
 .config-drawer-overlay.active{opacity:1;visibility:visible;}
@@ -536,6 +550,36 @@ input,select,textarea{font-family:inherit;font-size:inherit;}
 .config-help-btn:hover{background:rgba(0,0,0,0.06);color:var(--md-on-surface);}
 .config-help-btn.active{background:var(--md-info-container);color:var(--color-info);}
 .config-help-btn svg{width:16px;height:16px;}
+
+/* ============================================
+   流程编排列表页 + 垂直设计器补充
+   ============================================ */
+/* 表单绑定条（一行高） */
+.form-bind-bar{display:flex;align-items:center;gap:var(--space-3);padding:var(--space-2) var(--space-6);background:#fff;border-bottom:1px solid var(--color-border);flex-shrink:0;min-height:44px;}
+.form-bind-bar-label{font-size:var(--font-size-sm);color:var(--md-on-surface-variant);flex-shrink:0;}
+.form-bind-bar-name{font-size:var(--font-size-sm);font-weight:500;color:var(--md-on-surface);display:inline-flex;align-items:center;gap:var(--space-1);}
+.form-bind-bar-name svg{width:14px;height:14px;color:var(--color-success);}
+.form-bind-bar-actions{display:flex;align-items:center;gap:var(--space-1);margin-left:auto;}
+.form-bind-warn{display:inline-flex;align-items:center;gap:var(--space-2);padding:4px 12px;background:var(--md-warning-container);color:var(--color-warning);border-radius:var(--radius-full);font-size:var(--font-size-sm);font-weight:500;cursor:pointer;transition:var(--transition-fast);}
+.form-bind-warn:hover{filter:brightness(0.97);}
+.form-bind-warn svg{width:15px;height:15px;}
+/* 流程名（可点击改名） */
+.flow-name-edit{display:inline-flex;align-items:center;gap:var(--space-1);font-size:var(--font-size-lg);font-weight:500;color:var(--md-on-surface);cursor:pointer;padding:2px 8px;border-radius:var(--radius-sm);transition:var(--transition-fast);}
+.flow-name-edit:hover{background:var(--md-surface-container);}
+.flow-name-edit svg{width:13px;height:13px;color:var(--md-outline);}
+/* 提交成功引导横幅 */
+.success-banner{display:flex;align-items:center;gap:var(--space-3);padding:var(--space-3) var(--space-4);background:var(--color-success-bg);border:1px solid rgba(24,128,56,0.25);border-radius:var(--radius-md);margin-bottom:var(--space-4);font-size:var(--font-size-sm);color:var(--color-success);}
+.success-banner svg{width:18px;height:18px;flex-shrink:0;}
+.success-banner-close{margin-left:auto;background:none;border:none;cursor:pointer;color:var(--color-success);opacity:0.6;font-size:16px;line-height:1;padding:2px 6px;border-radius:var(--radius-sm);}
+.success-banner-close:hover{opacity:1;background:rgba(24,128,56,0.08);}
+/* 新建审批流类型卡片 */
+.flow-type-cards{display:flex;gap:var(--space-2);margin-top:var(--space-2);}
+.flow-type-card{flex:1;border:1px solid var(--md-outline-variant);border-radius:var(--radius-md);padding:var(--space-3);text-align:center;cursor:pointer;transition:var(--transition-base);}
+.flow-type-card.selected{border-color:var(--md-primary);background:var(--color-primary-muted);}
+.flow-type-card.disabled{opacity:0.5;cursor:not-allowed;background:var(--md-surface-container-low);}
+.flow-type-card .node-card-icon{margin:0 auto var(--space-2);}
+.flow-type-card-title{font-size:var(--font-size-sm);font-weight:500;color:var(--md-on-surface);}
+.flow-type-card-note{font-size:10px;color:var(--md-outline);margin-top:2px;}
   </style>
 </head>
 <body>
@@ -563,7 +607,7 @@ input,select,textarea{font-family:inherit;font-size:inherit;}
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
             <span>表单管理</span>
           </div>
-          <div class="nav-item active" id="navApproval">
+          <div class="nav-item active" id="navApproval" onclick="switchToApproval()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
             <span>我的审批</span>
             <span class="nav-badge">4</span>
@@ -634,7 +678,7 @@ input,select,textarea{font-family:inherit;font-size:inherit;}
 // ============================================
 
 // --- 当前视图状态 ---
-let currentView = 'list'; // list | approver-detail | initiator-detail | processed-detail | initiate-form | designer
+let currentView = 'list'; // list | approver-detail | initiator-detail | processed-detail | initiate-form | flow-list | designer
 let activeTab = 'pending'; // pending | processed | initiated
 let currentDetailData = null;
 
@@ -648,6 +692,7 @@ let searchTimer = null, isComposing = false, searchFocused = false;
 // --- 发起表单状态 ---
 let initiateFormValues = {};
 let nextInstanceId = 100;
+let submitBannerVisible = false; // 提交成功后在发起人详情页顶部显示引导横幅
 
 // --- 时间工具 ---
 function pad2(n) { return String(n).padStart(2, '0'); }
@@ -715,51 +760,88 @@ const formList = [
 ];
 let selectedFormId = 1; // 当前选择的申请表单
 
-// --- 流程节点 (设计器画布) ---
-const workflowNodes = [
-  { id: 'start', type: 'start', name: '开始', x: 60, y: 280,
-    summary: '发起人提交申请' },
-  { id: 'approval_1', type: 'approval', name: '部门经理审批', x: 340, y: 280, code: 'approval_1',
-    config: {
-      mode: 'countersign', // single | countersign | or-sign
-      approverType: 'fixed', // fixed | param | org
-      approvers: ['王经理', '李总监', '张副总'],
-      paramRef: '',
-      orgType: 'direct-supervisor',
-      orgDept: '',
-      emptyHandler: 'transfer-to-owner',
-      emptyHandlerPerson: '',
-      rejectBehavior: 'rollback',
-      rollbackTarget: 'start',
-      commentRequired: false
-    }
+// --- 流程编排：审批流列表 mock ---
+const flowStore = [
+  { id: 1, name: '出差审批流', status: 'published', formId: 1, updatedAt: '2026-07-01 10:00',
+    nodes: [
+      { id: 'start', type: 'start', name: '开始', summary: '发起人提交申请' },
+      { id: 'approval_1', type: 'approval', name: '部门经理审批', code: 'approval_1',
+        config: {
+          mode: 'countersign', // single | countersign | or-sign
+          approverType: 'fixed', // fixed | param | org
+          approvers: ['王经理', '李总监', '张副总'],
+          paramRef: '',
+          orgType: 'direct-supervisor',
+          orgDept: '',
+          emptyHandler: 'transfer-to-owner',
+          emptyHandlerPerson: '',
+          rejectBehavior: 'rollback',
+          rollbackTarget: 'start',
+          commentRequired: false
+        }
+      },
+      { id: 'cc_1', type: 'cc', name: '抄送通知', code: 'cc_1',
+        config: {
+          recipients: ['张某某'],
+          recipientsType: 'fixed',
+          recipientsParamRef: '',
+          note: '审批通过后通知行政部安排行程'
+        }
+      },
+      { id: 'approval_2', type: 'approval', name: '财务审批', code: 'approval_2',
+        config: {
+          mode: 'single',
+          approverType: 'fixed',
+          approvers: ['李总监'],
+          paramRef: '',
+          orgType: 'direct-supervisor',
+          orgDept: '',
+          emptyHandler: 'transfer-to-owner',
+          emptyHandlerPerson: '',
+          rejectBehavior: 'end',
+          rollbackTarget: '',
+          commentRequired: true
+        }
+      },
+      { id: 'end', type: 'end', name: '结束', summary: '流程结束' }
+    ]
   },
-  { id: 'cc_1', type: 'cc', name: '抄送通知', x: 620, y: 280, code: 'cc_1',
-    config: {
-      recipients: [],
-      recipientsType: 'param',
-      recipientsParamRef: '${trigger_9.observers}',
-      note: '审批通过后通知行政部安排行程'
-    }
+  { id: 2, name: '报销审批流', status: 'published', formId: 2, updatedAt: '2026-06-28 16:30',
+    nodes: [
+      { id: 'start', type: 'start', name: '开始', summary: '发起人提交申请' },
+      { id: 'approval_1', type: 'approval', name: '财务审批', code: 'approval_1',
+        config: {
+          mode: 'single', approverType: 'fixed', approvers: ['孙财务'], paramRef: '',
+          orgType: 'direct-supervisor', orgDept: '', emptyHandler: 'transfer-to-owner', emptyHandlerPerson: '',
+          rejectBehavior: 'end', rollbackTarget: '', commentRequired: true
+        }
+      },
+      { id: 'cc_1', type: 'cc', name: '抄送通知', code: 'cc_1',
+        config: { recipients: ['王五'], recipientsType: 'fixed', recipientsParamRef: '', note: '报销已通过，请留意到账' }
+      },
+      { id: 'end', type: 'end', name: '结束', summary: '流程结束' }
+    ]
   },
-  { id: 'approval_2', type: 'approval', name: '财务审批', x: 900, y: 280, code: 'approval_2',
-    config: {
-      mode: 'single',
-      approverType: 'fixed',
-      approvers: ['李总监'],
-      paramRef: '',
-      orgType: 'direct-supervisor',
-      orgDept: '',
-      emptyHandler: 'transfer-to-owner',
-      emptyHandlerPerson: '',
-      rejectBehavior: 'end',
-      rollbackTarget: '',
-      commentRequired: true
-    }
-  },
-  { id: 'end', type: 'end', name: '结束', x: 1180, y: 280,
-    summary: '流程结束' }
+  { id: 3, name: '采购审批流', status: 'draft', formId: null, updatedAt: '2026-07-05 09:12',
+    nodes: [
+      { id: 'start', type: 'start', name: '开始', summary: '发起人提交申请' },
+      { id: 'approval_1', type: 'approval', name: '采购审批', code: 'approval_1',
+        config: {
+          mode: 'countersign', approverType: 'fixed', approvers: [], paramRef: '',
+          orgType: 'direct-supervisor', orgDept: '', emptyHandler: 'transfer-to-owner', emptyHandlerPerson: '',
+          rejectBehavior: 'end', rollbackTarget: '', commentRequired: false
+        }
+      },
+      { id: 'end', type: 'end', name: '结束', summary: '流程结束' }
+    ]
+  }
 ];
+let flowNextId = 10;
+let currentFlowId = null; // 当前在设计器中编辑的流程
+function getCurrentFlow() { return flowStore.find(f => f.id === currentFlowId) || null; }
+
+// --- 流程节点 (设计器画布，有序数组，指向当前流程的 nodes) ---
+let workflowNodes = flowStore[0].nodes;
 
 // 获取节点的卡片摘要
 function getNodeSummary(node) {
@@ -1245,8 +1327,12 @@ function renderView() {
     setDetailBreadcrumb('发起申请');
     main.innerHTML = renderInitiateForm();
     main.style.padding = 'var(--space-8)';
+  } else if (currentView === 'flow-list') {
+    document.getElementById('breadcrumbText').innerHTML = '<span class="breadcrumb-item current">流程编排</span>';
+    main.innerHTML = renderFlowListView();
+    main.style.padding = 'var(--space-8)';
   } else if (currentView === 'designer') {
-    document.getElementById('breadcrumbText').innerHTML = '<span class="breadcrumb-item" onclick="switchToApproval()">我的审批</span><span class="breadcrumb-separator">/</span><span class="breadcrumb-item current">流程编排</span>';
+    document.getElementById('breadcrumbText').innerHTML = '<span class="breadcrumb-item" onclick="switchToDesigner()">流程编排</span><span class="breadcrumb-separator">/</span><span class="breadcrumb-item current">' + escHtml((getCurrentFlow() || {}).name || '设计器') + '</span>';
     main.innerHTML = renderDesignerView();
     main.style.padding = '0';
   }
@@ -1266,9 +1352,28 @@ function setDetailBreadcrumb(label) {
   document.getElementById('breadcrumbText').innerHTML = '<span class="breadcrumb-item" onclick="backToList()">我的审批</span><span class="breadcrumb-separator">/</span><span class="breadcrumb-item current">' + label + '</span>';
 }
 
+// 侧边栏「流程编排」入口：进入审批流列表页
 function switchToDesigner() {
+  currentView = 'flow-list';
+  currentFlowId = null;
+  selectedNodeId = null;
+  closeAddNodeMenu();
+  closeConfigDrawer();
+  document.getElementById('navDesigner').classList.add('active');
+  document.getElementById('navApproval').classList.remove('active');
+  renderView();
+}
+
+// 进入某条流程的设计器
+function openFlowDesigner(flowId) {
+  const flow = flowStore.find(f => f.id === flowId);
+  if (!flow) return;
+  currentFlowId = flowId;
+  workflowNodes = flow.nodes;
+  selectedFormId = flow.formId;
   currentView = 'designer';
   selectedNodeId = null;
+  closeAddNodeMenu();
   closeConfigDrawer();
   document.getElementById('navDesigner').classList.add('active');
   document.getElementById('navApproval').classList.remove('active');
@@ -1277,6 +1382,7 @@ function switchToDesigner() {
 
 function switchToApproval() {
   currentView = 'list';
+  closeAddNodeMenu();
   closeConfigDrawer();
   document.getElementById('navDesigner').classList.remove('active');
   document.getElementById('navApproval').classList.add('active');
@@ -1286,6 +1392,7 @@ function switchToApproval() {
 function backToList() {
   currentView = 'list';
   currentDetailData = null;
+  submitBannerVisible = false;
   renderView();
 }
 
@@ -1525,6 +1632,12 @@ function renderProcessedDetail() {
 function openInitiatorDetail(id) {
   currentDetailData = approvalData.initiated.find(x => x.id === id);
   currentView = 'initiator-detail';
+  submitBannerVisible = false;
+  renderView();
+}
+
+function dismissSubmitBanner() {
+  submitBannerVisible = false;
   renderView();
 }
 
@@ -1534,6 +1647,9 @@ function renderInitiatorDetail() {
   const isEnded = d.status === 'approved' || d.status === 'rejected' || d.status === 'withdrawn';
   let html = `<div class="detail-page">`;
   html += `<div class="detail-back" onclick="backToList()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg>返回列表</div>`;
+  if (submitBannerVisible) {
+    html += `<div class="success-banner"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg><span>提交成功，已通知审批人 王经理</span><button class="success-banner-close" title="关闭" onclick="dismissSubmitBanner()">×</button></div>`;
+  }
   html += `<div class="detail-header"><div class="detail-title">${d.formName} <span style="color:var(--md-on-surface-variant);font-weight:400;">— ${d.statusText}</span></div>`;
   html += `<div class="detail-subtitle">提交时间：${d.submitTime}</div></div>`;
   html += renderFormInfoCard(d);
@@ -1978,6 +2094,7 @@ function finishInitiateSubmit() {
   activeTab = 'initiated';
   currentDetailData = record;
   currentView = 'initiator-detail';
+  submitBannerVisible = true;
   renderView();
 }
 
@@ -2002,11 +2119,12 @@ function closeModal(event) {
   document.getElementById('modalOverlay').classList.remove('active');
 }
 
-// ESC 关闭弹窗
+// ESC 关闭弹窗 / 插入菜单 / 配置抽屉（按层级依次关闭）
 document.addEventListener('keydown', function (e) {
-  if (e.key === 'Escape' && document.getElementById('modalOverlay').classList.contains('active')) {
-    closeModal();
-  }
+  if (e.key !== 'Escape') return;
+  if (document.getElementById('modalOverlay').classList.contains('active')) { closeModal(); return; }
+  if (document.getElementById('addNodeMenu')) { closeAddNodeMenu(); return; }
+  if (document.getElementById('configDrawer').classList.contains('open')) { closeConfigDrawer(); }
 });
 
 // --- Toast ---
@@ -2078,6 +2196,7 @@ function openNotifTarget(id) {
   const n = notifications.find(x => x.id === id);
   if (!n) return;
   n.unread = false;
+  submitBannerVisible = false;
   document.getElementById('notifPanel').classList.remove('open');
   updateNotifBadge();
   if (!n.target) { renderView(); return; }
@@ -2180,6 +2299,122 @@ function confirmPersonPicker() {
 }
 
 // ============================================
+// 流程编排 - 审批流列表页
+// ============================================
+function renderFlowListView() {
+  let html = '<div class="page-header"><div class="page-title">流程编排</div>';
+  html += '<button class="btn btn-primary" onclick="showCreateFlowModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14"/><path d="M5 12h14"/></svg>新建审批流</button></div>';
+  html += '<div class="table-card"><div class="table-wrapper"><table class="data-table"><thead><tr><th>流程名称</th><th style="width:90px">类型</th><th style="width:140px">申请表单</th><th style="width:90px">状态</th><th style="width:150px">最后编辑时间</th><th style="width:220px">操作</th></tr></thead><tbody>';
+  flowStore.forEach(f => { html += renderFlowRow(f); });
+  html += '</tbody></table></div></div>';
+  return html;
+}
+
+function renderFlowRow(f) {
+  const form = formList.find(x => x.id === f.formId);
+  const published = f.status === 'published';
+  const statusTag = published ? '<span class="badge badge-success">已发布</span>' : '<span class="badge badge-neutral">草稿</span>';
+  const nodeCount = f.nodes.filter(n => n.type === 'approval' || n.type === 'cc').length;
+  let ops = '<button class="btn btn-outlined btn-sm" onclick="openFlowDesigner(' + f.id + ')">编辑</button>';
+  if (published) ops += '<button class="btn btn-text btn-sm" onclick="initiateFromFlow(' + f.id + ')">发起申请</button>';
+  ops += '<button class="btn btn-text btn-sm" onclick="showFlowMoreMenu(' + f.id + ')">更多</button>';
+  let html = '<tr onclick="openFlowDesigner(' + f.id + ')" style="cursor:pointer">';
+  html += '<td><div class="ds-name-cell"><span class="ds-name">' + escHtml(f.name) + '</span><span class="ds-desc">' + nodeCount + ' 个流程节点</span></div></td>';
+  html += '<td><span class="badge" style="background:var(--md-primary-container);color:var(--md-primary)">审批流</span></td>';
+  html += '<td>' + (form ? escHtml(form.name) : '<span style="color:var(--color-warning)">⚠ 未选择</span>') + '</td>';
+  html += '<td>' + statusTag + '</td>';
+  html += '<td style="font-size:12px;color:var(--md-outline)">' + f.updatedAt + '</td>';
+  html += '<td onclick="event.stopPropagation()" style="white-space:nowrap">' + ops + '</td>';
+  html += '</tr>';
+  return html;
+}
+
+// 「更多」操作：复制 / 删除
+function showFlowMoreMenu(flowId) {
+  const f = flowStore.find(x => x.id === flowId);
+  if (!f) return;
+  let body = '<div style="display:flex;flex-direction:column;gap:var(--space-2)">';
+  body += '<div class="radio-card" onclick="duplicateFlow(' + flowId + ')"><div class="radio-card-content"><div class="radio-card-title">复制流程</div><div class="radio-card-desc">创建一份「' + escHtml(f.name) + ' 副本」草稿</div></div></div>';
+  body += '<div class="radio-card" onclick="confirmDeleteFlow(' + flowId + ')"><div class="radio-card-content"><div class="radio-card-title" style="color:var(--md-error)">删除流程</div><div class="radio-card-desc">删除后不可恢复</div></div></div>';
+  body += '</div>';
+  showModal('更多操作 — ' + f.name, body, [{ text: '取消', class: 'btn btn-outlined', onclick: 'closeModal()' }]);
+}
+
+function duplicateFlow(flowId) {
+  const f = flowStore.find(x => x.id === flowId);
+  if (!f) return;
+  const copy = JSON.parse(JSON.stringify(f));
+  copy.id = flowNextId++;
+  copy.name = f.name + ' 副本';
+  copy.status = 'draft';
+  copy.updatedAt = nowFull();
+  flowStore.push(copy);
+  closeModal();
+  showToast('success', '复制成功', '已创建草稿「' + copy.name + '」');
+  renderView();
+}
+
+function confirmDeleteFlow(flowId) {
+  const f = flowStore.find(x => x.id === flowId);
+  if (!f) return;
+  showModal('删除流程', '<p>确定要删除「' + escHtml(f.name) + '」吗？删除后不可恢复。</p>', [
+    { text: '取消', class: 'btn btn-outlined', onclick: 'closeModal()' },
+    { text: '确认删除', class: 'btn btn-danger-filled', onclick: 'doDeleteFlow(' + flowId + ')' }
+  ]);
+}
+
+function doDeleteFlow(flowId) {
+  const i = flowStore.findIndex(x => x.id === flowId);
+  if (i >= 0) flowStore.splice(i, 1);
+  closeModal();
+  showToast('success', '已删除', '流程已删除');
+  renderView();
+}
+
+// 列表页「发起申请」：跳到发起表单页
+function initiateFromFlow(flowId) {
+  const f = flowStore.find(x => x.id === flowId);
+  if (!f) return;
+  document.getElementById('navDesigner').classList.remove('active');
+  document.getElementById('navApproval').classList.add('active');
+  openInitiateForm();
+}
+
+// --- 新建审批流弹窗 ---
+let createFlowType = 'approval';
+function showCreateFlowModal() {
+  createFlowType = 'approval';
+  let body = '<div class="form-group"><label class="form-label">流程名称 <span class="required">*</span></label>';
+  body += '<input class="form-input" type="text" id="newFlowName" placeholder="例如：加班审批流" maxlength="30" /></div>';
+  body += '<div class="form-group" style="margin-bottom:0"><label class="form-label">流程类型</label><div class="flow-type-cards">';
+  body += '<div class="flow-type-card selected" id="flowTypeApproval"><div class="node-card-icon approval">' + nodeIcons.approval + '</div><div class="flow-type-card-title">审批流</div><div class="flow-type-card-note">人审批 + 抄送</div></div>';
+  body += '<div class="flow-type-card disabled" title="请在主原型体验"><div class="node-card-icon end"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div><div class="flow-type-card-title">应用流</div><div class="flow-type-card-note">请在主原型体验</div></div>';
+  body += '<div class="flow-type-card disabled" title="请在主原型体验"><div class="node-card-icon end"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div><div class="flow-type-card-title">对话流</div><div class="flow-type-card-note">请在主原型体验</div></div>';
+  body += '</div></div>';
+  showModal('新建审批流', body, [
+    { text: '取消', class: 'btn btn-outlined', onclick: 'closeModal()' },
+    { text: '创建', class: 'btn btn-primary', onclick: 'confirmCreateFlow()' }
+  ]);
+}
+
+function confirmCreateFlow() {
+  const input = document.getElementById('newFlowName');
+  const name = (input ? input.value : '').trim();
+  if (!name) { showToast('error', '请输入流程名称', '流程名称不能为空'); return; }
+  const flow = {
+    id: flowNextId++, name: name, status: 'draft', formId: null, updatedAt: nowFull(),
+    nodes: [
+      { id: 'start', type: 'start', name: '开始', summary: '发起人提交申请' },
+      { id: 'end', type: 'end', name: '结束', summary: '流程结束' }
+    ]
+  };
+  flowStore.push(flow);
+  closeModal();
+  showToast('success', '创建成功', '已创建草稿「' + name + '」，请编排流程节点');
+  openFlowDesigner(flow.id);
+}
+
+// ============================================
 // 设计器视图 - 流程编排
 // ============================================
 const nodeIcons = {
@@ -2190,74 +2425,213 @@ const nodeIcons = {
 };
 
 function renderDesignerView() {
+  const flow = getCurrentFlow();
+  if (!flow) return '';
   const selForm = formList.find(f => f.id === selectedFormId);
+  const published = flow.status === 'published';
   let html = '<div class="designer-view">';
-  // Toolbar
+  // 顶栏
   html += '<div class="designer-toolbar">';
   html += '<div class="designer-toolbar-left">';
-  html += '<button class="btn btn-text btn-sm" onclick="switchToApproval()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg>返回</button>';
-  html += '<span style="font-size:var(--font-size-lg);font-weight:500;color:var(--md-on-surface)">出差审批流</span>';
-  html += '<span class="badge badge-neutral" style="font-size:11px">审批流</span>';
+  html += '<button class="btn btn-text btn-sm" onclick="switchToDesigner()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg>返回列表</button>';
+  html += '<span class="flow-name-edit" title="点击修改流程名" onclick="showRenameFlowModal()">' + escHtml(flow.name) + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></span>';
+  html += published ? '<span class="badge badge-success" style="font-size:11px">已发布</span>' : '<span class="badge badge-neutral" style="font-size:11px">草稿</span>';
   html += '</div>';
   html += '<div class="designer-toolbar-right">';
-  html += '<button class="btn btn-outlined btn-sm" onclick="showToast(\'info\',\'保存\',\'草稿已保存\')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>保存草稿</button>';
+  html += '<button class="btn btn-outlined btn-sm" onclick="saveFlowDraft()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>保存草稿</button>';
   html += '<button class="btn btn-primary btn-sm" onclick="showPublishValidation()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg>发布</button>';
   html += '</div>';
   html += '</div>';
-  // Form select bar
-  html += '<div style="padding:var(--space-3) var(--space-6);background:#fff;border-bottom:1px solid var(--color-border);">';
-  html += '<div class="form-select-bar">';
-  html += '<span class="form-select-bar-label">申请表单：</span>';
-  html += '<span class="form-select-bar-name">'+(selForm?selForm.name:'未选择')+'</span>';
-  if(selForm){html+='<span style="font-size:12px;color:var(--md-on-primary-container);opacity:0.7">'+selForm.fields.length+' 个字段 · 更新于 '+selForm.updatedAt+'</span>';}
-  html += '<button class="btn btn-text btn-sm form-select-bar-btn" onclick="showFormSelectModal()">更换表单</button>';
-  html += '<button class="btn btn-text btn-sm" onclick="window.location.href=\'./form-engine.html\'">编辑表单</button>';
-  html += '</div>';
-  // Form preview
-  if(selForm){
-    html+='<div style="margin-top:var(--space-3)"><div class="form-preview-card">';
-    html+='<div class="form-preview-header"><span>表单预览（只读）</span><span style="font-size:11px;color:var(--md-outline)">'+selForm.fields.length+' 个字段</span></div>';
-    selForm.fields.forEach(f=>{
-      html+='<div class="form-field-row"><span class="form-field-name">'+f.name+(f.required?'<span class="form-field-required"> *</span>':'')+'</span><span class="form-field-type">'+f.type+'</span></div>';
-    });
-    html+='</div></div>';
+  // 表单绑定条（一行高）
+  html += '<div class="form-bind-bar">';
+  if (selForm) {
+    html += '<span class="form-bind-bar-label">申请表单：</span>';
+    html += '<span class="form-bind-bar-name">' + escHtml(selForm.name) + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></span>';
+    html += '<span style="font-size:12px;color:var(--md-outline)">' + selForm.fields.length + ' 个字段 · 更新于 ' + selForm.updatedAt + '</span>';
+    html += '<div class="form-bind-bar-actions">';
+    html += '<button class="btn btn-text btn-sm" onclick="showFormPreviewModal()">预览</button>';
+    html += '<button class="btn btn-text btn-sm" onclick="showFormSelectModal()">更换</button>';
+    html += '<button class="btn btn-text btn-sm" onclick="window.location.href=\'./form-engine.html\'">编辑表单</button>';
+    html += '</div>';
+  } else {
+    html += '<span class="form-bind-warn" onclick="showFormSelectModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>未选择申请表单，点击选择</span>';
   }
   html += '</div>';
-  // Canvas
-  html += '<div class="designer-canvas" style="min-height:400px">';
-  // Node palette
-  html += '<div class="node-palette">';
-  html += '<div class="node-palette-title">审批流节点</div>';
-  html += '<div class="node-palette-item"><div class="node-card-icon approval">'+nodeIcons.approval+'</div><span class="node-palette-item-label">审批节点</span></div>';
-  html += '<div class="node-palette-item"><div class="node-card-icon cc">'+nodeIcons.cc+'</div><span class="node-palette-item-label">抄送节点</span></div>';
-  html += '<div class="node-palette-item" style="opacity:0.5;cursor:not-allowed"><div class="node-card-icon" style="background:var(--md-surface-container);color:var(--md-outline)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div><span class="node-palette-item-label">IF 条件</span></div>';
-  html += '<div class="node-palette-item" style="opacity:0.5;cursor:not-allowed"><div class="node-card-icon" style="background:var(--md-surface-container);color:var(--md-outline)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div><span class="node-palette-item-label">飞书通知</span></div>';
-  html += '</div>';
-  // Nodes
+  // 垂直流程画布
+  html += '<div class="designer-canvas"><div class="flow-column">';
   workflowNodes.forEach((node, i) => {
-    const summary = getNodeSummary(node);
-    const isWarning = summary.includes('⚠');
-    html += '<div class="node-card '+(selectedNodeId===node.id?'selected':'')+'" style="left:'+node.x+'px;top:'+node.y+'px" onclick="openNodeConfig(\''+node.id+'\')">';
-    html += '<div class="node-card-header"><div class="node-card-icon '+node.type+'">'+(nodeIcons[node.type]||'')+'</div><span class="node-card-title">'+node.name+'</span></div>';
-    if(node.code){html+='<div class="node-card-code">'+node.code+'</div>';}
-    html += '<div class="node-card-body"><div class="node-card-summary'+(isWarning?' warning':'')+'">'+summary+'</div></div>';
-    html += '</div>';
-    // Arrow to next node
-    if(i<workflowNodes.length-1){
-      const next=workflowNodes[i+1];
-      const arrowLeft=node.x+210;
-      const arrowWidth=next.x-arrowLeft;
-      html+='<div class="node-arrow" style="left:'+arrowLeft+'px;top:'+(node.y+35)+'px;width:'+arrowWidth+'px"></div>';
-    }
+    html += renderFlowNodeCard(node);
+    if (i < workflowNodes.length - 1) html += renderFlowConnector(i);
   });
-  html += '</div>';
+  html += '</div></div>';
   // Footer
   html += '<div class="designer-footer">';
-  html += '<span style="font-size:12px;color:var(--md-on-surface-variant)">'+workflowNodes.filter(n=>n.type==='approval').length+' 个审批节点 · '+workflowNodes.filter(n=>n.type==='cc').length+' 个抄送节点</span>';
-  html += '<span style="font-size:12px;color:var(--md-outline)">最后编辑：2026-07-01 10:00</span>';
+  html += '<span style="font-size:12px;color:var(--md-on-surface-variant)">' + workflowNodes.filter(n => n.type === 'approval').length + ' 个审批节点 · ' + workflowNodes.filter(n => n.type === 'cc').length + ' 个抄送节点</span>';
+  html += '<span style="font-size:12px;color:var(--md-outline)">最后编辑：' + flow.updatedAt + '</span>';
   html += '</div>';
   html += '</div>';
   return html;
+}
+
+// 单个节点卡片（垂直画布）
+function renderFlowNodeCard(node) {
+  const summary = getNodeSummary(node);
+  const isWarning = summary.includes('⚠');
+  const deletable = node.type === 'approval' || node.type === 'cc';
+  let html = '<div class="node-card ' + (selectedNodeId === node.id ? 'selected' : '') + '" onclick="openNodeConfig(\'' + node.id + '\')">';
+  if (deletable) {
+    html += '<span class="node-card-del" title="删除节点" onclick="event.stopPropagation();deleteFlowNode(\'' + node.id + '\')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span>';
+  }
+  html += '<div class="node-card-header"><div class="node-card-icon ' + node.type + '">' + (nodeIcons[node.type] || '') + '</div><span class="node-card-title">' + escHtml(node.name) + '</span>';
+  if (node.code) html += '<span style="margin-left:auto;font-size:10px;color:var(--md-outline);font-family:var(--font-family-mono)">' + node.code + '</span>';
+  html += '</div>';
+  html += '<div class="node-card-body"><div class="node-card-summary' + (isWarning ? ' warning' : '') + '">' + summary + '</div></div>';
+  html += '</div>';
+  return html;
+}
+
+// 节点间连接线（竖线 + 中点「+」按钮）
+function renderFlowConnector(afterIndex) {
+  let html = '<div class="flow-connector">';
+  html += '<div class="flow-connector-line"></div>';
+  html += '<button class="flow-add-btn" title="在此处添加节点" onclick="event.stopPropagation();showAddNodeMenu(event,' + (afterIndex + 1) + ')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14"/><path d="M5 12h14"/></svg></button>';
+  html += '<div class="flow-connector-line arrow"></div>';
+  html += '</div>';
+  return html;
+}
+
+// --- 插入节点浮层菜单 ---
+let addNodeInsertIndex = -1;
+function showAddNodeMenu(event, insertIndex) {
+  closeAddNodeMenu();
+  addNodeInsertIndex = insertIndex;
+  const menu = document.createElement('div');
+  menu.className = 'add-node-menu';
+  menu.id = 'addNodeMenu';
+  let html = '<div class="add-node-menu-item" onclick="insertFlowNode(\'approval\')"><div class="node-card-icon approval">' + nodeIcons.approval + '</div><div><div class="add-node-menu-label">审批节点</div><div class="add-node-menu-note">指定人审批，通过后流程继续</div></div></div>';
+  html += '<div class="add-node-menu-item" onclick="insertFlowNode(\'cc\')"><div class="node-card-icon cc">' + nodeIcons.cc + '</div><div><div class="add-node-menu-label">抄送节点</div><div class="add-node-menu-note">发通知给指定人，不阻塞流程</div></div></div>';
+  html += '<div class="add-node-menu-item disabled" onclick="event.stopPropagation()"><div class="node-card-icon end"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div><div><div class="add-node-menu-label">IF 条件</div><div class="add-node-menu-note">主原型中体验</div></div></div>';
+  html += '<div class="add-node-menu-item disabled" onclick="event.stopPropagation()"><div class="node-card-icon end"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div><div><div class="add-node-menu-label">飞书通知</div><div class="add-node-menu-note">主原型中体验</div></div></div>';
+  menu.innerHTML = html;
+  document.body.appendChild(menu);
+  // 定位到「+」按钮旁，防止溢出屏幕
+  const btn = event.currentTarget || event.target;
+  const rect = btn.getBoundingClientRect();
+  let left = rect.right + 10;
+  if (left + 230 > window.innerWidth) left = rect.left - 240;
+  let top = rect.top - 10;
+  if (top + 240 > window.innerHeight) top = window.innerHeight - 250;
+  menu.style.left = left + 'px';
+  menu.style.top = Math.max(10, top) + 'px';
+  event.stopPropagation();
+}
+
+function closeAddNodeMenu() {
+  const menu = document.getElementById('addNodeMenu');
+  if (menu) menu.remove();
+  addNodeInsertIndex = -1;
+}
+
+// 点击浮层外关闭插入菜单
+document.addEventListener('click', function (e) {
+  const menu = document.getElementById('addNodeMenu');
+  if (menu && !menu.contains(e.target)) closeAddNodeMenu();
+});
+
+// 生成节点唯一编码 (approval_N / cc_N)
+function nextNodeCode(type) {
+  let max = 0;
+  workflowNodes.forEach(n => {
+    if (n.code && n.code.startsWith(type + '_')) {
+      const num = parseInt(n.code.slice(type.length + 1), 10);
+      if (!isNaN(num) && num > max) max = num;
+    }
+  });
+  return type + '_' + (max + 1);
+}
+
+// 在指定位置插入节点
+function insertFlowNode(type) {
+  const idx = addNodeInsertIndex;
+  closeAddNodeMenu();
+  if (idx < 0) return;
+  const code = nextNodeCode(type);
+  let node;
+  if (type === 'approval') {
+    node = { id: code, type: 'approval', name: '审批节点', code: code,
+      config: { mode: 'single', approverType: 'fixed', approvers: [], paramRef: '', orgType: 'direct-supervisor', orgDept: '',
+        emptyHandler: 'transfer-to-owner', emptyHandlerPerson: '', rejectBehavior: 'end', rollbackTarget: '', commentRequired: false } };
+  } else {
+    node = { id: code, type: 'cc', name: '抄送节点', code: code,
+      config: { recipients: [], recipientsType: 'fixed', recipientsParamRef: '', note: '' } };
+  }
+  workflowNodes.splice(idx, 0, node);
+  const flow = getCurrentFlow();
+  if (flow) flow.updatedAt = nowFull();
+  renderView();
+  showToast('success', '已添加节点', (type === 'approval' ? '审批节点' : '抄送节点') + '已插入流程，请完成配置');
+  openNodeConfig(node.id);
+}
+
+// 删除节点（开始/结束不可删）
+function deleteFlowNode(nodeId) {
+  const idx = workflowNodes.findIndex(n => n.id === nodeId);
+  if (idx < 0) return;
+  const node = workflowNodes[idx];
+  if (node.type === 'start' || node.type === 'end') return;
+  workflowNodes.splice(idx, 1);
+  if (configDrawerNode && configDrawerNode.id === nodeId) closeConfigDrawer();
+  if (selectedNodeId === nodeId) selectedNodeId = null;
+  const flow = getCurrentFlow();
+  if (flow) flow.updatedAt = nowFull();
+  renderView();
+  showToast('success', '已删除', '节点「' + node.name + '」已从流程中移除');
+}
+
+// --- 流程改名 ---
+function showRenameFlowModal() {
+  const flow = getCurrentFlow();
+  if (!flow) return;
+  showModal('修改流程名称', '<div class="form-group" style="margin-bottom:0"><label class="form-label">流程名称 <span class="required">*</span></label><input class="form-input" type="text" id="renameFlowInput" value="' + escHtml(flow.name) + '" maxlength="30" /></div>', [
+    { text: '取消', class: 'btn btn-outlined', onclick: 'closeModal()' },
+    { text: '确定', class: 'btn btn-primary', onclick: 'confirmRenameFlow()' }
+  ]);
+}
+
+function confirmRenameFlow() {
+  const flow = getCurrentFlow();
+  const input = document.getElementById('renameFlowInput');
+  const name = (input ? input.value : '').trim();
+  if (!name) { showToast('error', '名称不能为空', '请输入流程名称'); return; }
+  flow.name = name;
+  flow.updatedAt = nowFull();
+  closeModal();
+  renderView();
+  showToast('success', '已更新', '流程名称已修改为「' + name + '」');
+}
+
+// --- 保存草稿 ---
+function saveFlowDraft() {
+  const flow = getCurrentFlow();
+  if (flow) flow.updatedAt = nowFull();
+  renderView();
+  showToast('success', '已保存', '草稿已保存');
+}
+
+// --- 表单只读预览弹窗 ---
+function showFormPreviewModal() {
+  const selForm = formList.find(f => f.id === selectedFormId);
+  if (!selForm) { showFormSelectModal(); return; }
+  let body = '<div class="form-preview-card">';
+  body += '<div class="form-preview-header"><span>表单预览（只读）</span><span style="font-size:11px;color:var(--md-outline)">' + selForm.fields.length + ' 个字段 · 更新于 ' + selForm.updatedAt + '</span></div>';
+  selForm.fields.forEach(f => {
+    body += '<div class="form-field-row"><span class="form-field-name">' + escHtml(f.name) + (f.required ? '<span class="form-field-required"> *</span>' : '') + '</span><span class="form-field-type">' + f.type + '</span></div>';
+  });
+  body += '</div>';
+  showModal('申请表单 — ' + selForm.name, body, [
+    { text: '编辑表单', class: 'btn btn-outlined', onclick: 'window.location.href=\'./form-engine.html\'' },
+    { text: '关闭', class: 'btn btn-primary', onclick: 'closeModal()' }
+  ]);
 }
 
 // --- 打开/关闭配置抽屉 ---
@@ -2588,6 +2962,8 @@ function showFormSelectModal() {
 
 function selectForm(id) {
   selectedFormId = id;
+  const flow = getCurrentFlow();
+  if (flow) { flow.formId = id; flow.updatedAt = nowFull(); }
   closeModal();
   renderView();
   showToast('success', '已选择表单', formList.find(f=>f.id===id)?.name + ' 已设为申请表单');
@@ -2645,7 +3021,14 @@ function showPublishValidation() {
     }
   });
   if(errors.length === 0) {
+    const flow = getCurrentFlow();
+    if (flow) { flow.status = 'published'; flow.updatedAt = nowFull(); }
+    renderView();
     showToast('success', '发布成功', '审批流已发布，版本 v1');
+    showModal('发布成功', '<p>流程已发布，是否立即发起一次申请体验完整流程？</p><p style="margin-top:8px;font-size:13px;color:var(--md-on-surface-variant)">发起后可在「我的审批 - 我发起的」中跟踪审批进度。</p>', [
+      { text: '稍后再说', class: 'btn btn-outlined', onclick: 'closeModal()' },
+      { text: '立即发起', class: 'btn btn-primary', onclick: 'closeModal();initiateFromFlow(' + (flow ? flow.id : 0) + ')' }
+    ]);
   } else {
     let bodyHtml = '<div class="validation-error" style="margin-bottom:8px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg><div class="validation-error-text">发布失败，存在 '+errors.length+' 个错误：</div></div>';
     errors.forEach(e => { bodyHtml += '<div style="font-size:13px;color:var(--md-error);padding:4px 0;padding-left:16px">• '+escHtml(e)+'</div>'; });
