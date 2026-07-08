@@ -317,7 +317,7 @@ input,select,textarea{font-family:inherit;font-size:inherit;}
 .fd-canvas-field .field-label{font-size:var(--font-size-sm);font-weight:500;color:var(--md-on-surface);margin-bottom:var(--space-2);display:flex;align-items:center;gap:var(--space-1);}
 .fd-canvas-field .field-label .required-star{color:var(--md-error);font-size:16px;}
 .fd-canvas-field .field-control{pointer-events:none;}
-.fd-canvas-field .field-control input,.fd-canvas-field .field-control textarea,.fd-canvas-field .field-control select{width:100%;height:36px;padding:0 var(--space-3);border:1px solid var(--md-outline-variant);border-radius:var(--radius-sm);font-size:var(--font-size-sm);color:var(--color-text-placeholder);background:var(--md-surface-container-low);pointer-events:none;}
+.fd-canvas-field .field-control input,.fd-canvas-field .field-control textarea,.fd-canvas-field .field-control select{width:100%;height:36px;padding:0 var(--space-3);border:1px solid var(--md-outline-variant);border-radius:var(--radius-sm);font-size:var(--font-size-sm);color:var(--color-text-placeholder);background:var(--md-surface);pointer-events:none;}
 .fd-canvas-field .field-control textarea{height:72px;padding:var(--space-2) var(--space-3);}
 .fd-canvas-field .field-actions{position:absolute;top:var(--space-2);right:var(--space-2);display:flex;gap:2px;opacity:0;transition:var(--transition-fast);}
 .fd-canvas-field:hover .field-actions,.fd-canvas-field.selected .field-actions{opacity:1;}
@@ -426,6 +426,13 @@ input,select,textarea{font-family:inherit;font-size:inherit;}
 .fd-preview-radio label,.fd-preview-checkbox label{display:flex;align-items:center;gap:var(--space-2);cursor:pointer;font-size:var(--font-size-base);color:var(--md-on-surface);}
 .fd-preview-radio input[type="radio"]{accent-color:var(--md-primary);width:18px;height:18px;cursor:pointer;}
 .fd-preview-checkbox input[type="checkbox"]{accent-color:var(--md-primary);width:18px;height:18px;cursor:pointer;}
+
+/* Vuetify outlined 风格浮动标签：label 嵌在输入框边框左上角 */
+.vf-wrap{position:relative;}
+.vf-wrap .field-label,.vf-wrap .form-label{position:absolute;top:-8px;left:10px;z-index:1;margin:0;padding:0 4px;background:var(--md-surface);font-size:var(--font-size-xs);font-weight:400;color:var(--md-on-surface-variant);line-height:16px;display:inline-flex;align-items:center;gap:2px;white-space:nowrap;}
+.vf-wrap .field-label .required-star{font-size:var(--font-size-xs);}
+.vf-wrap:focus-within .field-label,.vf-wrap:focus-within .form-label{color:var(--md-primary);}
+.fd-preview-field.has-error .vf-wrap .field-label{color:var(--md-error);}
 
 /* Person selector mock */
 .fd-person-selector{display:flex;align-items:center;gap:var(--space-2);height:40px;padding:0 var(--space-3);border:1px solid var(--md-outline-variant);border-radius:var(--radius-sm);background:var(--md-surface);cursor:pointer;transition:var(--transition-base);}
@@ -1207,6 +1214,10 @@ function renderCanvasField(field, index) {
       break;
   }
 
+  const isBoxed = ['shortText', 'longText', 'number', 'dropdown', 'datetime', 'person'].includes(field.type);
+  const labelHtml = `<div class="field-label">${escHtml(field.name)}${reqStar}</div>`;
+  const bodyHtml = isBoxed ? `<div class="vf-wrap">${labelHtml}${controlHtml}</div>` : `${labelHtml}${controlHtml}`;
+
   return `
     <div class="fd-canvas-field ${selected}" draggable="true"
       ondragstart="onFieldDragStart(event, ${index})" ondragend="onDragEnd(event)"
@@ -1221,8 +1232,7 @@ function renderCanvasField(field, index) {
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
         </button>
       </div>
-      <div class="field-label">${reqStar}${escHtml(field.name)}</div>
-      ${controlHtml}
+      ${bodyHtml}
     </div>
   `;
 }
@@ -1253,7 +1263,7 @@ function renderDesignerColField(cf, fieldIndex, colIndex, fi) {
     <div class="cf-del" onclick="deleteColumnField(${fieldIndex}, ${colIndex}, ${fi}, event)" title="删除">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
     </div>
-    <div class="cf-label">${star}${escHtml(cf.name)}</div>
+    <div class="cf-label">${escHtml(cf.name)}${star}</div>
     <div class="cf-ctrl">${ft ? ft.name : cf.type}</div>
   </div>`;
 }
@@ -1848,18 +1858,24 @@ function saveForm() {
 function showFormSettings() {
   showModal('表单设置', `
     <div class="form-group">
-      <label class="form-label">表单名称 <span class="required">*</span></label>
-      <input class="form-input" id="settingsName" value="${escHtml(formSettings.name || document.getElementById('fdFormName').value)}" maxlength="50" />
+      <div class="vf-wrap">
+        <label class="form-label">表单名称 <span class="required">*</span></label>
+        <input class="form-input" id="settingsName" value="${escHtml(formSettings.name || document.getElementById('fdFormName').value)}" maxlength="50" />
+      </div>
       <div class="form-hint">最长 50 字符</div>
     </div>
     <div class="form-group">
-      <label class="form-label">表单描述</label>
-      <textarea class="form-textarea" id="settingsDesc" maxlength="200" rows="3">${escHtml(formSettings.desc || '')}</textarea>
+      <div class="vf-wrap">
+        <label class="form-label">表单描述</label>
+        <textarea class="form-textarea" id="settingsDesc" maxlength="200" rows="3">${escHtml(formSettings.desc || '')}</textarea>
+      </div>
       <div class="form-hint">最长 200 字符，展示在表单顶部</div>
     </div>
     <div class="form-group">
-      <label class="form-label">提交按钮文案</label>
-      <input class="form-input" id="settingsSubmitBtn" value="${escHtml(formSettings.submitBtnText)}" />
+      <div class="vf-wrap">
+        <label class="form-label">提交按钮文案</label>
+        <input class="form-input" id="settingsSubmitBtn" value="${escHtml(formSettings.submitBtnText)}" />
+      </div>
       <div class="form-hint">默认「提交申请」，可自定义</div>
     </div>
   `, [
@@ -1977,7 +1993,9 @@ function renderPreviewField(field, id) {
     return html;
   }
 
-  html += `<div class="field-label">${req}${escHtml(field.name)}</div>`;
+  const boxed = ['shortText', 'longText', 'number', 'dropdown', 'datetime', 'person'].includes(field.type);
+  const labelHtml = `<div class="field-label">${escHtml(field.name)}${req}</div>`;
+  html += boxed ? `<div class="vf-wrap">${labelHtml}` : labelHtml;
 
   switch (field.type) {
     case 'shortText': {
@@ -2040,6 +2058,7 @@ function renderPreviewField(field, id) {
       break;
   }
 
+  if (boxed) html += '</div>';
   html += `<div class="field-error" id="pverr_${id}">此项为必填</div></div>`;
   return html;
 }
