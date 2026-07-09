@@ -364,6 +364,16 @@ input,select,textarea{font-family:inherit;font-size:inherit;}
 .fd-prop-check{display:flex;align-items:center;gap:var(--space-2);font-size:var(--font-size-sm);cursor:pointer;user-select:none;}
 .fd-prop-check input{accent-color:var(--md-primary);cursor:pointer;}
 
+/* 折叠分组（校验规则 / 高级设置） */
+.fd-prop-group{border:1px solid var(--md-outline-variant);border-radius:var(--radius-md);margin-bottom:var(--space-3);background:#fff;overflow:hidden;}
+.fd-prop-group-header{display:flex;align-items:center;gap:var(--space-2);min-height:40px;padding:0 var(--space-3);cursor:pointer;user-select:none;transition:var(--transition-fast);}
+.fd-prop-group-header:hover{background:var(--md-surface-container-low);}
+.fd-prop-group-title{font-size:var(--font-size-xs);font-weight:600;color:var(--md-on-surface-variant);text-transform:uppercase;letter-spacing:0.05em;flex:1;}
+.fd-prop-group-badge{font-size:11px;font-weight:500;color:var(--md-primary);background:var(--md-primary-container,#EADDFF);padding:1px 8px;border-radius:10px;white-space:nowrap;flex-shrink:0;}
+.fd-prop-group-arrow{width:16px;height:16px;color:var(--md-outline);transition:transform 0.2s;flex-shrink:0;}
+.fd-prop-group.open .fd-prop-group-arrow{transform:rotate(180deg);}
+.fd-prop-group-body{padding:var(--space-3) var(--space-3) 0;border-top:1px solid var(--md-outline-variant);}
+
 /* 选项列表配置 */
 .fd-option-list{display:flex;flex-direction:column;gap:var(--space-2);}
 .fd-option-item{display:flex;align-items:center;gap:var(--space-2);}
@@ -1293,102 +1303,163 @@ function getOtherFieldNames(exclude) {
   return names;
 }
 
+// 折叠分组展开状态（校验规则 / 高级设置默认收起；切换选中字段时重置）
+let propGroupExpanded = { validation: false, advanced: false };
+
+function resetPropGroups() {
+  propGroupExpanded = { validation: false, advanced: false };
+}
+
+function togglePropGroup(key) {
+  propGroupExpanded[key] = !propGroupExpanded[key];
+  renderProps();
+}
+
+// 判断某个属性是否已配置（用于收起时的「已设 N 项」徽标）
+function propIsSet(v) {
+  if (v === undefined || v === null || v === '') return false;
+  if (Array.isArray(v)) return v.length > 0;
+  return true;
+}
+
+function propGroup(key, title, bodyHtml, setCount) {
+  if (!bodyHtml) return '';
+  const open = propGroupExpanded[key];
+  const badge = !open && setCount > 0 ? `<span class="fd-prop-group-badge">已设 ${setCount} 项</span>` : '';
+  return `<div class="fd-prop-group ${open ? 'open' : ''}">
+    <div class="fd-prop-group-header" onclick="togglePropGroup('${key}')">
+      <span class="fd-prop-group-title">${title}</span>${badge}
+      <svg class="fd-prop-group-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+    </div>
+    ${open ? `<div class="fd-prop-group-body">${bodyHtml}</div>` : ''}
+  </div>`;
+}
+
 function renderPropsForField(field) {
-  let html = '<div class="fd-props-section"><div class="fd-props-section-title">基础属性</div>';
+  const p = field.props || {};
+  let basic = '';
+  let validation = '';
+  let advanced = '';
+  let vCount = 0;
+  let aCount = 0;
+
   // 字段名称
   if (field.type !== 'columns') {
-    html += `<div class="fd-prop-row"><label class="fd-prop-label">字段名称</label><input class="fd-prop-input" maxlength="30" value="${escHtml(field.name)}" onchange="updateFieldName(this.value)" /></div>`;
+    basic += `<div class="fd-prop-row"><label class="fd-prop-label">字段名称</label><input class="fd-prop-input" maxlength="30" value="${escHtml(field.name)}" onchange="updateFieldName(this.value)" /></div>`;
   }
 
   switch (field.type) {
     case 'shortText':
-      html += propInput('placeholder', '占位提示', field.props?.placeholder || '');
-      html += propCheck('required', '是否必填', field.props?.required);
-      html += propInput('maxLength', '最大长度', field.props?.maxLength || '', 'number');
-      html += propInput('defaultValue', '默认值', field.props?.defaultValue || '');
+      basic += propCheck('required', '是否必填', p.required);
+      validation += propInput('maxLength', '最大长度', p.maxLength || '', 'number');
+      if (propIsSet(p.maxLength)) vCount++;
+      advanced += propInput('placeholder', '占位提示', p.placeholder || '');
+      advanced += propInput('defaultValue', '默认值', p.defaultValue || '');
+      if (propIsSet(p.placeholder)) aCount++;
+      if (propIsSet(p.defaultValue)) aCount++;
       break;
     case 'longText':
-      html += propInput('placeholder', '占位提示', field.props?.placeholder || '');
-      html += propCheck('required', '是否必填', field.props?.required);
-      html += propInput('maxLength', '最大长度', field.props?.maxLength || '', 'number');
-      html += propInput('rows', '行数', field.props?.rows || 4, 'number');
-      html += propInput('defaultValue', '默认值', field.props?.defaultValue || '');
+      basic += propCheck('required', '是否必填', p.required);
+      validation += propInput('maxLength', '最大长度', p.maxLength || '', 'number');
+      if (propIsSet(p.maxLength)) vCount++;
+      advanced += propInput('placeholder', '占位提示', p.placeholder || '');
+      advanced += propInput('rows', '行数', p.rows || 4, 'number');
+      advanced += propInput('defaultValue', '默认值', p.defaultValue || '');
+      if (propIsSet(p.placeholder)) aCount++;
+      if (propIsSet(p.rows) && Number(p.rows) !== 4) aCount++;
+      if (propIsSet(p.defaultValue)) aCount++;
       break;
     case 'number':
-      html += propCheck('required', '是否必填', field.props?.required);
-      html += propInput('min', '最小值', field.props?.min ?? '', 'number');
-      html += propInput('max', '最大值', field.props?.max ?? '', 'number');
-      html += propInput('decimal', '小数位数', field.props?.decimal || 0, 'number');
-      html += propInput('unit', '单位', field.props?.unit || '');
-      html += propInput('defaultValue', '默认值', field.props?.defaultValue || '', 'number');
+      basic += propCheck('required', '是否必填', p.required);
+      basic += propInput('decimal', '小数位数', p.decimal || 0, 'number');
+      basic += propInput('unit', '单位', p.unit || '');
+      validation += propInput('min', '最小值', p.min ?? '', 'number');
+      validation += propInput('max', '最大值', p.max ?? '', 'number');
+      if (propIsSet(p.min)) vCount++;
+      if (propIsSet(p.max)) vCount++;
+      advanced += propInput('defaultValue', '默认值', p.defaultValue || '', 'number');
+      if (propIsSet(p.defaultValue)) aCount++;
       break;
     case 'radio':
-      html += '</div><div class="fd-props-section"><div class="fd-props-section-title">选项列表</div>';
-      html += renderOptionList(field.props?.options || [], 'radio');
-      html += propCheck('required', '是否必填', field.props?.required);
-      html += renderDefaultCheckedSelect(field, false);
-      html += propSelect('layout', '排列方式', field.props?.layout || 'vertical', [['vertical', '竖排'], ['horizontal', '横排']]);
+      basic += propCheck('required', '是否必填', p.required);
+      basic += '</div><div class="fd-props-section"><div class="fd-props-section-title">选项列表</div>';
+      basic += renderOptionList(p.options || [], 'radio');
+      advanced += renderDefaultCheckedSelect(field, false);
+      advanced += propSelect('layout', '排列方式', p.layout || 'vertical', [['vertical', '竖排'], ['horizontal', '横排']]);
+      if (propIsSet(p.defaultChecked)) aCount++;
+      if (p.layout === 'horizontal') aCount++;
       break;
     case 'checkbox':
-      html += '</div><div class="fd-props-section"><div class="fd-props-section-title">选项列表</div>';
-      html += renderOptionList(field.props?.options || [], 'checkbox');
-      html += propCheck('required', '是否必填', field.props?.required);
-      html += propInput('minSelect', '最少选几项', field.props?.minSelect || '', 'number');
-      html += propInput('maxSelect', '最多选几项', field.props?.maxSelect || '', 'number');
-      html += renderDefaultCheckedSelect(field, true);
-      html += propSelect('layout', '排列方式', field.props?.layout || 'vertical', [['vertical', '竖排'], ['horizontal', '横排']]);
+      basic += propCheck('required', '是否必填', p.required);
+      basic += '</div><div class="fd-props-section"><div class="fd-props-section-title">选项列表</div>';
+      basic += renderOptionList(p.options || [], 'checkbox');
+      advanced += renderDefaultCheckedSelect(field, true);
+      advanced += propSelect('layout', '排列方式', p.layout || 'vertical', [['vertical', '竖排'], ['horizontal', '横排']]);
+      if (propIsSet(p.defaultChecked)) aCount++;
+      if (p.layout === 'horizontal') aCount++;
       break;
     case 'dropdown':
-      html += propSelect('mode', '选择模式', field.props?.mode || 'single', [['single', '单选'], ['multi', '多选']]);
-      html += propInput('placeholder', '占位提示', field.props?.placeholder || '请选择');
-      html += propCheck('required', '是否必填', field.props?.required);
-      html += propSelect('source', '数据来源', field.props?.source || 'manual', [['manual', '手动填写'], ['api', '从接口获取']]);
-      if (field.props?.source === 'api') {
-        html += '</div><div class="fd-props-section"><div class="fd-props-section-title">接口配置</div>';
-        html += propInput('apiUrl', '接口地址', field.props?.apiUrl || '', 'url');
-        html += propSelect('apiMethod', '请求方式', field.props?.apiMethod || 'GET', [['GET', 'GET'], ['POST', 'POST']]);
-        html += propInput('displayField', '显示字段', field.props?.displayField || '');
-        html += propInput('valueField', '值字段', field.props?.valueField || '');
-        html += '</div><div class="fd-props-section"><div class="fd-props-section-title">请求参数</div>';
-        html += renderApiParams(field);
-        html += `<div class="fd-prop-row"><button class="btn btn-outlined btn-sm" onclick="testApiConfig()">测试</button></div>`;
+      basic += propSelect('mode', '选择模式', p.mode || 'single', [['single', '单选'], ['multi', '多选']]);
+      basic += propCheck('required', '是否必填', p.required);
+      basic += propSelect('source', '数据来源', p.source || 'manual', [['manual', '手动填写'], ['api', '从接口获取']]);
+      if (p.source === 'api') {
+        basic += '</div><div class="fd-props-section"><div class="fd-props-section-title">接口配置</div>';
+        basic += propInput('apiUrl', '接口地址', p.apiUrl || '', 'url');
+        basic += propSelect('apiMethod', '请求方式', p.apiMethod || 'GET', [['GET', 'GET'], ['POST', 'POST']]);
+        basic += propInput('displayField', '显示字段', p.displayField || '');
+        basic += propInput('valueField', '值字段', p.valueField || '');
+        basic += '</div><div class="fd-props-section"><div class="fd-props-section-title">请求参数</div>';
+        basic += renderApiParams(field);
+        basic += `<div class="fd-prop-row"><button class="btn btn-outlined btn-sm" onclick="testApiConfig()">测试</button></div>`;
       } else {
-        html += '</div><div class="fd-props-section"><div class="fd-props-section-title">选项列表</div>';
-        html += renderOptionList(field.props?.options || [], 'radio');
-        html += renderDefaultCheckedSelect(field, field.props?.mode === 'multi');
+        basic += '</div><div class="fd-props-section"><div class="fd-props-section-title">选项列表</div>';
+        basic += renderOptionList(p.options || [], 'radio');
+        advanced += renderDefaultCheckedSelect(field, p.mode === 'multi');
+        if (propIsSet(p.defaultChecked)) aCount++;
       }
+      advanced += propInput('placeholder', '占位提示', p.placeholder || '请选择');
+      if (propIsSet(p.placeholder) && p.placeholder !== '请选择') aCount++;
       break;
     case 'datetime':
-      html += propSelect('format', '格式', field.props?.format || 'datetime', [['date', '仅日期'], ['datetime', '日期+时间']]);
-      html += propCheck('required', '是否必填', field.props?.required);
-      html += propInput('minDate', '最早可选日期', field.props?.minDate || '', 'date');
-      html += propInput('maxDate', '最晚可选日期', field.props?.maxDate || '', 'date');
-      html += propInput('defaultValue', '默认值', field.props?.defaultValue || '');
-      html += `<div class="fd-prop-row"><div class="form-hint">默认值可填固定日期，或填「当前时间」表示打开表单时的时间</div></div>`;
+      basic += propSelect('format', '格式', p.format || 'datetime', [['date', '仅日期'], ['datetime', '日期+时间']]);
+      basic += propCheck('required', '是否必填', p.required);
+      validation += propInput('minDate', '最早可选日期', p.minDate || '', 'date');
+      validation += propInput('maxDate', '最晚可选日期', p.maxDate || '', 'date');
+      if (propIsSet(p.minDate)) vCount++;
+      if (propIsSet(p.maxDate)) vCount++;
+      advanced += propInput('defaultValue', '默认值', p.defaultValue || '');
+      advanced += `<div class="fd-prop-row"><div class="form-hint">默认值可填固定日期，或填「当前时间」表示打开表单时的时间</div></div>`;
+      if (propIsSet(p.defaultValue)) aCount++;
       break;
     case 'person':
-      html += propCheck('required', '是否必填', field.props?.required);
-      html += propSelect('personMode', '选择模式', field.props?.personMode || 'single', [['single', '单人'], ['multi', '多人']]);
-      html += propSelect('personScope', '选择范围', field.props?.personScope || 'all', [['all', '全部'], ['employee', '仅员工'], ['dept', '仅部门'], ['role', '仅角色']]);
-      html += propInput('defaultValue', '默认值', field.props?.defaultValue || '');
+      basic += propCheck('required', '是否必填', p.required);
+      basic += propSelect('personMode', '选择模式', p.personMode || 'single', [['single', '单人'], ['multi', '多人']]);
+      basic += propSelect('personScope', '选择范围', p.personScope || 'all', [['all', '全部'], ['employee', '仅员工'], ['dept', '仅部门'], ['role', '仅角色']]);
+      advanced += propInput('defaultValue', '默认值', p.defaultValue || '');
+      if (propIsSet(p.defaultValue)) aCount++;
       break;
     case 'columns':
-      html += propSelect('colCount', '栏数', field.props?.colCount || 2, [[2, '2 栏'], [3, '3 栏']]);
-      html += `<div class="fd-prop-row"><div class="fd-prop-label" style="font-size:11px;color:var(--md-outline);">各栏宽度自动等分</div></div>`;
+      basic += propSelect('colCount', '栏数', p.colCount || 2, [[2, '2 栏'], [3, '3 栏']]);
+      basic += `<div class="fd-prop-row"><div class="fd-prop-label" style="font-size:11px;color:var(--md-outline);">各栏宽度自动等分</div></div>`;
       break;
     case 'detail':
-      html += propCheck('required', '是否必填', field.props?.required);
-      html += propInput('minRows', '最少行数', field.props?.minRows || 1, 'number');
-      html += propInput('maxRows', '最多行数', field.props?.maxRows || '', 'number');
-      html += '</div><div class="fd-props-section"><div class="fd-props-section-title">列配置</div>';
-      html += renderColumnConfig(field.props?.columns || []);
+      basic += propCheck('required', '是否必填', p.required);
+      basic += '</div><div class="fd-props-section"><div class="fd-props-section-title">列配置</div>';
+      basic += renderColumnConfig(p.columns || []);
+      validation += propInput('minRows', '最少行数', p.minRows || 1, 'number');
+      validation += propInput('maxRows', '最多行数', p.maxRows || '', 'number');
+      if (propIsSet(p.minRows) && Number(p.minRows) !== 1) vCount++;
+      if (propIsSet(p.maxRows)) vCount++;
       break;
     case 'readonlyText':
-      html += `<div class="fd-prop-row"><label class="fd-prop-label">文本内容</label><textarea class="fd-prop-input" style="height:80px;padding:8px 12px;resize:vertical;" onchange="updateFieldProp('text',this.value)">${escHtml(field.props?.text || '')}</textarea></div>`;
-      html += propSelect('style', '样式', field.props?.style || 'body', [['title', '标题（大号加粗）'], ['body', '正文（常规）'], ['desc', '说明（小号灰色）']]);
+      basic += `<div class="fd-prop-row"><label class="fd-prop-label">文本内容</label><textarea class="fd-prop-input" style="height:80px;padding:8px 12px;resize:vertical;" onchange="updateFieldProp('text',this.value)">${escHtml(p.text || '')}</textarea></div>`;
+      basic += propSelect('style', '样式', p.style || 'body', [['title', '标题（大号加粗）'], ['body', '正文（常规）'], ['desc', '说明（小号灰色）']]);
       break;
   }
-  html += '</div>';
+
+  let html = '<div class="fd-props-section"><div class="fd-props-section-title">基础属性</div>' + basic + '</div>';
+  html += propGroup('validation', '校验规则', validation, vCount);
+  html += propGroup('advanced', '高级设置', advanced, aCount);
   return html;
 }
 
@@ -1594,6 +1665,7 @@ function deleteDetailColOption(colIndex, optIndex) {
 // --- 交互方法 ---
 function selectField(index, event) {
   if (event) event.stopPropagation();
+  if (selectedFieldIndex !== index || selectedColPos) resetPropGroups();
   selectedFieldIndex = index;
   selectedColPos = null;
   renderCanvas();
@@ -1602,6 +1674,7 @@ function selectField(index, event) {
 
 function selectColumnField(fieldIndex, colIndex, fi, event) {
   if (event) event.stopPropagation();
+  if (selectedFieldIndex !== fieldIndex || !selectedColPos || selectedColPos[0] !== colIndex || selectedColPos[1] !== fi) resetPropGroups();
   selectedFieldIndex = fieldIndex;
   selectedColPos = [colIndex, fi];
   renderCanvas();
@@ -2532,8 +2605,6 @@ function pvValidateField(field, id) {
     case 'checkbox': {
       const count = el.querySelectorAll('input[type=checkbox]:checked').length;
       if (p.required && count === 0) return '此项为必填';
-      if (p.minSelect && count < Number(p.minSelect)) return `请至少选择 ${p.minSelect} 项`;
-      if (p.maxSelect && count > Number(p.maxSelect)) return `最多只能选择 ${p.maxSelect} 项`;
       return null;
     }
     case 'dropdown': {
