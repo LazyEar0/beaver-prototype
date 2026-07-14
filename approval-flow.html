@@ -1100,7 +1100,7 @@ const approvalData = {
       id: 10, formName: '出差申请', applicant: '我（Sukey Wu）', submitTime: '2026-07-01 10:00',
       status: 'in-progress', statusText: '审批中', badgeClass: 'badge-warning',
       summary: { '出差目的地': '上海', '出发日期': '2026-07-15' },
-      currentStep: '部门会签审批（2/3 已通过）',
+      currentStep: '',
       canWithdraw: true,
       formData: [
         { label: '出差目的地', value: '上海' },
@@ -1575,6 +1575,16 @@ function renderProcessedList() {
 }
 
 // --- 我发起的 (表格) ---
+// 从时间线推导当前待处理人：单人显示「待 xxx 处理」，多人显示「待 xxx 等 N 人处理」
+function getPendingApproverText(item) {
+  const cur = (item.timeline || []).find(n => n.type === 'node' && n.isCurrent);
+  if (!cur || !cur.records) return item.currentStep || '—';
+  const waiting = cur.records.filter(r => r.status === '待审批').map(r => r.name.replace('（我）', ''));
+  if (!waiting.length) return item.currentStep || '—';
+  if (waiting.length === 1) return '待 ' + waiting[0] + ' 处理';
+  return '待 ' + waiting[0] + ' 等 ' + waiting.length + ' 人处理';
+}
+
 function renderInitiatedList() {
   const initiateBtn = '<button class="btn btn-primary" style="margin-left:auto" onclick="openInitiateForm()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14"/><path d="M5 12h14"/></svg>发起申请</button>';
   let items=[...approvalData.initiated];
@@ -1585,11 +1595,11 @@ function renderInitiatedList() {
   if(listPage>totalPages)listPage=totalPages;
   const paged=items.slice((listPage-1)*listPageSize,listPage*listPageSize);
   let html=renderFilterBar('initiated',initiateBtn);
-  html+='<div class="table-card"><div class="table-wrapper"><table class="data-table"><thead><tr><th>申请标题</th><th style="width:140px">提交时间</th><th style="width:180px">当前进度</th><th style="width:80px">状态</th><th style="width:140px">操作</th></tr></thead><tbody>';
+  html+='<div class="table-card"><div class="table-wrapper"><table class="data-table"><thead><tr><th>申请标题</th><th style="width:140px">提交时间</th><th style="width:180px">当前处理人</th><th style="width:80px">状态</th><th style="width:140px">操作</th></tr></thead><tbody>';
   const stMap={'in-progress':'st-in-progress','approved':'st-approved','rejected':'st-rejected','withdrawn':'st-withdrawn'};
   paged.forEach(item=>{
     const canResubmit=item.status==='approved'||item.status==='rejected'||item.status==='withdrawn';
-    const progressText=item.status==='in-progress'?escHtml(item.currentStep||'—'):'—';
+    const progressText=item.status==='in-progress'?escHtml(getPendingApproverText(item)):'—';
     html+='<tr onclick="openInitiatorDetail('+item.id+')" style="cursor:pointer"><td><div class="ds-name-cell"><span class="ds-name">'+item.formName+'</span><span class="ds-desc">'+Object.entries(item.summary).slice(0,2).map(([k,v])=>k+'：'+v).join(' · ')+'</span></div></td><td style="font-size:12px;color:var(--md-outline)">'+item.submitTime+'</td><td style="font-size:12px;color:var(--md-on-surface-variant)">'+progressText+'</td><td><span class="st-badge '+(stMap[item.status]||'')+'">'+item.statusText+'</span></td><td onclick="event.stopPropagation()" style="display:flex;gap:4px;align-items:center"><button class="btn btn-outlined btn-sm" onclick="openInitiatorDetail('+item.id+')">查看详情</button>'+(canResubmit?'<button class="btn btn-text btn-sm" onclick="handleResubmit('+item.id+')">重新发起</button>':'')+'</td></tr>';
   });
   html+='</tbody></table></div></div>';
@@ -2184,7 +2194,7 @@ function finishInitiateSubmit() {
     submitTime: nowFull(),
     status: 'in-progress', statusText: '审批中', badgeClass: 'badge-warning',
     summary: { '出差目的地': v.dest, '出发日期': v.startDate },
-    currentStep: '部门会签审批（0/3 已通过）',
+    currentStep: '',
     canWithdraw: true,
     ccList: [],
     formData: [
