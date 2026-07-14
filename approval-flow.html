@@ -678,8 +678,8 @@ input,select,textarea{font-family:inherit;font-size:inherit;}
 // ============================================
 
 // --- 当前视图状态 ---
-let currentView = 'list'; // list | approver-detail | initiator-detail | processed-detail | initiate-form | flow-list | designer
-let activeTab = 'pending'; // pending | processed | initiated
+let currentView = 'list'; // list | approver-detail | initiator-detail | processed-detail | cc-detail | initiate-form | flow-list | designer
+let activeTab = 'pending'; // pending | processed | initiated | cc
 let currentDetailData = null;
 
 // --- 列表筛选状态 ---
@@ -717,7 +717,7 @@ const notifications = [
   { id: 1, title: '【待审批】出差申请', body: '张三 提交了一份出差申请，请及时审批。出差目的地：上海...', time: '07-01 10:00', unread: true, target: { type: 'pending', id: 1 } },
   { id: 2, title: '【已通过】请假申请', body: '你的请假申请已被 王经理 通过。审批意见：同意', time: '06-25 11:00', unread: true, target: { type: 'initiated', id: 11 } },
   { id: 3, title: '【已拒绝】报销单', body: '你的报销单被 李总监 拒绝。拒绝原因：预算超标，请缩减费用后重新提交', time: '06-21 10:00', unread: false, target: { type: 'initiated', id: 12 } },
-  { id: 4, title: '【抄送】出差申请', body: '出差申请审批进展通知。抄送说明：出差已通过审批，请协助安排行程', time: '06-10 14:35', unread: true, target: { type: 'initiated', id: 14 } }
+  { id: 4, title: '【抄送】出差申请', body: '出差申请审批进展通知。抄送说明：部门经理已通过，请知晓后续行程安排', time: '07-02 11:30', unread: true, target: { type: 'cc', id: 20 } }
 ];
 let notifNextId = 100;
 
@@ -1295,6 +1295,77 @@ const approvalData = {
         { type: 'end', title: '结束', status: '已通过', dotClass: 'end-approved' }
       ]
     }
+  ],
+  cc: [
+    {
+      id: 20, formName: '出差申请', applicant: '李四', submitTime: '2026-07-02 10:00',
+      status: 'in-progress', statusText: '审批中', badgeClass: 'badge-warning',
+      summary: { '出差目的地': '杭州', '出发日期': '2026-07-20' },
+      ccSource: '抄送节点', ccBy: '', ccTime: '07-02 11:30', ccNote: '部门经理已通过，请知晓后续行程安排',
+      formData: [
+        { label: '出差目的地', value: '杭州' },
+        { label: '出发日期', value: '2026-07-20' },
+        { label: '返回日期', value: '2026-07-22' },
+        { label: '出差事由', value: '客户项目启动会' },
+        { label: '费用预算', value: '4200 元' }
+      ],
+      timeline: [
+        { type: 'start', title: '开始', status: '已提交', time: '07-02 10:00', dotClass: 'start' },
+        { type: 'node', title: '部门经理审批', status: '已通过', dotClass: 'approved', records: [
+          { name: '王经理', status: '已通过', statusClass: 's-approved', time: '07-02 11:30', comment: '同意' }
+        ]},
+        { type: 'node', title: '抄送通知', status: '已抄送', dotClass: 'approved', records: [
+          { name: 'Sukey Wu（我）', status: '已抄送', statusClass: 's-auto', time: '07-02 11:30', note: '抄送说明：部门经理已通过，请知晓后续行程安排' }
+        ]},
+        { type: 'node', title: '财务审批', status: '当前节点', dotClass: 'current', isCurrent: true, records: [
+          { name: '李总监', status: '待审批', statusClass: 's-pending', time: '' }
+        ]},
+        { type: 'end', title: '结束', status: '待开始', dotClass: 'pending' }
+      ]
+    },
+    {
+      id: 21, formName: '报销单', applicant: '陈七', submitTime: '2026-06-30 09:00',
+      status: 'approved', statusText: '已通过', badgeClass: 'badge-success',
+      summary: { '报销类型': '日常报销', '报销总金额': '2600 元' },
+      ccSource: '临时加抄送', ccBy: '陈七', ccTime: '06-30 10:20', ccNote: '',
+      formData: [
+        { label: '报销人', value: '陈七' },
+        { label: '报销类型', value: '日常报销' },
+        { label: '费用明细', value: '部门团建活动费用' },
+        { label: '报销总金额', value: '2600 元' },
+        { label: '银行账号', value: '6222****1178' }
+      ],
+      timeline: [
+        { type: 'start', title: '开始', status: '已提交', time: '06-30 09:00', dotClass: 'start' },
+        { type: 'node', title: '财务审批', status: '已通过', dotClass: 'approved', records: [
+          { name: '孙财务', status: '已通过', statusClass: 's-approved', time: '06-30 14:00', comment: '票据齐全，同意报销' }
+        ]},
+        { type: 'end', title: '结束', status: '已通过', dotClass: 'end-approved' }
+      ],
+      ccList: ['Sukey Wu（我）']
+    },
+    {
+      id: 22, formName: '采购申请单', applicant: '周八', submitTime: '2026-06-22 14:00',
+      status: 'rejected', statusText: '已拒绝', badgeClass: 'badge-error',
+      summary: { '采购物品': '办公椅 x20', '预算金额': '18000 元' },
+      ccSource: '抄送节点', ccBy: '', ccTime: '06-22 15:00', ccNote: '采购申请已提交，请知晓',
+      formData: [
+        { label: '采购物品', value: '办公椅 x20' },
+        { label: '采购数量', value: '20' },
+        { label: '预算金额', value: '18000 元' },
+        { label: '采购说明', value: '办公区座椅更换' }
+      ],
+      timeline: [
+        { type: 'start', title: '开始', status: '已提交', time: '06-22 14:00', dotClass: 'start' },
+        { type: 'node', title: '抄送通知', status: '已抄送', dotClass: 'approved', records: [
+          { name: 'Sukey Wu（我）', status: '已抄送', statusClass: 's-auto', time: '06-22 15:00', note: '抄送说明：采购申请已提交，请知晓' }
+        ]},
+        { type: 'node', title: '预算审批', status: '已拒绝', dotClass: 'rejected', records: [
+          { name: '张副总', status: '已拒绝', statusClass: 's-rejected', time: '06-23 10:00', comment: '本季度预算已用完，下季度再申请' }
+        ]},
+        { type: 'end', title: '结束', status: '已拒绝', dotClass: 'end-rejected' }
+      ]
+    }
   ]
 };
 
@@ -1322,6 +1393,10 @@ function renderView() {
   } else if (currentView === 'processed-detail') {
     setDetailBreadcrumb('审批详情');
     main.innerHTML = renderProcessedDetail();
+    main.style.padding = 'var(--space-8)';
+  } else if (currentView === 'cc-detail') {
+    setDetailBreadcrumb('审批详情');
+    main.innerHTML = renderCcDetail();
     main.style.padding = 'var(--space-8)';
   } else if (currentView === 'initiate-form') {
     setDetailBreadcrumb('发起申请');
@@ -1401,7 +1476,8 @@ function renderListView() {
   const tabs = [
     { key: 'pending', label: '待我审批', count: approvalData.pending.length },
     { key: 'processed', label: '我已审批', count: approvalData.processed.length },
-    { key: 'initiated', label: '我发起的', count: approvalData.initiated.length }
+    { key: 'initiated', label: '我发起的', count: approvalData.initiated.length },
+    { key: 'cc', label: '抄送我的', count: approvalData.cc.length }
   ];
   let html = `<div class="page-header"><div class="page-title">我的审批</div></div>`;
   html += `<div class="card" style="overflow:hidden;">`;
@@ -1419,6 +1495,7 @@ function renderTabContent() {
   if (activeTab === 'pending') return renderPendingList();
   if (activeTab === 'processed') return renderProcessedList();
   if (activeTab === 'initiated') return renderInitiatedList();
+  if (activeTab === 'cc') return renderCcList();
   return '';
 }
 
@@ -1429,7 +1506,8 @@ function renderFilterBar(tab, extraHtml) {
   const filterOptions = {
     pending: [{value:'all',label:'全部模式'},{value:'单人审批',label:'单人审批'},{value:'会签',label:'会签'},{value:'或签',label:'或签'}],
     processed: [{value:'all',label:'全部状态'},{value:'approved',label:'已通过'},{value:'rejected',label:'已拒绝'},{value:'transferred',label:'已转交'},{value:'skipped',label:'已跳过'}],
-    initiated: [{value:'all',label:'全部状态'},{value:'in-progress',label:'审批中'},{value:'approved',label:'已通过'},{value:'rejected',label:'已拒绝'},{value:'withdrawn',label:'已撤回'}]
+    initiated: [{value:'all',label:'全部状态'},{value:'in-progress',label:'审批中'},{value:'approved',label:'已通过'},{value:'rejected',label:'已拒绝'},{value:'withdrawn',label:'已撤回'}],
+    cc: [{value:'all',label:'全部状态'},{value:'in-progress',label:'审批中'},{value:'approved',label:'已通过'},{value:'rejected',label:'已拒绝'}]
   };
   let html = '<div class="filter-bar">';
   html += '<div class="filter-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><input type="text" placeholder="搜索申请标题或发起人..." value="'+escHtml(listSearch)+'" oninput="onListSearch(this.value)" oncompositionstart="isComposing=true" oncompositionend="isComposing=false;onListSearch(this.value)" onfocus="searchFocused=true" onblur="searchFocused=false" />'+(listSearch?'<button class="search-clear-btn" onclick="clearListSearch()">×</button>':'')+'</div>';
@@ -1514,6 +1592,26 @@ function renderInitiatedList() {
   paged.forEach(item=>{
     const canResubmit=item.status==='approved'||item.status==='rejected'||item.status==='withdrawn';
     html+='<tr onclick="openInitiatorDetail('+item.id+')" style="cursor:pointer"><td><div class="ds-name-cell"><span class="ds-name">'+item.formName+'</span><span class="ds-desc">'+Object.entries(item.summary).slice(0,2).map(([k,v])=>k+'：'+v).join(' · ')+'</span></div></td><td style="font-size:12px;color:var(--md-outline)">'+item.submitTime+'</td><td style="font-size:12px;color:var(--md-on-surface-variant)">'+escHtml(item.currentStep||'—')+'</td><td><span class="st-badge '+(stMap[item.status]||'')+'">'+item.statusText+'</span></td><td onclick="event.stopPropagation()" style="display:flex;gap:4px;align-items:center"><button class="btn btn-outlined btn-sm" onclick="openInitiatorDetail('+item.id+')">查看详情</button>'+(canResubmit?'<button class="btn btn-text btn-sm" onclick="handleResubmit('+item.id+')">重新发起</button>':'')+'</td></tr>';
+  });
+  html+='</tbody></table></div></div>';
+  html+=renderPagination(total,totalPages);
+  return html;
+}
+
+// --- 抄送我的 (表格) ---
+function renderCcList() {
+  let items=[...approvalData.cc];
+  if(listSearch){const q=listSearch.toLowerCase();items=items.filter(i=>i.formName.toLowerCase().includes(q)||i.applicant.toLowerCase().includes(q));}
+  if(listStatusFilter!=='all')items=items.filter(i=>i.status===listStatusFilter);
+  if(!items.length)return renderFilterBar('cc')+renderEmpty('暂无抄送给我的审批');
+  const total=items.length,totalPages=Math.max(1,Math.ceil(total/listPageSize));
+  if(listPage>totalPages)listPage=totalPages;
+  const paged=items.slice((listPage-1)*listPageSize,listPage*listPageSize);
+  let html=renderFilterBar('cc');
+  html+='<div class="table-card"><div class="table-wrapper"><table class="data-table"><thead><tr><th>申请标题</th><th style="width:80px">发起人</th><th style="width:120px">抄送时间</th><th style="width:100px">抄送来源</th><th style="width:180px">抄送说明</th><th style="width:80px">审批状态</th><th style="width:100px">操作</th></tr></thead><tbody>';
+  const stMap={'in-progress':'st-in-progress','approved':'st-approved','rejected':'st-rejected'};
+  paged.forEach(item=>{
+    html+='<tr onclick="openCcDetail('+item.id+')" style="cursor:pointer"><td><div class="ds-name-cell"><span class="ds-name">'+item.formName+'</span><span class="ds-desc">'+escHtml(Object.entries(item.summary).slice(0,2).map(([k,v])=>k+'：'+v).join(' · '))+'</span></div></td><td>'+item.applicant+'</td><td style="font-size:12px;color:var(--md-outline)">'+item.ccTime+'</td><td style="font-size:12px;color:var(--md-on-surface-variant)">'+item.ccSource+'</td><td style="font-size:12px;color:var(--md-on-surface-variant);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escHtml(item.ccNote||'')+'">'+escHtml(item.ccNote||'—')+'</td><td><span class="st-badge '+(stMap[item.status]||'')+'">'+item.statusText+'</span></td><td onclick="event.stopPropagation()"><button class="btn btn-outlined btn-sm" onclick="openCcDetail('+item.id+')">查看详情</button></td></tr>';
   });
   html+='</tbody></table></div></div>';
   html+=renderPagination(total,totalPages);
@@ -1624,6 +1722,27 @@ function renderProcessedDetail() {
   html += renderFormInfoCard(d);
   html += renderTimelineCard(d);
   html += `<div class="action-area"><div class="processed-notice"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg><div class="processed-notice-text">你已于 ${d.myActionTime} ${d.myAction}${d.myComment ? '，审批意见：' + escHtml(d.myComment) : ''}</div></div></div>`;
+  html += `</div>`;
+  return html;
+}
+
+// --- 抄送我的只读详情页 (M-04) ---
+function openCcDetail(id) {
+  currentDetailData = approvalData.cc.find(x => x.id === id);
+  currentView = 'cc-detail';
+  renderView();
+}
+
+function renderCcDetail() {
+  const d = currentDetailData;
+  if (!d) return '';
+  let html = `<div class="detail-page">`;
+  html += `<div class="detail-back" onclick="backToList()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg>返回列表</div>`;
+  html += `<div class="detail-header"><div class="detail-title">${d.formName} <span class="badge ${d.badgeClass}">${d.statusText}</span></div>`;
+  html += `<div class="detail-subtitle">发起人：${d.applicant} &nbsp;&nbsp; 提交时间：${d.submitTime}</div></div>`;
+  html += renderFormInfoCard(d);
+  html += renderTimelineCard(d);
+  html += `<div class="action-area"><div class="processed-notice"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg><div class="processed-notice-text">此审批于 ${d.ccTime} 抄送给你（${d.ccSource === '临时加抄送' ? '由 ' + escHtml(d.ccBy) + ' 临时加抄送' : '流程抄送节点'}）${d.ccNote ? '，抄送说明：' + escHtml(d.ccNote) : ''}。你仅可查看，无需任何操作</div></div></div>`;
   html += `</div>`;
   return html;
 }
@@ -2210,6 +2329,9 @@ function openNotifTarget(id) {
   } else if (t.type === 'processed') {
     const rec = approvalData.processed.find(x => x.id === t.id);
     if (rec) { currentDetailData = rec; currentView = 'processed-detail'; activeTab = 'processed'; renderView(); return; }
+  } else if (t.type === 'cc') {
+    const rec = approvalData.cc.find(x => x.id === t.id);
+    if (rec) { currentDetailData = rec; currentView = 'cc-detail'; activeTab = 'cc'; renderView(); return; }
   }
   showToast('info', '通知', '对应的审批记录不存在或已被处理');
 }
