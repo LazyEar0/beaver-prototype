@@ -628,6 +628,18 @@ input,select,textarea{font-family:inherit;font-size:inherit;}
   /* 通知面板全宽 */
   .notif-panel{width:calc(100vw - 24px);right:-8px;}
 }
+/* ============================================
+   原型演示场景导航（非产品功能，仅供演示走查）
+   ============================================ */
+.demo-nav-btn{position:fixed;right:20px;bottom:20px;z-index:900;display:flex;align-items:center;gap:6px;padding:8px 14px;background:#1F2937;color:#fff;border:none;border-radius:var(--radius-full);font-size:12px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,0.25);opacity:0.85;}
+.demo-nav-btn:hover{opacity:1;}
+.demo-nav-panel{position:fixed;right:20px;bottom:64px;z-index:900;width:300px;max-height:70vh;overflow-y:auto;background:#1F2937;color:#E5E7EB;border-radius:var(--radius-lg);box-shadow:0 8px 32px rgba(0,0,0,0.35);padding:var(--space-3) 0;display:none;}
+.demo-nav-panel.open{display:block;}
+.demo-nav-head{padding:4px var(--space-4) 8px;font-size:11px;color:#9CA3AF;border-bottom:1px solid rgba(255,255,255,0.1);}
+.demo-nav-group{padding:8px var(--space-4) 2px;font-size:11px;font-weight:600;color:#9CA3AF;}
+.demo-nav-item{padding:6px var(--space-4);font-size:12px;color:#E5E7EB;cursor:pointer;}
+.demo-nav-item:hover{background:rgba(255,255,255,0.08);}
+@media (max-width:768px){.demo-nav-panel{right:12px;left:12px;width:auto;}}
   </style>
 </head>
 <body>
@@ -719,6 +731,10 @@ input,select,textarea{font-family:inherit;font-size:inherit;}
 
   <!-- Toast -->
   <div class="toast-container" id="toastContainer"></div>
+
+  <!-- 原型演示场景导航（非产品功能） -->
+  <button class="demo-nav-btn" onclick="toggleDemoNav()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18"/><path d="M3 6h18"/><path d="M3 18h18"/></svg>演示场景</button>
+  <div class="demo-nav-panel" id="demoNavPanel"></div>
 
 <script>
 // ============================================
@@ -3233,6 +3249,69 @@ function showPublishValidation() {
     errors.forEach(e => { bodyHtml += '<div style="font-size:13px;color:var(--md-error);padding:4px 0;padding-left:16px">• '+escHtml(e)+'</div>'; });
     showModal('发布校验', bodyHtml, [{text:'知道了', class:'btn btn-primary', onclick:'closeModal()'}]);
   }
+}
+
+// ============================================
+// 原型演示场景导航（非产品功能，仅供演示走查）
+// ============================================
+const demoScenarios = [
+  { group: '待我审批', items: [
+    { t: 'pending', id: 1, label: '会签：前 2 人已通过，待我操作' },
+    { t: 'pending', id: 2, label: '单人审批：审批意见必填' },
+    { t: 'pending', id: 3, label: '或签：多人均未操作' },
+    { t: 'pending', id: 8, label: '或签已被他人处理：只读禁用（R-16）' }
+  ]},
+  { group: '我已审批', items: [
+    { t: 'processed', id: 4, label: '已通过 + 后续节点审批人去重（R-11）' },
+    { t: 'processed', id: 5, label: '已拒绝' },
+    { t: 'processed', id: 6, label: '已转交：接手人通过 + 去重' },
+    { t: 'processed', id: 7, label: '已跳过：或签他人已通过' }
+  ]},
+  { group: '我发起的', items: [
+    { t: 'initiated', id: 10, label: '审批中：会签 2/3，可撤回/加抄送' },
+    { t: 'initiated', id: 11, label: '已通过：单节点' },
+    { t: 'initiated', id: 12, label: '已拒绝：第二节点拒绝' },
+    { t: 'initiated', id: 13, label: '拒绝回退后重审：两轮记录（R-17）' },
+    { t: 'initiated', id: 14, label: '转交 + 审批人去重（R-14）' },
+    { t: 'initiated', id: 15, label: '会签一人拒绝，其余跳过（R-06）' },
+    { t: 'initiated', id: 16, label: '发起人=审批人自动通过（R-12）' },
+    { t: 'initiated', id: 17, label: '会签部分人不存在，兜底转交（R-15）' }
+  ]},
+  { group: '抄送我的', items: [
+    { t: 'cc', id: 20, label: '抄送节点触发：审批中' },
+    { t: 'cc', id: 21, label: '临时加抄送：已通过' },
+    { t: 'cc', id: 22, label: '抄送节点触发：已拒绝' }
+  ]}
+];
+
+function toggleDemoNav() {
+  const p = document.getElementById('demoNavPanel');
+  if (p.classList.contains('open')) { p.classList.remove('open'); return; }
+  let html = '<div class="demo-nav-head">原型演示导航：点击跳到对应场景的详情页。此浮层仅供演示走查，不属于产品设计。</div>';
+  demoScenarios.forEach(g => {
+    html += '<div class="demo-nav-group">' + g.group + '</div>';
+    g.items.forEach(it => { html += '<div class="demo-nav-item" onclick="demoJump(\'' + it.t + '\',' + it.id + ')">' + it.label + '</div>'; });
+  });
+  p.innerHTML = html;
+  p.classList.add('open');
+}
+
+function demoJump(t, id) {
+  document.getElementById('demoNavPanel').classList.remove('open');
+  const map = {
+    pending: { list: approvalData.pending, view: 'approver-detail' },
+    processed: { list: approvalData.processed, view: 'processed-detail' },
+    initiated: { list: approvalData.initiated, view: 'initiator-detail' },
+    cc: { list: approvalData.cc, view: 'cc-detail' }
+  };
+  const m = map[t];
+  const rec = m && m.list.find(x => x.id === id);
+  if (!rec) { showToast('info', '演示导航', '该记录已在本次会话中被操作，刷新页面可复原'); return; }
+  activeTab = t; currentDetailData = rec; currentView = m.view; submitBannerVisible = false;
+  closeAddNodeMenu(); closeConfigDrawer();
+  document.getElementById('navDesigner').classList.remove('active');
+  document.getElementById('navApproval').classList.add('active');
+  renderView();
 }
 
 // --- 初始化 ---
