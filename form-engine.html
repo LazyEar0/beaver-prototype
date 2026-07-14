@@ -1000,7 +1000,7 @@ function getSampleFields(formName) {
       ] } },
       { type: 'radio', name: '出行方式', props: { required: true, layout: 'vertical', options: ['飞机', '高铁', '自驾', '其他'] } },
       { type: 'person', name: '随行人员', props: { required: false, personMode: 'multi', personScope: 'all' } },
-      { type: 'detail', name: '费用明细', props: { required: true, minRows: 1, maxRows: 10, columns: [
+      { type: 'detail', name: '费用明细', props: { required: true, columns: [
         { name: '费用类型', type: 'dropdown', required: true, options: ['交通费', '住宿费', '餐饮费', '其他'] },
         { name: '金额', type: 'number', required: true },
         { name: '日期', type: 'date', required: false },
@@ -1012,7 +1012,7 @@ function getSampleFields(formName) {
     return [
       { type: 'shortText', name: '报销人', props: { required: true, placeholder: '请输入姓名' } },
       { type: 'radio', name: '报销类型', props: { required: true, layout: 'vertical', options: ['差旅报销', '日常报销', '项目报销'] } },
-      { type: 'detail', name: '费用明细', props: { required: true, minRows: 1, columns: [
+      { type: 'detail', name: '费用明细', props: { required: true, columns: [
         { name: '费用项目', type: 'text', required: true },
         { name: '金额', type: 'number', required: true },
         { name: '日期', type: 'date', required: true }
@@ -1446,10 +1446,6 @@ function renderPropsForField(field) {
       basic += propCheck('required', '是否必填', p.required);
       basic += '</div><div class="fd-props-section"><div class="fd-props-section-title">列配置</div>';
       basic += renderColumnConfig(p.columns || []);
-      validation += propInput('minRows', '最少行数', p.minRows || 1, 'number');
-      validation += propInput('maxRows', '最多行数', p.maxRows || '', 'number');
-      if (propIsSet(p.minRows) && Number(p.minRows) !== 1) vCount++;
-      if (propIsSet(p.maxRows)) vCount++;
       break;
     case 'readonlyText':
       basic += `<div class="fd-prop-row"><label class="fd-prop-label">文本内容</label><textarea class="fd-prop-input" style="height:80px;padding:8px 12px;resize:vertical;" onchange="updateFieldProp('text',this.value)">${escHtml(p.text || '')}</textarea></div>`;
@@ -1703,7 +1699,7 @@ function buildDefaultField(type) {
     case 'datetime': field.props = { required: false, format: 'datetime' }; break;
     case 'person': field.props = { required: false, personMode: 'single', personScope: 'all' }; break;
     case 'columns': field.props = { colCount: 2, columns_data: [[], []] }; break;
-    case 'detail': field.props = { required: true, minRows: 1, columns: [{ name: '列1', type: 'text', required: false }] }; break;
+    case 'detail': field.props = { required: true, columns: [{ name: '列1', type: 'text', required: false }] }; break;
     case 'readonlyText': field.props = { text: '请输入说明文本', style: 'body' }; break;
   }
   return field;
@@ -2462,15 +2458,13 @@ function removePerson(id, index, event) {
 // ========== 明细（预览可交互） ==========
 function renderPreviewDetail(field, id) {
   const cols = field.props?.columns || [];
-  const minRows = Math.max(1, Number(field.props?.minRows) || 1);
   let html = `<div style="overflow-x:auto;"><table class="fd-preview-detail-table"><thead><tr><th style="width:44px;text-align:center;">序号</th>`;
   cols.forEach(c => { html += `<th>${escHtml(c.name)}${c.required ? ' <span style="color:var(--md-error);">*</span>' : ''}</th>`; });
   html += `<th style="width:56px;text-align:center;">操作</th></tr></thead><tbody id="pvdt_body_${id}">`;
-  for (let r = 0; r < minRows; r++) html += pvDetailRowHtml(field, id);
+  html += pvDetailRowHtml(field, id);
   html += '</tbody></table></div>';
   html += `<div style="text-align:center;margin-top:8px;">
     <button class="btn btn-text btn-sm" id="pvdt_add_${id}" onclick="pvAddDetailRow('${id}')">+ 添加一行</button>
-    <div id="pvdt_hint_${id}" class="form-hint" style="display:none;color:var(--md-warning);"></div>
   </div>`;
   return html;
 }
@@ -2509,11 +2503,6 @@ function pvAddDetailRow(id) {
   const field = pvGetDetailField(id);
   const tbody = document.getElementById('pvdt_body_' + id);
   if (!field || !tbody) return;
-  const maxRows = Number(field.props?.maxRows) || 0;
-  if (maxRows && tbody.rows.length >= maxRows) {
-    showToast('error', '无法添加', `最多只能添加 ${maxRows} 行`);
-    return;
-  }
   tbody.insertAdjacentHTML('beforeend', pvDetailRowHtml(field, id));
   pvUpdateDetailButtons(id);
 }
@@ -2522,8 +2511,7 @@ function pvRemoveDetailRow(btn, id) {
   const field = pvGetDetailField(id);
   const tbody = document.getElementById('pvdt_body_' + id);
   if (!field || !tbody) return;
-  const minRows = Math.max(1, Number(field.props?.minRows) || 1);
-  if (tbody.rows.length <= minRows) return;
+  if (tbody.rows.length <= 1) return;
   const tr = btn.closest('tr');
   if (tr) tr.remove();
   pvUpdateDetailButtons(id);
@@ -2534,28 +2522,17 @@ function pvUpdateDetailButtons(id) {
   const tbody = document.getElementById('pvdt_body_' + id);
   if (!field || !tbody) return;
   const rows = tbody.rows.length;
-  const minRows = Math.max(1, Number(field.props?.minRows) || 1);
-  const maxRows = Number(field.props?.maxRows) || 0;
   // 序号重排
   Array.from(tbody.rows).forEach((tr, i) => {
     const idx = tr.querySelector('.dt-index');
     if (idx) idx.textContent = i + 1;
   });
-  // 只剩最少行数时删除按钮置灰
+  // 只剩 1 行时删除按钮置灰
   tbody.querySelectorAll('.pvdt-del').forEach(b => {
-    b.disabled = rows <= minRows;
-    b.style.opacity = rows <= minRows ? '0.38' : '';
-    b.style.pointerEvents = rows <= minRows ? 'none' : '';
+    b.disabled = rows <= 1;
+    b.style.opacity = rows <= 1 ? '0.38' : '';
+    b.style.pointerEvents = rows <= 1 ? 'none' : '';
   });
-  // 达最多行数时添加按钮置灰 + 提示
-  const addBtn = document.getElementById('pvdt_add_' + id);
-  const hint = document.getElementById('pvdt_hint_' + id);
-  const atMax = maxRows > 0 && rows >= maxRows;
-  if (addBtn) addBtn.disabled = atMax;
-  if (hint) {
-    hint.style.display = atMax ? 'block' : 'none';
-    hint.textContent = atMax ? `最多添加 ${maxRows} 行` : '';
-  }
 }
 
 // ========== 提交校验 ==========
@@ -2633,8 +2610,7 @@ function pvValidateDetail(field, id) {
   const p = field.props || {};
   const tbody = document.getElementById('pvdt_body_' + id);
   if (!tbody) return null;
-  const minRows = Math.max(1, Number(p.minRows) || 1);
-  if (p.required && tbody.rows.length < minRows) return `请至少添加 ${minRows} 行数据`;
+  if (p.required && tbody.rows.length === 0) return '此项为必填';
   // 必填列逐行逐列校验，对应单元格标红
   const cols = p.columns || [];
   let cellError = false;
