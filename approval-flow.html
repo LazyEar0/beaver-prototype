@@ -1489,7 +1489,7 @@ function renderListView() {
   return html;
 }
 
-function switchTab(tab) { activeTab = tab; renderView(); }
+function switchTab(tab) { activeTab = tab; listSearch = ''; listStatusFilter = 'all'; listPage = 1; renderView(); }
 
 function renderTabContent() {
   if (activeTab === 'pending') return renderPendingList();
@@ -1504,14 +1504,13 @@ function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot
 // --- 筛选栏 ---
 function renderFilterBar(tab, extraHtml) {
   const filterOptions = {
-    pending: [{value:'all',label:'全部模式'},{value:'单人审批',label:'单人审批'},{value:'会签',label:'会签'},{value:'或签',label:'或签'}],
     processed: [{value:'all',label:'全部状态'},{value:'approved',label:'已通过'},{value:'rejected',label:'已拒绝'},{value:'transferred',label:'已转交'},{value:'skipped',label:'已跳过'}],
     initiated: [{value:'all',label:'全部状态'},{value:'in-progress',label:'审批中'},{value:'approved',label:'已通过'},{value:'rejected',label:'已拒绝'},{value:'withdrawn',label:'已撤回'}],
     cc: [{value:'all',label:'全部状态'},{value:'in-progress',label:'审批中'},{value:'approved',label:'已通过'},{value:'rejected',label:'已拒绝'}]
   };
   let html = '<div class="filter-bar">';
   html += '<div class="filter-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><input type="text" placeholder="搜索申请标题或发起人..." value="'+escHtml(listSearch)+'" oninput="onListSearch(this.value)" oncompositionstart="isComposing=true" oncompositionend="isComposing=false;onListSearch(this.value)" onfocus="searchFocused=true" onblur="searchFocused=false" />'+(listSearch?'<button class="search-clear-btn" onclick="clearListSearch()">×</button>':'')+'</div>';
-  html += '<select class="filter-select" onchange="onListStatusFilter(this.value)">'+(filterOptions[tab]||[]).map(o=>'<option value="'+o.value+'" '+(listStatusFilter===o.value?'selected':'')+'>'+o.label+'</option>').join('')+'</select>';
+  if (filterOptions[tab]) html += '<select class="filter-select" onchange="onListStatusFilter(this.value)">'+filterOptions[tab].map(o=>'<option value="'+o.value+'" '+(listStatusFilter===o.value?'selected':'')+'>'+o.label+'</option>').join('')+'</select>';
   if (extraHtml) html += extraHtml;
   html += '</div>';
   return html;
@@ -1540,16 +1539,15 @@ function renderPagination(total,totalPages){
 function renderPendingList() {
   let items = [...approvalData.pending];
   if(listSearch){const q=listSearch.toLowerCase();items=items.filter(i=>i.formName.toLowerCase().includes(q)||i.applicant.toLowerCase().includes(q));}
-  if(listStatusFilter!=='all')items=items.filter(i=>i.mode===listStatusFilter);
   if(!items.length)return renderFilterBar('pending')+renderEmpty('暂无待审批事项');
   const total=items.length,totalPages=Math.max(1,Math.ceil(total/listPageSize));
   if(listPage>totalPages)listPage=totalPages;
   const paged=items.slice((listPage-1)*listPageSize,listPage*listPageSize);
   let html=renderFilterBar('pending');
-  html+='<div class="table-card"><div class="table-wrapper"><table class="data-table"><thead><tr><th>申请标题</th><th style="width:80px">发起人</th><th style="width:90px">审批模式</th><th style="width:140px">提交时间</th><th style="width:70px">状态</th><th style="width:110px">操作</th></tr></thead><tbody>';
+  html+='<div class="table-card"><div class="table-wrapper"><table class="data-table"><thead><tr><th>申请标题</th><th style="width:80px">发起人</th><th style="width:140px">提交时间</th><th style="width:70px">状态</th><th style="width:110px">操作</th></tr></thead><tbody>';
   paged.forEach(item=>{
     const summaryStr=Object.entries(item.summary).slice(0,3).map(([k,v])=>k+'：'+v).join(' · ');
-    html+='<tr onclick="openApproverDetail('+item.id+')" style="cursor:pointer"><td><div class="ds-name-cell"><span class="ds-name">'+item.formName+'</span><span class="ds-desc">'+escHtml(summaryStr)+'</span></div></td><td>'+item.applicant+'</td><td>'+item.mode+(item.modeDetail?'<br/><span style="font-size:11px;color:var(--md-outline)">'+escHtml(item.modeDetail)+'</span>':'')+'</td><td style="font-size:12px;color:var(--md-outline)">'+item.submitTime+'</td><td><span class="st-badge st-pending">'+item.statusText+'</span></td><td onclick="event.stopPropagation()"><button class="btn btn-primary btn-sm" onclick="openApproverDetail('+item.id+')">查看并审批</button></td></tr>';
+    html+='<tr onclick="openApproverDetail('+item.id+')" style="cursor:pointer"><td><div class="ds-name-cell"><span class="ds-name">'+item.formName+'</span><span class="ds-desc">'+escHtml(summaryStr)+'</span></div></td><td>'+item.applicant+'</td><td style="font-size:12px;color:var(--md-outline)">'+item.submitTime+'</td><td><span class="st-badge st-pending">'+item.statusText+'</span></td><td onclick="event.stopPropagation()"><button class="btn btn-primary btn-sm" onclick="openApproverDetail('+item.id+')">查看并审批</button></td></tr>';
   });
   html+='</tbody></table></div></div>';
   html+=renderPagination(total,totalPages);
@@ -1609,10 +1607,10 @@ function renderCcList() {
   if(listPage>totalPages)listPage=totalPages;
   const paged=items.slice((listPage-1)*listPageSize,listPage*listPageSize);
   let html=renderFilterBar('cc');
-  html+='<div class="table-card"><div class="table-wrapper"><table class="data-table"><thead><tr><th>申请标题</th><th style="width:80px">发起人</th><th style="width:120px">抄送时间</th><th style="width:100px">抄送来源</th><th style="width:180px">抄送说明</th><th style="width:80px">审批状态</th><th style="width:100px">操作</th></tr></thead><tbody>';
+  html+='<div class="table-card"><div class="table-wrapper"><table class="data-table"><thead><tr><th>申请标题</th><th style="width:80px">发起人</th><th style="width:120px">抄送时间</th><th style="width:220px">抄送说明</th><th style="width:80px">审批状态</th><th style="width:100px">操作</th></tr></thead><tbody>';
   const stMap={'in-progress':'st-in-progress','approved':'st-approved','rejected':'st-rejected'};
   paged.forEach(item=>{
-    html+='<tr onclick="openCcDetail('+item.id+')" style="cursor:pointer"><td><div class="ds-name-cell"><span class="ds-name">'+item.formName+'</span><span class="ds-desc">'+escHtml(Object.entries(item.summary).slice(0,2).map(([k,v])=>k+'：'+v).join(' · '))+'</span></div></td><td>'+item.applicant+'</td><td style="font-size:12px;color:var(--md-outline)">'+item.ccTime+'</td><td style="font-size:12px;color:var(--md-on-surface-variant)">'+item.ccSource+'</td><td style="font-size:12px;color:var(--md-on-surface-variant);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escHtml(item.ccNote||'')+'">'+escHtml(item.ccNote||'—')+'</td><td><span class="st-badge '+(stMap[item.status]||'')+'">'+item.statusText+'</span></td><td onclick="event.stopPropagation()"><button class="btn btn-outlined btn-sm" onclick="openCcDetail('+item.id+')">查看详情</button></td></tr>';
+    html+='<tr onclick="openCcDetail('+item.id+')" style="cursor:pointer"><td><div class="ds-name-cell"><span class="ds-name">'+item.formName+'</span><span class="ds-desc">'+escHtml(Object.entries(item.summary).slice(0,2).map(([k,v])=>k+'：'+v).join(' · '))+'</span></div></td><td>'+item.applicant+'</td><td style="font-size:12px;color:var(--md-outline)">'+item.ccTime+'</td><td style="font-size:12px;color:var(--md-on-surface-variant);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escHtml(item.ccNote||'')+'">'+escHtml(item.ccNote||'—')+'</td><td><span class="st-badge '+(stMap[item.status]||'')+'">'+item.statusText+'</span></td><td onclick="event.stopPropagation()"><button class="btn btn-outlined btn-sm" onclick="openCcDetail('+item.id+')">查看详情</button></td></tr>';
   });
   html+='</tbody></table></div></div>';
   html+=renderPagination(total,totalPages);
