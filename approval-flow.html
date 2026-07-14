@@ -1124,7 +1124,7 @@ const approvalData = {
       id: 11, formName: '请假申请', applicant: '我（Sukey Wu）', submitTime: '2026-06-25 09:00',
       status: 'approved', statusText: '已通过', badgeClass: 'badge-success',
       summary: { '请假类型': '年假', '请假天数': '2 天' },
-      currentStep: '已完成',
+      currentStep: '',
       canWithdraw: false,
       formData: [
         { label: '请假类型', value: '年假' },
@@ -1145,7 +1145,7 @@ const approvalData = {
       id: 12, formName: '报销单', applicant: '我（Sukey Wu）', submitTime: '2026-06-20 14:00',
       status: 'rejected', statusText: '已拒绝', badgeClass: 'badge-error',
       summary: { '报销类型': '差旅报销', '报销总金额': '8500 元' },
-      currentStep: '已拒绝',
+      currentStep: '',
       canWithdraw: false,
       formData: [
         { label: '报销类型', value: '差旅报销' },
@@ -1168,7 +1168,7 @@ const approvalData = {
       id: 13, formName: '采购申请单', applicant: '我（Sukey Wu）', submitTime: '2026-06-15 09:00',
       status: 'approved', statusText: '已通过', badgeClass: 'badge-success',
       summary: { '采购物品': '办公显示器 x10', '预算金额': '15000 元' },
-      currentStep: '已完成（含回退重审）',
+      currentStep: '',
       canWithdraw: false,
       formData: [
         { label: '采购物品', value: '办公显示器 x10' },
@@ -1205,7 +1205,7 @@ const approvalData = {
       id: 14, formName: '出差申请', applicant: '我（Sukey Wu）', submitTime: '2026-06-10 08:00',
       status: 'approved', statusText: '已通过', badgeClass: 'badge-success',
       summary: { '出差目的地': '广州', '出发日期': '2026-06-18' },
-      currentStep: '已完成（含转交）',
+      currentStep: '',
       canWithdraw: false,
       formData: [
         { label: '出差目的地', value: '广州' },
@@ -1229,7 +1229,7 @@ const approvalData = {
       id: 15, formName: '出差申请', applicant: '我（Sukey Wu）', submitTime: '2026-06-05 10:00',
       status: 'rejected', statusText: '已拒绝', badgeClass: 'badge-error',
       summary: { '出差目的地': '成都', '出发日期': '2026-06-12' },
-      currentStep: '会签中被拒绝',
+      currentStep: '',
       canWithdraw: false,
       formData: [
         { label: '出差目的地', value: '成都' },
@@ -1252,7 +1252,7 @@ const approvalData = {
       id: 16, formName: '请假申请', applicant: '我（Sukey Wu）', submitTime: '2026-06-02 09:00',
       status: 'approved', statusText: '已通过', badgeClass: 'badge-success',
       summary: { '请假类型': '事假', '请假天数': '1 天' },
-      currentStep: '已完成（含自动通过）',
+      currentStep: '',
       canWithdraw: false,
       formData: [
         { label: '请假人', value: 'Sukey Wu' },
@@ -1277,7 +1277,7 @@ const approvalData = {
       id: 17, formName: '采购申请单', applicant: '我（Sukey Wu）', submitTime: '2026-05-28 10:00',
       status: 'approved', statusText: '已通过', badgeClass: 'badge-success',
       summary: { '采购物品': '团队服务器 x2', '预算金额': '36000 元' },
-      currentStep: '已完成（含审批人兜底）',
+      currentStep: '',
       canWithdraw: false,
       formData: [
         { label: '采购物品', value: '团队服务器 x2' },
@@ -1591,7 +1591,8 @@ function renderInitiatedList() {
   const stMap={'in-progress':'st-in-progress','approved':'st-approved','rejected':'st-rejected','withdrawn':'st-withdrawn'};
   paged.forEach(item=>{
     const canResubmit=item.status==='approved'||item.status==='rejected'||item.status==='withdrawn';
-    html+='<tr onclick="openInitiatorDetail('+item.id+')" style="cursor:pointer"><td><div class="ds-name-cell"><span class="ds-name">'+item.formName+'</span><span class="ds-desc">'+Object.entries(item.summary).slice(0,2).map(([k,v])=>k+'：'+v).join(' · ')+'</span></div></td><td style="font-size:12px;color:var(--md-outline)">'+item.submitTime+'</td><td style="font-size:12px;color:var(--md-on-surface-variant)">'+escHtml(item.currentStep||'—')+'</td><td><span class="st-badge '+(stMap[item.status]||'')+'">'+item.statusText+'</span></td><td onclick="event.stopPropagation()" style="display:flex;gap:4px;align-items:center"><button class="btn btn-outlined btn-sm" onclick="openInitiatorDetail('+item.id+')">查看详情</button>'+(canResubmit?'<button class="btn btn-text btn-sm" onclick="handleResubmit('+item.id+')">重新发起</button>':'')+'</td></tr>';
+    const progressText=item.status==='in-progress'?escHtml(item.currentStep||'—'):'—';
+    html+='<tr onclick="openInitiatorDetail('+item.id+')" style="cursor:pointer"><td><div class="ds-name-cell"><span class="ds-name">'+item.formName+'</span><span class="ds-desc">'+Object.entries(item.summary).slice(0,2).map(([k,v])=>k+'：'+v).join(' · ')+'</span></div></td><td style="font-size:12px;color:var(--md-outline)">'+item.submitTime+'</td><td style="font-size:12px;color:var(--md-on-surface-variant)">'+progressText+'</td><td><span class="st-badge '+(stMap[item.status]||'')+'">'+item.statusText+'</span></td><td onclick="event.stopPropagation()" style="display:flex;gap:4px;align-items:center"><button class="btn btn-outlined btn-sm" onclick="openInitiatorDetail('+item.id+')">查看详情</button>'+(canResubmit?'<button class="btn btn-text btn-sm" onclick="handleResubmit('+item.id+')">重新发起</button>':'')+'</td></tr>';
   });
   html+='</tbody></table></div></div>';
   html+=renderPagination(total,totalPages);
@@ -2011,7 +2012,7 @@ function confirmWithdraw() {
     d.statusText = '已撤回';
     d.badgeClass = 'badge-neutral';
     d.canWithdraw = false;
-    d.currentStep = '已撤回';
+    d.currentStep = '';
     // timeline 更新：当前节点的待审批记录标记为已取消，结束节点标记为已撤回
     (d.timeline || []).forEach(node => {
       if (node.type === 'node' && node.isCurrent) {
