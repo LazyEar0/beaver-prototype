@@ -580,6 +580,54 @@ input,select,textarea{font-family:inherit;font-size:inherit;}
 .flow-type-card .node-card-icon{margin:0 auto var(--space-2);}
 .flow-type-card-title{font-size:var(--font-size-sm);font-weight:500;color:var(--md-on-surface);}
 .flow-type-card-note{font-size:10px;color:var(--md-outline);margin-top:2px;}
+
+/* ============================================
+   吸底操作栏（详情页）
+   ============================================ */
+.sticky-action-bar{position:sticky;bottom:0;z-index:20;background:#fff;border-top:1px solid var(--color-border);padding:var(--space-3) var(--space-6);margin:var(--space-6) calc(-1 * var(--space-8)) calc(-1 * var(--space-8));box-shadow:0 -2px 12px rgba(0,0,0,0.06);}
+.sticky-action-bar .action-buttons{max-width:800px;margin:0 auto;justify-content:flex-end;}
+.sticky-action-bar .processed-notice{max-width:800px;margin:0 auto var(--space-2);}
+
+/* ============================================
+   移动端适配（审批列表页 + 详情页；设计器不适配）
+   ============================================ */
+/* 列表在窄屏切换为卡片 */
+.mobile-card-list{display:none;}
+.mobile-approval-card{background:#fff;border:1px solid var(--color-border);border-radius:var(--radius-lg);padding:var(--space-4);margin-bottom:var(--space-3);cursor:pointer;}
+.mobile-approval-card:active{background:var(--color-primary-subtle);}
+.mobile-card-top{display:flex;align-items:center;justify-content:space-between;gap:var(--space-2);margin-bottom:var(--space-2);}
+.mobile-card-title{font-size:var(--font-size-base);font-weight:500;color:var(--md-on-surface);}
+.mobile-card-desc{font-size:var(--font-size-xs);color:var(--md-on-surface-variant);margin-bottom:var(--space-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.mobile-card-meta{display:flex;align-items:center;gap:var(--space-3);font-size:var(--font-size-xs);color:var(--md-outline);flex-wrap:wrap;}
+
+@media (max-width: 768px) {
+  /* 布局：隐藏侧边栏，主区全宽 */
+  .sidebar{display:none;}
+  .content{padding:var(--space-4) !important;}
+  .header{padding:0 var(--space-3);}
+  /* 列表页：表格切换为卡片 */
+  .table-card{display:none;}
+  .mobile-card-list{display:block;}
+  .tabs-header{overflow-x:auto;}
+  .tab-item{padding:var(--space-3) var(--space-3);font-size:var(--font-size-sm);}
+  .tab-content{padding:var(--space-4) var(--space-3);}
+  .filter-search{max-width:none;}
+  .pagination{flex-direction:column;gap:var(--space-2);align-items:flex-start;}
+  /* 详情页：字段单列，操作按钮撑满 */
+  .info-field{flex-direction:column;gap:2px;}
+  .info-field-label{width:auto;min-width:0;}
+  .detail-title{font-size:var(--font-size-lg);}
+  .page-title{font-size:var(--font-size-xl);}
+  .sticky-action-bar{margin:var(--space-4) calc(-1 * var(--space-4)) calc(-1 * var(--space-4));padding:var(--space-3) var(--space-4);padding-bottom:calc(var(--space-3) + env(safe-area-inset-bottom));}
+  .sticky-action-bar .action-buttons{justify-content:stretch;}
+  .sticky-action-bar .action-buttons .btn{flex:1;justify-content:center;}
+  /* 弹窗：底部弹层样式 */
+  .modal-overlay{align-items:flex-end;}
+  .modal{width:100%;max-width:none;border-radius:var(--radius-lg) var(--radius-lg) 0 0;max-height:85vh;}
+  .modal-footer .btn{flex:1;justify-content:center;}
+  /* 通知面板全宽 */
+  .notif-panel{width:calc(100vw - 24px);right:-8px;}
+}
   </style>
 </head>
 <body>
@@ -1550,6 +1598,7 @@ function renderPendingList() {
     html+='<tr onclick="openApproverDetail('+item.id+')" style="cursor:pointer"><td><div class="ds-name-cell"><span class="ds-name">'+item.formName+'</span><span class="ds-desc">'+escHtml(summaryStr)+'</span></div></td><td>'+item.applicant+'</td><td style="font-size:12px;color:var(--md-outline)">'+item.submitTime+'</td><td><span class="st-badge st-pending">'+item.statusText+'</span></td><td onclick="event.stopPropagation()"><button class="btn btn-primary btn-sm" onclick="openApproverDetail('+item.id+')">查看并审批</button></td></tr>';
   });
   html+='</tbody></table></div></div>';
+  html+=renderMobileCards(paged,{onclick:'openApproverDetail',badgeClass:()=>'st-pending',badgeText:i=>i.statusText,meta:i=>['发起人：'+i.applicant,i.submitTime]});
   html+=renderPagination(total,totalPages);
   return html;
 }
@@ -1570,6 +1619,7 @@ function renderProcessedList() {
     html+='<tr onclick="openProcessedDetail('+item.id+')" style="cursor:pointer"><td><div class="ds-name-cell"><span class="ds-name">'+item.formName+'</span><span class="ds-desc">'+Object.entries(item.summary).slice(0,2).map(([k,v])=>k+'：'+v).join(' · ')+'</span></div></td><td>'+item.applicant+'</td><td style="font-size:12px;color:var(--md-outline)">'+item.submitTime+'</td><td><span class="st-badge '+(stMap[item.status]||'')+'">'+item.myAction+'</span></td><td style="font-size:12px;color:var(--md-outline)">'+item.myActionTime+'</td><td style="font-size:12px;color:var(--md-on-surface-variant);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escHtml(item.myComment||'')+'">'+escHtml(item.myComment||'—')+'</td></tr>';
   });
   html+='</tbody></table></div></div>';
+  html+=renderMobileCards(paged,{onclick:'openProcessedDetail',badgeClass:i=>stMap[i.status]||'',badgeText:i=>i.myAction,meta:i=>['发起人：'+i.applicant,'操作于 '+i.myActionTime]});
   html+=renderPagination(total,totalPages);
   return html;
 }
@@ -1603,6 +1653,7 @@ function renderInitiatedList() {
     html+='<tr onclick="openInitiatorDetail('+item.id+')" style="cursor:pointer"><td><div class="ds-name-cell"><span class="ds-name">'+item.formName+'</span><span class="ds-desc">'+Object.entries(item.summary).slice(0,2).map(([k,v])=>k+'：'+v).join(' · ')+'</span></div></td><td style="font-size:12px;color:var(--md-outline)">'+item.submitTime+'</td><td style="font-size:12px;color:var(--md-on-surface-variant)">'+progressText+'</td><td><span class="st-badge '+(stMap[item.status]||'')+'">'+item.statusText+'</span></td><td onclick="event.stopPropagation()" style="display:flex;gap:4px;align-items:center"><button class="btn btn-outlined btn-sm" onclick="openInitiatorDetail('+item.id+')">查看详情</button>'+(canResubmit?'<button class="btn btn-text btn-sm" onclick="handleResubmit('+item.id+')">重新发起</button>':'')+'</td></tr>';
   });
   html+='</tbody></table></div></div>';
+  html+=renderMobileCards(paged,{onclick:'openInitiatorDetail',badgeClass:i=>stMap[i.status]||'',badgeText:i=>i.statusText,meta:i=>[i.submitTime,i.status==='in-progress'?getPendingApproverText(i):'']});
   html+=renderPagination(total,totalPages);
   return html;
 }
@@ -1623,7 +1674,23 @@ function renderCcList() {
     html+='<tr onclick="openCcDetail('+item.id+')" style="cursor:pointer"><td><div class="ds-name-cell"><span class="ds-name">'+item.formName+'</span><span class="ds-desc">'+escHtml(Object.entries(item.summary).slice(0,2).map(([k,v])=>k+'：'+v).join(' · '))+'</span></div></td><td>'+item.applicant+'</td><td style="font-size:12px;color:var(--md-outline)">'+item.ccTime+'</td><td style="font-size:12px;color:var(--md-on-surface-variant);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escHtml(item.ccNote||'')+'">'+escHtml(item.ccNote||'—')+'</td><td><span class="st-badge '+(stMap[item.status]||'')+'">'+item.statusText+'</span></td><td onclick="event.stopPropagation()"><button class="btn btn-outlined btn-sm" onclick="openCcDetail('+item.id+')">查看详情</button></td></tr>';
   });
   html+='</tbody></table></div></div>';
+  html+=renderMobileCards(paged,{onclick:'openCcDetail',badgeClass:i=>stMap[i.status]||'',badgeText:i=>i.statusText,meta:i=>['发起人：'+i.applicant,'抄送于 '+i.ccTime]});
   html+=renderPagination(total,totalPages);
+  return html;
+}
+
+// --- 移动端卡片列表（<=768px 时表格切换为卡片） ---
+function renderMobileCards(items, opts) {
+  let html = '<div class="mobile-card-list">';
+  items.forEach(item => {
+    const desc = Object.entries(item.summary).slice(0, 2).map(([k, v]) => k + '：' + v).join(' · ');
+    html += '<div class="mobile-approval-card" onclick="' + opts.onclick + '(' + item.id + ')">';
+    html += '<div class="mobile-card-top"><span class="mobile-card-title">' + escHtml(item.formName) + '</span><span class="st-badge ' + (opts.badgeClass(item) || '') + '">' + escHtml(opts.badgeText(item)) + '</span></div>';
+    html += '<div class="mobile-card-desc">' + escHtml(desc) + '</div>';
+    html += '<div class="mobile-card-meta">' + opts.meta(item).filter(Boolean).map(m => '<span>' + escHtml(m) + '</span>').join('') + '</div>';
+    html += '</div>';
+  });
+  html += '</div>';
   return html;
 }
 
@@ -1690,23 +1757,20 @@ function renderApproverDetail() {
   html += renderFormInfoCard(d);
   html += renderTimelineCard(d);
 
-  // 操作区
+  // 操作区（吸底，审批意见在点击通过/拒绝后的弹层中填写）
   if (d.isProcessed) {
-    html += `<div class="action-area"><div class="processed-notice"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg><div class="processed-notice-text">该审批已被 ${d.processedBy || '其他人'} 处理，操作按钮已禁用</div></div>`;
+    html += `<div class="sticky-action-bar"><div class="processed-notice"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg><div class="processed-notice-text">该审批已被 ${d.processedBy || '其他人'} 处理，操作按钮已禁用</div></div>`;
     html += `<div class="action-buttons"><button class="btn btn-primary" disabled>通过</button><button class="btn btn-danger" disabled>拒绝</button><button class="btn btn-outlined" disabled>转交</button></div></div>`;
   } else {
-    html += `<div class="action-area">`;
-    html += `<div class="action-area-title">审批意见${d.commentRequired ? ' <span style="color:var(--md-error);">*</span>' : ''}</div>`;
-    html += `<textarea class="action-comment" id="approvalComment" placeholder="${d.commentRequired ? '请填写审批意见（必填）' : '请填写审批意见（选填）'}"></textarea>`;
-    html += `<div class="action-buttons">`;
-    html += `<button class="btn btn-primary" onclick="handleApprove()">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg>通过</button>`;
-    html += `<button class="btn btn-danger" onclick="handleReject()">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>拒绝</button>`;
-    html += `<button class="btn btn-outlined" onclick="handleTransfer()">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17l9.2-9.2M17 17V7H7"/></svg>转交</button>`;
+    html += `<div class="sticky-action-bar"><div class="action-buttons">`;
     html += `<button class="btn btn-text" onclick="handleAddCC()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6"/><path d="M22 11h-6"/></svg>加抄送</button>`;
+    html += `<button class="btn btn-outlined" onclick="handleTransfer()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17l9.2-9.2M17 17V7H7"/></svg>转交</button>`;
+    html += `<button class="btn btn-danger" onclick="handleReject()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>拒绝</button>`;
+    html += `<button class="btn btn-primary" onclick="handleApprove()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg>通过</button>`;
     html += `</div></div>`;
   }
 
@@ -1785,14 +1849,14 @@ function renderInitiatorDetail() {
 
   // 操作区
   if (!isEnded) {
-    html += `<div class="action-area"><div class="action-buttons">`;
+    html += `<div class="sticky-action-bar"><div class="action-buttons">`;
     html += `<button class="btn btn-outlined" onclick="handleAddCC()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6"/><path d="M22 11h-6"/></svg>加抄送</button>`;
     if (d.canWithdraw) {
       html += `<button class="btn btn-danger" onclick="handleWithdraw()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>撤回申请</button>`;
     }
     html += `</div></div>`;
   } else {
-    html += `<div class="action-area"><div class="action-buttons">`;
+    html += `<div class="sticky-action-bar"><div class="action-buttons">`;
     html += `<button class="btn btn-primary" onclick="handleResubmit(${d.id})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>重新发起</button>`;
     html += `</div></div>`;
   }
@@ -1816,27 +1880,31 @@ function getDotIcon(dotClass) {
 }
 
 // --- 审批操作 ---
-let pendingApproveComment = '';
 function handleApprove() {
-  const comment = document.getElementById('approvalComment')?.value || '';
-  if (currentDetailData?.commentRequired && !comment.trim()) {
-    showToast('error', '操作失败', '审批意见为必填，请填写后再操作');
-    return;
-  }
-  pendingApproveComment = comment;
-  showModal('确认通过', `<p>确定要通过该审批申请吗？</p>${comment ? `<p style="margin-top:8px;color:var(--md-on-surface-variant);font-size:13px;">审批意见：${escHtml(comment)}</p>` : ''}`, [
+  const required = !!currentDetailData?.commentRequired;
+  showModal('确认通过', `
+    <div class="form-group">
+      <label class="form-label">审批意见${required ? ' <span class="required">*</span>' : ''}</label>
+      <textarea class="form-textarea" id="approvalComment" placeholder="${required ? '请填写审批意见（必填）' : '请填写审批意见（选填）'}" rows="3"></textarea>
+    </div>
+  `, [
     { text: '取消', class: 'btn btn-outlined', onclick: 'closeModal()' },
     { text: '确认通过', class: 'btn btn-primary', onclick: 'confirmApprove()' }
   ]);
 }
 
 function confirmApprove() {
+  const comment = document.getElementById('approvalComment')?.value || '';
+  if (currentDetailData?.commentRequired && !comment.trim()) {
+    showToast('error', '操作失败', '审批意见为必填，请填写后再操作');
+    return;
+  }
   closeModal();
   showToast('success', '已通过', '审批已通过，流程继续执行');
   currentDetailData.isProcessed = true;
   currentDetailData.processedBy = 'Sukey Wu';
   // R-09: 发起人收到通过通知
-  pushNotification('【已通过】' + currentDetailData.formName, '你的' + currentDetailData.formName + '已被 Sukey Wu 通过。审批意见：' + (pendingApproveComment.trim() || '同意'), null);
+  pushNotification('【已通过】' + currentDetailData.formName, '你的' + currentDetailData.formName + '已被 Sukey Wu 通过。审批意见：' + (comment.trim() || '同意'), null);
   renderView();
 }
 
