@@ -1358,6 +1358,49 @@ const approvalData = {
         ]},
         { type: 'end', title: '结束', status: '已通过', dotClass: 'end-approved' }
       ]
+    },
+    {
+      id: 18, formName: '报销单', applicant: '我（Sukey Wu）', submitTime: '2026-05-20 09:00',
+      status: 'rejected', statusText: '已拒绝', badgeClass: 'badge-error',
+      summary: { '报销类型': '日常报销', '报销总金额': '900 元' },
+      currentStep: '',
+      canWithdraw: false,
+      formData: [
+        { label: '报销类型', value: '日常报销' },
+        { label: '费用明细', value: '部门下午茶采购' },
+        { label: '报销总金额', value: '900 元' },
+        { label: '银行账号', value: '6228****8901' }
+      ],
+      timeline: [
+        { type: 'start', title: '开始', status: '已提交', time: '05-20 09:00', dotClass: 'start' },
+        { type: 'node', title: '或签审批', status: '已拒绝', dotClass: 'rejected', records: [
+          { name: '孙财务', status: '已拒绝', statusClass: 's-rejected', time: '05-20 11:00', comment: '非工作必要支出，不予报销' },
+          { name: '李总监', status: '已跳过', statusClass: 's-skipped', time: '', note: '（审批已被 孙财务 拒绝）' }
+        ]},
+        { type: 'end', title: '结束', status: '已拒绝', dotClass: 'end-rejected' }
+      ]
+    },
+    {
+      id: 19, formName: '请假申请', applicant: '我（Sukey Wu）', submitTime: '2026-05-15 14:00',
+      status: 'withdrawn', statusText: '已撤回', badgeClass: 'badge-neutral',
+      summary: { '请假类型': '年假', '请假天数': '5 天' },
+      currentStep: '',
+      canWithdraw: false,
+      formData: [
+        { label: '请假人', value: 'Sukey Wu' },
+        { label: '请假类型', value: '年假' },
+        { label: '起始日期', value: '2026-05-25' },
+        { label: '结束日期', value: '2026-05-29' },
+        { label: '请假天数', value: '5 天' },
+        { label: '请假事由', value: '家庭旅行（行程取消，主动撤回）' }
+      ],
+      timeline: [
+        { type: 'start', title: '开始', status: '已提交', time: '05-15 14:00', dotClass: 'start' },
+        { type: 'node', title: '主管审批', status: '已撤回', dotClass: 'skipped', records: [
+          { name: '王经理', status: '已取消', statusClass: 's-skipped', time: '', note: '（发起人已撤回申请）' }
+        ]},
+        { type: 'end', title: '结束', status: '已撤回', dotClass: 'pending' }
+      ]
     }
   ],
   cc: [
@@ -3275,12 +3318,22 @@ const demoScenarios = [
     { t: 'initiated', id: 14, label: '转交 + 审批人去重（R-14）' },
     { t: 'initiated', id: 15, label: '会签一人拒绝，其余跳过（R-06）' },
     { t: 'initiated', id: 16, label: '发起人=审批人自动通过（R-12）' },
-    { t: 'initiated', id: 17, label: '会签部分人不存在，兜底转交（R-15）' }
+    { t: 'initiated', id: 17, label: '会签部分人不存在，兜底转交（R-15）' },
+    { t: 'initiated', id: 18, label: '或签一人拒绝，其余跳过（R-08）' },
+    { t: 'initiated', id: 19, label: '已撤回（A-04）' }
   ]},
   { group: '抄送我的', items: [
     { t: 'cc', id: 20, label: '抄送节点触发：审批中' },
     { t: 'cc', id: 21, label: '临时加抄送：已通过' },
     { t: 'cc', id: 22, label: '抄送节点触发：已拒绝' }
+  ]},
+  { group: '发起与通知', items: [
+    { t: 'action', id: 'initiate', label: '发起申请表单：必填校验（A-01/A-02）' },
+    { t: 'action', id: 'notif', label: '通知面板：各类系统通知（9.1）' }
+  ]},
+  { group: '流程编排', items: [
+    { t: 'flow', id: 1, label: '出差审批流：会签/抄送/拒绝回退完整配置（D-03～D-06）' },
+    { t: 'flow', id: 3, label: '采购审批流：未配完，可演示发布校验失败（D-07/D-08）' }
   ]}
 ];
 
@@ -3298,6 +3351,16 @@ function toggleDemoNav() {
 
 function demoJump(t, id) {
   document.getElementById('demoNavPanel').classList.remove('open');
+  if (t === 'action') {
+    if (id === 'initiate') { openInitiateForm(); return; }
+    if (id === 'notif') {
+      // 延迟打开，避免本次点击冒泡到 document 后又把面板关掉
+      setTimeout(() => { const p = document.getElementById('notifPanel'); if (!p.classList.contains('open')) { p.classList.add('open'); renderNotifPanel(); } }, 50);
+      return;
+    }
+    return;
+  }
+  if (t === 'flow') { openFlowDesigner(id); return; }
   const map = {
     pending: { list: approvalData.pending, view: 'approver-detail' },
     processed: { list: approvalData.processed, view: 'processed-detail' },
