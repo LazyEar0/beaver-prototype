@@ -6,7 +6,7 @@ while ($listener.IsListening) {
     $context = $listener.GetContext()
     $path = $context.Request.Url.LocalPath
     if ($path -eq '/') { $path = '/index.html' }
-    $filePath = Join-Path 'd:\DidaCoreControl\Beaver\Docs\原型' ($path -replace '/', '\')
+    $filePath = Join-Path 'd:\DidaCoreControl\BeaverV3\Docs\原型' ($path -replace '/', '\')
     if (Test-Path $filePath -PathType Leaf) {
         $bytes = [System.IO.File]::ReadAllBytes($filePath)
         $ext = [System.IO.Path]::GetExtension($filePath)

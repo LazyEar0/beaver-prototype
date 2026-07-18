@@ -284,6 +284,11 @@ input,select,textarea{font-family:inherit;font-size:inherit;}
 .approval-record-comment{font-size:var(--font-size-sm);color:var(--md-on-surface-variant);margin-top:2px;font-style:italic;}
 .approval-record-note{font-size:var(--font-size-xs);color:var(--md-outline);margin-top:2px;}
 
+/* 单人审批环节一行式合并 */
+.timeline-inline-row{display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap;min-width:0;}
+.timeline-inline-row .timeline-node-title{margin-bottom:0;}
+.timeline-inline-comment{font-size:var(--font-size-sm);color:var(--md-on-surface-variant);margin-top:var(--space-1);font-style:italic;}
+
 /* 轮次分隔 */
 .round-divider{display:flex;align-items:center;gap:var(--space-3);margin:var(--space-4) 0;padding-left:32px;}
 .round-divider-line{flex:1;height:1px;background:var(--md-outline-variant);}
@@ -618,6 +623,9 @@ input,select,textarea{font-family:inherit;font-size:inherit;}
   .info-field-label{width:auto;min-width:0;}
   .detail-title{font-size:var(--font-size-lg);}
   .page-title{font-size:var(--font-size-xl);}
+  /* 时间线一行式合并：窄屏下允许换行、缩小间距，防溢出 */
+  .timeline-inline-row{gap:var(--space-1) var(--space-2);}
+  .timeline-inline-row .approval-record-name{word-break:break-all;}
   .sticky-action-bar{margin:var(--space-4) calc(-1 * var(--space-4)) calc(-1 * var(--space-4));padding:var(--space-3) var(--space-4);padding-bottom:calc(var(--space-3) + env(safe-area-inset-bottom));}
   .sticky-action-bar .action-buttons{justify-content:stretch;}
   .sticky-action-bar .action-buttons .btn{flex:1;justify-content:center;}
@@ -1246,7 +1254,7 @@ const approvalData = {
         { type: 'node', title: '部门经理审批', status: '已通过', dotClass: 'approved', records: [
           { name: '王经理', status: '已通过', statusClass: 's-approved', time: '06-15 11:00', comment: '同意' }
         ]},
-        { type: 'node', title: '抄送行政部', status: '已抄送', dotClass: 'approved', records: [
+        { type: 'node', nodeType: 'cc', title: '抄送行政部', status: '已抄送', dotClass: 'approved', records: [
           { name: '张某某', status: '已抄送', statusClass: 's-auto', time: '06-15 11:00', note: '抄送说明：采购申请已通过部门审批，请知晓' }
         ]},
         { type: 'node', title: '财务审批', status: '已拒绝', dotClass: 'rejected', records: [
@@ -1256,7 +1264,7 @@ const approvalData = {
         { type: 'node', title: '部门经理审批', status: '已通过', dotClass: 'approved', records: [
           { name: '王经理', status: '已通过', statusClass: 's-approved', time: '06-16 09:00', comment: '已更换供应商，同意' }
         ]},
-        { type: 'node', title: '抄送行政部', status: '已抄送', dotClass: 'approved', records: [
+        { type: 'node', nodeType: 'cc', title: '抄送行政部', status: '已抄送', dotClass: 'approved', records: [
           { name: '张某某', status: '已抄送', statusClass: 's-auto', time: '06-16 09:00', note: '回退后中间抄送节点重新执行，再次发送通知' }
         ]},
         { type: 'node', title: '财务审批', status: '已通过', dotClass: 'approved', records: [
@@ -1421,7 +1429,7 @@ const approvalData = {
         { type: 'node', title: '部门经理审批', status: '已通过', dotClass: 'approved', records: [
           { name: '王经理', status: '已通过', statusClass: 's-approved', time: '07-02 11:30', comment: '同意' }
         ]},
-        { type: 'node', title: '抄送通知', status: '已抄送', dotClass: 'approved', records: [
+        { type: 'node', nodeType: 'cc', title: '抄送通知', status: '已抄送', dotClass: 'approved', records: [
           { name: 'Sukey Wu（我）', status: '已抄送', statusClass: 's-auto', time: '07-02 11:30', note: '抄送说明：部门经理已通过，请知晓后续行程安排' }
         ]},
         { type: 'node', title: '财务审批', status: '当前节点', dotClass: 'current', isCurrent: true, records: [
@@ -1464,7 +1472,7 @@ const approvalData = {
       ],
       timeline: [
         { type: 'start', title: '开始', status: '已提交', time: '06-22 14:00', dotClass: 'start' },
-        { type: 'node', title: '抄送通知', status: '已抄送', dotClass: 'approved', records: [
+        { type: 'node', nodeType: 'cc', title: '抄送通知', status: '已抄送', dotClass: 'approved', records: [
           { name: 'Sukey Wu（我）', status: '已抄送', statusClass: 's-auto', time: '06-22 15:00', note: '抄送说明：采购申请已提交，请知晓' }
         ]},
         { type: 'node', title: '预算审批', status: '已拒绝', dotClass: 'rejected', records: [
@@ -1780,18 +1788,34 @@ function renderFormInfoCard(d) {
 }
 
 // --- 详情页公共渲染：审批流程进度卡片 ---
+// 审批节点标题加实时序号前缀（每轮独立重计）；单人审批环节合并为一行式
 function renderTimelineCard(d) {
   let html = `<div class="info-card"><div class="info-card-title">审批流程</div><div class="info-card-body"><div class="timeline">`;
+  let approvalSeq = 0; // 当前轮内审批环节计数（渲染时实时计算）
   (d.timeline || []).forEach(node => {
     if (node.type === 'round') {
+      approvalSeq = 0;
       html += `<div class="round-divider"><div class="round-divider-line"></div><div class="round-divider-text">── ${node.label} ──</div><div class="round-divider-line"></div></div>`;
       return;
     }
+    // type:'node' 且非抄送（nodeType:'cc'）的条目视为审批环节，占用序号
+    const isApprovalStep = node.type === 'node' && node.nodeType !== 'cc';
+    let title = node.title;
+    if (isApprovalStep) { title = approvalSeqPrefix(approvalSeq) + title; approvalSeq++; }
     const dotIcon = getDotIcon(node.dotClass);
     html += `<div class="timeline-node"><div class="timeline-dot ${node.dotClass}">${dotIcon}</div>`;
-    html += `<div class="timeline-node-title">${node.title}</div>`;
-    html += `<div class="timeline-node-status">${node.status}${node.time ? ' ' + node.time : ''}</div>`;
-    if (node.records) node.records.forEach(r => { html += renderApprovalRecord(r); });
+    if (isApprovalStep && node.records && node.records.length === 1) {
+      // 单人审批环节：标题 + 记录合并为一行
+      const r = node.records[0];
+      const timeHtml = r.time ? `<span class="approval-record-time">${r.time}</span>` : '';
+      html += `<div class="timeline-inline-row"><span class="timeline-node-title">${title}</span><span class="approval-record-name">${r.name}</span><span class="approval-record-status ${r.statusClass}">${r.status}</span>${timeHtml}</div>`;
+      if (r.comment) html += `<div class="timeline-inline-comment">意见：${r.comment}</div>`;
+      if (r.note) html += `<div class="approval-record-note">${r.note}</div>`;
+    } else {
+      html += `<div class="timeline-node-title">${title}</div>`;
+      html += `<div class="timeline-node-status">${node.status}${node.time ? ' ' + node.time : ''}</div>`;
+      if (node.records) node.records.forEach(r => { html += renderApprovalRecord(r); });
+    }
     html += `</div>`;
   });
   html += `</div></div></div>`;
@@ -1922,6 +1946,12 @@ function renderInitiatorDetail() {
 
   html += `</div>`;
   return html;
+}
+
+// --- 审批环节序号（展示时实时计算，不写入 name、不落库） ---
+const APPROVAL_SEQ_CHARS = ['①','②','③','④','⑤','⑥','⑦','⑧','⑨','⑩'];
+function approvalSeqPrefix(index) {
+  return (index < 10 ? APPROVAL_SEQ_CHARS[index] : String(index + 1)) + ' ';
 }
 
 // --- 时间线图标 ---
@@ -2732,15 +2762,21 @@ function renderDesignerView() {
 }
 
 // 单个节点卡片（垂直画布）
+// 审批节点标题按其在 nodes 中是第几个审批节点实时加序号前缀（不写入 name）
 function renderFlowNodeCard(node) {
   const summary = getNodeSummary(node);
   const isWarning = summary.includes('⚠');
   const deletable = node.type === 'approval' || node.type === 'cc';
+  let cardTitle = escHtml(node.name);
+  if (node.type === 'approval') {
+    const seq = workflowNodes.filter(n => n.type === 'approval').findIndex(n => n.id === node.id);
+    cardTitle = approvalSeqPrefix(seq) + cardTitle;
+  }
   let html = '<div class="node-card ' + (selectedNodeId === node.id ? 'selected' : '') + '" onclick="openNodeConfig(\'' + node.id + '\')">';
   if (deletable) {
     html += '<span class="node-card-del" title="删除节点" onclick="event.stopPropagation();deleteFlowNode(\'' + node.id + '\')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span>';
   }
-  html += '<div class="node-card-header"><div class="node-card-icon ' + node.type + '">' + (nodeIcons[node.type] || '') + '</div><span class="node-card-title">' + escHtml(node.name) + '</span>';
+  html += '<div class="node-card-header"><div class="node-card-icon ' + node.type + '">' + (nodeIcons[node.type] || '') + '</div><span class="node-card-title">' + cardTitle + '</span>';
   if (node.code) html += '<span style="margin-left:auto;font-size:10px;color:var(--md-outline);font-family:var(--font-family-mono)">' + node.code + '</span>';
   html += '</div>';
   html += '<div class="node-card-body"><div class="node-card-summary' + (isWarning ? ' warning' : '') + '">' + summary + '</div></div>';
@@ -2816,11 +2852,11 @@ function insertFlowNode(type) {
   const code = nextNodeCode(type);
   let node;
   if (type === 'approval') {
-    node = { id: code, type: 'approval', name: '审批节点', code: code,
+    node = { id: code, type: 'approval', name: '审批', code: code,
       config: { mode: 'single', approverType: 'fixed', approvers: [], paramRef: '', orgType: 'direct-supervisor', orgDept: '',
         emptyHandler: 'transfer-to-owner', emptyHandlerPerson: '', rejectBehavior: 'end', rollbackTarget: '', commentRequired: false } };
   } else {
-    node = { id: code, type: 'cc', name: '抄送节点', code: code,
+    node = { id: code, type: 'cc', name: '抄送', code: code,
       config: { recipients: [], recipientsType: 'fixed', recipientsParamRef: '', note: '' } };
   }
   workflowNodes.splice(idx, 0, node);
